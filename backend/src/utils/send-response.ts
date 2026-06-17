@@ -1,9 +1,9 @@
-import { Response } from "express";
+import { Response } from 'express'
 
 interface ApiResponse<T> {
-  success: boolean;
-  message: string;
-  data?: T;
+  success: boolean
+  message: string
+  data?: T
 }
 
 export const sendResponse = <T>(
@@ -15,12 +15,12 @@ export const sendResponse = <T>(
 ): void => {
   const responsePayload: ApiResponse<T> = {
     success,
-    message,
-  };
-
-  if (data !== undefined) {
-    responsePayload.data = data;
+    message
   }
 
-  res.status(statusCode).json(responsePayload);
-};
+  if (data !== undefined) {
+    responsePayload.data = data
+  }
+
+  res.status(statusCode).json(responsePayload)
+}

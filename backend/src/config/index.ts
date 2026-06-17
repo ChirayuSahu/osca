@@ -1,8 +1,8 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv'
 
-dotenv.config();
+dotenv.config()
 
 export const config = {
-  port: process.env.PORT || 8000,
-  nodeEnv: process.env.NODE_ENV || "development",
-};
+  port: process.env.PORT ?? '8000',
+  nodeEnv: process.env.NODE_ENV ?? 'development'
+}
