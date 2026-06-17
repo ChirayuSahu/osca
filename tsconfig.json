@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@/*": ["./frontend/src/*"]
+    }
+  },
+  "include": [
+    "backend/src/**/*.ts",
+    "backend/prisma.config.ts",
+    "frontend/src/**/*.ts",
+    "frontend/src/**/*.tsx",
+    "frontend/next.config.ts"
+  ]
+}
