@@ -27,7 +27,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production
+RUN npm ci --only=production --ignore-scripts
 
 # Copy compiled files and generated prisma client from builder
 COPY --from=builder /usr/src/app/dist ./dist
