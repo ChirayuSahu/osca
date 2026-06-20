@@ -9,5 +9,6 @@ export const getRedisConnectionOptions = (): ConnectionOptions => ({
   host: config.redis.host,
   port: config.redis.port,
   password: config.redis.password,
-  maxRetriesPerRequest: null
+  maxRetriesPerRequest: null,
+  ...(config.redis.tls ? { tls: {} } : {})
 })
