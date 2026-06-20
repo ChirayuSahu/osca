@@ -1,0 +1,21 @@
+$kind: http-request
+name: Create/Upsert Recommendation
+url: "{{BASE_URL}}/api/v1/recommendations"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "userId": "USER_ID_HERE",
+      "repositoryId": "REPO_ID_HERE",
+      "fitScore": 92.5,
+      "explanation": "You have strong React and TypeScript experience and this repository actively requires React contributors.",
+      "roadmap": [
+        "Read contributing guidelines",
+        "Setup project environment",
+        "Pick a good first issue"
+      ]
+    }
+order: 1000

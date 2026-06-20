@@ -1,0 +1,7 @@
+$kind: http-request
+name: Delete Repository
+url: "{{BASE_URL}}/api/v1/repositories/REPO_ID_HERE"
+method: DELETE
+headers:
+  Authorization: "Bearer {{JWT_TOKEN}}"
+order: 4000

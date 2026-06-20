@@ -1,0 +1,7 @@
+$kind: http-request
+name: List Repositories
+url: "{{BASE_URL}}/api/v1/repositories?page=1&limit=10"
+method: GET
+headers:
+  Authorization: "Bearer {{JWT_TOKEN}}"
+order: 2000

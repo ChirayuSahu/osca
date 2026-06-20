@@ -1,0 +1,14 @@
+$kind: http-request
+name: Create/Upsert Repository
+url: "{{BASE_URL}}/api/v1/repositories"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: "Bearer {{JWT_TOKEN}}"
+body:
+  type: text
+  content: |-
+    {
+      "fullName": "facebook/react"
+    }
+order: 1000

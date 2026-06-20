@@ -1,0 +1,9 @@
+$kind: http-request
+name: List Recommendations
+url: "{{BASE_URL}}/api/v1/recommendations?userId=USER_ID_HERE&page=1&limit=10"
+method: GET
+queryParams:
+  userId: USER_ID_HERE
+  page: 1
+  limit: 10
+order: 2000

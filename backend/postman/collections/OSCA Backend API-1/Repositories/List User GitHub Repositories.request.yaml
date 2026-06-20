@@ -1,0 +1,7 @@
+$kind: http-request
+name: List User GitHub Repositories
+url: "{{BASE_URL}}/api/v1/repositories/github?page=1&limit=10"
+method: GET
+headers:
+  Authorization: "Bearer {{JWT_TOKEN}}"
+order: 1500

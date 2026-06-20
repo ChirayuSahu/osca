@@ -4,6 +4,12 @@ interface ApiResponse<T> {
   success: boolean
   message: string
   data?: T
+  pagination?: {
+    page: number
+    limit: number
+    total?: number
+    totalPages?: number
+  }
 }
 
 export const sendResponse = <T>(
@@ -11,7 +17,8 @@ export const sendResponse = <T>(
   statusCode: number,
   success: boolean,
   message: string,
-  data?: T
+  data?: T,
+  pagination?: ApiResponse<T>['pagination']
 ): void => {
   const responsePayload: ApiResponse<T> = {
     success,
@@ -20,6 +27,10 @@ export const sendResponse = <T>(
 
   if (data !== undefined) {
     responsePayload.data = data
+  }
+
+  if (pagination !== undefined) {
+    responsePayload.pagination = pagination
   }
 
   res.status(statusCode).json(responsePayload)

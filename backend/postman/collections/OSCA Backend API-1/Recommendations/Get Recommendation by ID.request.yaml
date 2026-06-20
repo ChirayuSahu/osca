@@ -1,0 +1,4 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/recommendations/REC_ID_HERE"
+method: GET
+order: 3000
