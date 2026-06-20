@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config'
+import { AppError } from '../lib/errors'
 
 export interface RequestWithUser extends Request {
   user?: {
@@ -14,10 +15,7 @@ export const authMiddleware = (req: RequestWithUser, res: Response, next: NextFu
   const authHeader = req.headers.authorization
 
   if (authHeader === undefined || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({
-      success: false,
-      message: 'Access token is missing or invalid'
-    })
+    next(new AppError('Access token is missing or invalid', 401))
     return
   }
 
@@ -27,11 +25,7 @@ export const authMiddleware = (req: RequestWithUser, res: Response, next: NextFu
     const decoded = jwt.verify(token, config.jwtSecret) as { id: string, username: string, email: string }
     req.user = decoded
     next()
-  } catch (error) {
-    console.error('JWT Verification failed:', error)
-    res.status(401).json({
-      success: false,
-      message: 'Access token is invalid or expired'
-    })
+  } catch {
+    next(new AppError('Access token is invalid or expired', 401))
   }
 }
