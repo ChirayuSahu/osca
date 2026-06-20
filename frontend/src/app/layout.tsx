@@ -1,3 +1,49 @@
+<<<<<<< HEAD
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import { Navbar } from "@/components/layout/Navbar";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { Footer } from "@/components/layout/Footer";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "App",
+  description: "Next.js App Router with Express Backend",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        <Navbar />
+        <div className="flex pt-16 pb-16 min-h-screen">
+          <Sidebar />
+          <main className="flex-1 md:ml-64 p-6">
+            {children}
+          </main>
+        </div>
+        <Footer />
+      </body>
+    </html>
+  );
+}
+=======
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -35,3 +81,4 @@ export default function RootLayout({
     </html>
   );
 }
+>>>>>>> ad50349f5a4251c13553b26c3238d1ac026ce471
