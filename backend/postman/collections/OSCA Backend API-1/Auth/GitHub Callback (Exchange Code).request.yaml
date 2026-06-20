@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/auth/github/callback?code=YOUR_OAUTH_CODE_HERE"
+method: GET
+queryParams:
+  code: YOUR_OAUTH_CODE_HERE
+order: 2000

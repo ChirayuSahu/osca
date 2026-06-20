@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/users/USER_ID_HERE"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "John Doe Updated",
+      "skills": ["React", "TypeScript", "Node.js", "Prisma"]
+    }
+order: 3000
