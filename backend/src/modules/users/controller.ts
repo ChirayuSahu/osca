@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
+import { RequestWithUser } from '../../middlewares/auth.middleware'
 
 const getUser = (req: Request, res: Response, next: NextFunction): void => {
   const id = String(req.params.id)
@@ -24,8 +25,17 @@ const getUser = (req: Request, res: Response, next: NextFunction): void => {
     })
 }
 
-const updateUser = (req: Request, res: Response, next: NextFunction): void => {
+const updateUser = (req: RequestWithUser, res: Response, next: NextFunction): void => {
   const id = String(req.params.id)
+
+  if (req.user?.id !== id) {
+    res.status(403).json({
+      success: false,
+      message: 'Forbidden: You can only update your own user profile'
+    })
+    return
+  }
+
   const { name, email, avatarUrl, skills, contributionScore } = req.body
 
   const data: Record<string, any> = {}
