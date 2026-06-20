@@ -1,8 +1,11 @@
 import { Router } from 'express'
 import { RecommendationController } from './controller'
+import { authMiddleware } from '../../middlewares/auth.middleware'
 import { paginationMiddleware } from '../../middlewares/pagination.middleware'
 
 const router = Router()
+
+router.use(authMiddleware)
 
 router.post('/', RecommendationController.createRecommendation)
 router.get('/', paginationMiddleware, RecommendationController.listRecommendations)

@@ -1,0 +1,980 @@
+openapi: 3.0.3
+info:
+  title: OSCA Backend API
+  description: |
+    Open Source Contributor Matching Platform backend.
+
+    ## Architecture overview
+
+    - **Route -> Controller -> Service** modular layout under `/api/v1`
+    - **JWT bearer auth** on protected routes (`Authorization: Bearer <token>`)
+    - **Deep GitHub analysis** runs asynchronously via BullMQ + Redis and returns `202 Accepted` with a job id
+    - Poll job progress at `GET /jobs/{queueName}/{jobId}`
+
+    ## Async analysis queues
+
+    | Queue name | Trigger |
+    |------------|---------|
+    | `repository-analysis` | `POST /repositories` or `POST /repositories/analyze` |
+    | `contributor-analysis` | `POST /users/{id}/analyze` |
+
+    OAuth access tokens are stored server-side and are never returned in API responses.
+  version: 1.0.0
+  contact:
+    name: OSCA Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+tags:
+  - name: Health
+    description: Service health checks
+  - name: Auth
+    description: GitHub OAuth and JWT issuance
+  - name: Users
+    description: User profiles and contributor analysis
+  - name: Repositories
+    description: Repository CRUD, GitHub listing, and deep analysis
+  - name: Recommendations
+    description: User-repository recommendations (owner-scoped)
+  - name: Jobs
+    description: BullMQ job status polling
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthDetails'
+
+  /api/v1/auth/github:
+    get:
+      tags: [Auth]
+      summary: Redirect to GitHub OAuth
+      description: Redirects the browser to GitHub authorization page.
+      operationId: redirectToGithub
+      responses:
+        '302':
+          description: Redirect to GitHub
+
+  /api/v1/auth/github/callback:
+    get:
+      tags: [Auth]
+      summary: GitHub OAuth callback
+      description: Exchanges authorization code for access token, upserts user, returns JWT.
+      operationId: handleGithubCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+
+  /api/v1/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get own user profile
+      description: Self-service only. OAuth tokens are never included in the response.
+      operationId: getUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserSelf'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Users]
+      summary: Update own user profile
+      operationId: updateUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserSelf'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/users/{id}/analyze:
+    post:
+      tags: [Users]
+      summary: Queue contributor profile analysis
+      description: Enqueues deep GitHub profile skill extraction. Poll the returned statusUrl for progress.
+      operationId: analyzeContributorProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '202':
+          description: Analysis queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QueuedJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/repositories:
+    get:
+      tags: [Repositories]
+      summary: List stored repositories
+      operationId: listRepositories
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated repository list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Repository'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Repositories]
+      summary: Queue deep repository analysis
+      description: |
+        Enqueues BullMQ repository analysis (languages, frameworks, tech stack, CI/CD).
+        Accepts a GitHub URL, owner/repo pair, or fullName.
+      operationId: queueRepositoryAnalysis
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryAnalysisRequest'
+            examples:
+              byUrl:
+                summary: By GitHub URL
+                value:
+                  url: https://github.com/facebook/react
+              byFullName:
+                summary: By owner/repo shorthand
+                value:
+                  fullName: facebook/react
+              byOwnerRepo:
+                summary: By separate fields
+                value:
+                  owner: facebook
+                  repo: react
+      responses:
+        '202':
+          description: Analysis queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QueuedJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/repositories/analyze:
+    post:
+      tags: [Repositories]
+      summary: Queue deep repository analysis (alias)
+      description: Alias of `POST /repositories`. Same request body and async behavior.
+      operationId: queueRepositoryAnalysisAlias
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryAnalysisRequest'
+      responses:
+        '202':
+          description: Analysis queued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/QueuedJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/repositories/github:
+    get:
+      tags: [Repositories]
+      summary: List authenticated user's GitHub repositories
+      description: Lightweight synchronous listing from GitHub API (no deep analysis).
+      operationId: listGithubRepositories
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated GitHub repository summaries
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/GithubRepoSummary'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/repositories/{id}:
+    get:
+      tags: [Repositories]
+      summary: Get repository by ID
+      operationId: getRepository
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RepositoryId'
+      responses:
+        '200':
+          description: Repository found
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Repository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Repositories]
+      summary: Delete repository
+      operationId: deleteRepository
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RepositoryId'
+      responses:
+        '200':
+          description: Repository deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/recommendations:
+    get:
+      tags: [Recommendations]
+      summary: List own recommendations
+      operationId: listRecommendations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Paginated recommendations for authenticated user
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RecommendationWithRepository'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Recommendations]
+      summary: Create or upsert a recommendation
+      description: Authenticated user can only create recommendations for themselves.
+      operationId: createRecommendation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRecommendationRequest'
+      responses:
+        '201':
+          description: Recommendation created or updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Recommendation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/recommendations/{id}:
+    get:
+      tags: [Recommendations]
+      summary: Get recommendation by ID
+      operationId: getRecommendation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RecommendationId'
+      responses:
+        '200':
+          description: Recommendation found
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RecommendationWithRepository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Recommendations]
+      summary: Update recommendation status
+      operationId: updateRecommendationStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RecommendationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  example: ACCEPTED
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Recommendation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Recommendations]
+      summary: Delete recommendation
+      operationId: deleteRecommendation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RecommendationId'
+      responses:
+        '200':
+          description: Recommendation deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiSuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/jobs/{queueName}/{jobId}:
+    get:
+      tags: [Jobs]
+      summary: Poll async job status
+      description: |
+        Returns BullMQ job state and progress. Only the user who enqueued the job may view its status.
+
+        Valid queue names: `repository-analysis`, `contributor-analysis`
+      operationId: getJobStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: queueName
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [repository-analysis, contributor-analysis]
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status retrieved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/JobStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RepositoryId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RecommendationId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    Unauthorized:
+      description: Missing or invalid JWT
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    Forbidden:
+      description: Access denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+    BadGateway:
+      description: Upstream GitHub error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiErrorResponse'
+
+  schemas:
+    ApiSuccessResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+        data:
+          type: object
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ApiErrorResponse:
+      type: object
+      required: [success, message]
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            stack:
+              type: string
+              description: Present in development only
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    HealthDetails:
+      type: object
+      properties:
+        status:
+          type: string
+          example: UP
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserPublic'
+        token:
+          type: string
+          description: JWT bearer token
+
+    UserPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+
+    UserSelf:
+      allOf:
+        - $ref: '#/components/schemas/UserPublic'
+        - type: object
+          properties:
+            skills:
+              type: array
+              items:
+                type: string
+            contributionScore:
+              type: number
+            contributorProfile:
+              $ref: '#/components/schemas/ContributorProfile'
+            oauthAccounts:
+              type: array
+              description: Linked providers without secret tokens
+              items:
+                $ref: '#/components/schemas/OAuthAccountPublic'
+
+    OAuthAccountPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+          example: github
+        providerId:
+          type: string
+        username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ContributorProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        skillScore:
+          type: number
+        activityScore:
+          type: number
+        diversityScore:
+          type: number
+        qualityScore:
+          type: number
+        overallScore:
+          type: number
+        repositoryExperience:
+          type: object
+          additionalProperties: true
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        contributionScore:
+          type: number
+
+    RepositoryAnalysisRequest:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+          example: https://github.com/facebook/react
+        owner:
+          type: string
+          example: facebook
+        repo:
+          type: string
+          example: react
+        fullName:
+          type: string
+          example: facebook/react
+
+    QueuedJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+        queue:
+          type: string
+        statusUrl:
+          type: string
+          example: /api/v1/jobs/repository-analysis/1
+
+    JobStatus:
+      type: object
+      properties:
+        jobId:
+          type: string
+        queue:
+          type: string
+        state:
+          type: string
+          example: active
+        progress:
+          type: object
+          properties:
+            percent:
+              type: integer
+            message:
+              type: string
+        result:
+          nullable: true
+        failedReason:
+          type: string
+          nullable: true
+        attemptsMade:
+          type: integer
+        maxAttempts:
+          type: integer
+        createdAt:
+          type: integer
+        finishedAt:
+          type: integer
+          nullable: true
+
+    Repository:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        owner:
+          type: string
+        fullName:
+          type: string
+        description:
+          type: string
+          nullable: true
+        url:
+          type: string
+        stars:
+          type: integer
+        forks:
+          type: integer
+        openIssues:
+          type: integer
+        languages:
+          type: object
+          additionalProperties:
+            type: integer
+        frameworks:
+          type: array
+          items:
+            type: string
+        techStack:
+          type: array
+          items:
+            type: string
+        ciCd:
+          type: array
+          items:
+            type: string
+        dependencies:
+          type: object
+          nullable: true
+        folderStructure:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GithubRepoSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        full_name:
+          type: string
+        html_url:
+          type: string
+        description:
+          type: string
+          nullable: true
+        stargazers_count:
+          type: integer
+        forks_count:
+          type: integer
+        open_issues_count:
+          type: integer
+        private:
+          type: boolean
+
+    Recommendation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        repositoryId:
+          type: string
+          format: uuid
+        fitScore:
+          type: number
+        explanation:
+          type: string
+        roadmap:
+          type: object
+          nullable: true
+        status:
+          type: string
+          example: PENDING
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RecommendationWithRepository:
+      allOf:
+        - $ref: '#/components/schemas/Recommendation'
+        - type: object
+          properties:
+            repository:
+              $ref: '#/components/schemas/Repository'
+
+    CreateRecommendationRequest:
+      type: object
+      required: [repositoryId, explanation]
+      properties:
+        userId:
+          type: string
+          format: uuid
+          description: Optional; defaults to authenticated user
+        repositoryId:
+          type: string
+          format: uuid
+        fitScore:
+          type: number
+        explanation:
+          type: string
+        roadmap:
+          type: object
