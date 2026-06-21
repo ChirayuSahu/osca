@@ -12,6 +12,7 @@ RUN npm ci
 
 # Copy source files
 COPY src ./src/
+COPY swagger.yaml ./
 
 # Generate Prisma Client
 RUN npx prisma generate
@@ -31,6 +32,7 @@ RUN npm ci --only=production --ignore-scripts
 
 # Copy compiled files and generated prisma client from builder
 COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/swagger.yaml ./swagger.yaml
 COPY --from=builder /usr/src/app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /usr/src/app/node_modules/@prisma/client ./node_modules/@prisma/client
 
