@@ -28,6 +28,8 @@ router.get('/:id', authMiddleware, RepositoryController.getRepository)
 
 router.get('/:id/threads', authMiddleware, paginationMiddleware, RepositoryController.listRepositoryThreads)
 
+router.post('/:id/like', authMiddleware, RepositoryController.toggleRepositoryLike)
+
 router.delete('/:id', authMiddleware, RepositoryController.deleteRepository)
 
 

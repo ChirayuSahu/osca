@@ -23,6 +23,8 @@ model User {
   threadComments     ThreadComment[]
   commentVotes       CommentVote[]
   repositoryLikes    RepositoryLike[]
+  interactions       UserInteraction[]
+  interests          UserInterest[]
 }
 
 model OAuthAccount {
@@ -164,4 +166,28 @@ model RepositoryLike {
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@unique([userId, repositoryId])
+}
+
+model UserInteraction {
+  id           String     @id @default(uuid())
+  userId       String
+  repositoryId String
+  action       String     // e.g., REPOSITORY_VIEW, REPOSITORY_LIKE, ISSUE_VIEW, ISSUE_COMMENT, CONTRIBUTION, REPOSITORY_SAVE
+  weight       Int
+  createdAt    DateTime   @default(now())
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+}
+
+model UserInterest {
+  id           String     @id @default(uuid())
+  userId       String
+  tag          String     // language or topic name
+  score        Float      @default(0.0)
+  updatedAt    DateTime   @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tag])
 }
