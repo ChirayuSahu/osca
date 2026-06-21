@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderGit2, User, Settings } from "lucide-react";
+import { LayoutDashboard, FolderGit2, User, Settings, LogOut } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
+import { useAuth } from "@/context/auth-context";
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +18,7 @@ import {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   const navItems = [
     { name: "Dashboard", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
@@ -66,6 +68,16 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={logout}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 hover:bg-red-500/10 hover:text-red-400 text-neutral-500"
+                >
+                  <LogOut className="w-4 h-4 text-neutral-500 group-hover:text-red-400" />
+                  <span>Logout</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
