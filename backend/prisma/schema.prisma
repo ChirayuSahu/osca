@@ -49,7 +49,10 @@ model Repository {
   openIssues      Int              @default(0)
   languages       Json?            // Detected languages & stats
   frameworks      String[]
+<<<<<<< HEAD
+=======
   techStack       String[]
+>>>>>>> 6a412ca414434aafc0ffe61cd5ab8fb927d96da9
   dependencies    Json?            // Dependency name and version mappings
   folderStructure Json?            // Identified layouts (e.g. frontend, backend)
   ciCd            String[]         // e.g. ["github-actions", "docker"]
