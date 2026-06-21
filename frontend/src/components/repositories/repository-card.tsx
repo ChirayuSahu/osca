@@ -72,10 +72,10 @@ export function RepositoryCard({ repo }: RepositoryCardProps) {
         </div>
 
         <a 
-          href={`/dashboard/repository/${repo.id}`}
+          href={`/dashboard/repository/import?url=https://github.com/${repo.name}`}
           className="text-xs font-normal text-neutral-400 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
         >
-          View Issues
+          View / Import Repository
           <ArrowRight className="w-3.5 h-3.5" />
         </a>
       </div>
