@@ -46,57 +46,61 @@ export default function CommentSection({ threadId }: { threadId: string }) {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-3 border-b border-white/[0.04] pb-4">
-        <MessageSquare className="w-5 h-5 text-emerald-400" />
-        <h2 className="text-lg font-medium text-white">Comments ({comments.length})</h2>
+    <div className="space-y-10 pt-4">
+      <div className="flex items-center gap-3 border-b border-white/[0.06] pb-5">
+        <MessageSquare className="w-5 h-5 text-emerald-500" />
+        <h2 className="text-xl font-medium text-white">Comments <span className="text-neutral-500 font-light">({comments.length})</span></h2>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {loading ? (
-          <div className="text-center text-neutral-500 text-sm animate-pulse">Loading comments...</div>
+          <div className="text-center text-neutral-500 text-sm animate-pulse py-8">Loading comments...</div>
         ) : comments.length === 0 ? (
-          <div className="text-neutral-500 text-sm italic">No comments yet.</div>
+          <div className="text-neutral-500 text-base font-light italic text-center py-12 bg-white/[0.01] rounded-2xl border border-white/[0.03]">No comments yet. Start the conversation!</div>
         ) : (
           comments.map(comment => (
-            <div key={comment.id} className="flex gap-4 group">
-              <div className="w-10 h-10 rounded-full shrink-0 bg-neutral-800 border border-white/[0.04] flex items-center justify-center text-neutral-400 text-sm font-medium">
+            <div key={comment.id} className="flex gap-5 group">
+              <div className="w-12 h-12 rounded-full shrink-0 bg-neutral-900 border border-white/[0.06] flex items-center justify-center text-neutral-300 text-base font-medium shadow-sm">
                 {comment.author?.name?.charAt(0) || "U"}
               </div>
-              <div className="flex-1 bg-neutral-950/50 border border-white/[0.02] group-hover:border-white/[0.06] transition-colors rounded-2xl p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-neutral-300">{comment.author?.name || "User"}</span>
-                  <span className="text-xs text-neutral-600">{new Date(comment.createdAt).toLocaleString()}</span>
+              <div className="flex-1">
+                <div className="bg-neutral-950/40 border border-white/[0.04] group-hover:border-white/[0.08] transition-all rounded-2xl rounded-tl-sm p-6 shadow-xl shadow-black/20">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-base font-medium text-neutral-200">{comment.author?.name || "User"}</span>
+                    <span className="text-xs font-medium text-neutral-500 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">
+                      {new Date(comment.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {new Date(comment.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <p className="text-base text-neutral-300 font-light leading-relaxed whitespace-pre-wrap">{comment.content}</p>
                 </div>
-                <p className="text-sm text-neutral-400 leading-relaxed whitespace-pre-wrap">{comment.content}</p>
               </div>
             </div>
           ))
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 pt-6 border-t border-white/[0.04]">
-        <div className="flex gap-4">
-          <div className="w-10 h-10 rounded-full shrink-0 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 text-sm font-bold">
+      <form onSubmit={handleSubmit} className="mt-12 pt-8 border-t border-white/[0.06]">
+        <div className="flex gap-5">
+          <div className="w-12 h-12 rounded-full shrink-0 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-base font-bold shadow-inner">
             {user?.name?.charAt(0) || "Y"}
           </div>
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 space-y-4">
             <textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              rows={3}
-              className="w-full bg-neutral-900 border border-white/[0.06] rounded-xl px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/50 transition-colors resize-none text-sm"
+              placeholder="Write a meaningful comment..."
+              rows={4}
+              className="w-full bg-neutral-950 border border-white/[0.06] rounded-2xl rounded-tl-sm px-5 py-4 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/40 transition-all resize-none text-base font-light shadow-inner"
               required
             />
             <div className="flex justify-end">
               <button 
                 type="submit" 
                 disabled={submitting || !newComment.trim()}
-                className="flex items-center gap-2 px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-xl text-sm transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-neutral-200 text-black font-semibold rounded-full text-sm transition-all disabled:opacity-50 active:scale-95 shadow-lg shadow-white/10"
               >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                Comment
+                {submitting && <Loader2 className="w-4 h-4 animate-spin text-black" />}
+                Post Comment
               </button>
             </div>
           </div>
