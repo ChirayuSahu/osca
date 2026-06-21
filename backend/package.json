@@ -5,11 +5,16 @@
   "main": "index.js",
   "scripts": {
     "start": "node dist/index.js",
+<<<<<<< HEAD
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+=======
     "build": "prisma generate && tsc",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
+>>>>>>> 6a412ca414434aafc0ffe61cd5ab8fb927d96da9
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -19,6 +24,13 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+<<<<<<< HEAD
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.22.0"
+=======
     "bullmq": "^5.79.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -28,6 +40,7 @@
     "pg": "^8.22.0",
     "swagger-ui-express": "^5.0.1",
     "yamljs": "^0.3.0"
+>>>>>>> 6a412ca414434aafc0ffe61cd5ab8fb927d96da9
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -35,8 +48,11 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.9.3",
     "@types/pg": "^8.20.0",
+<<<<<<< HEAD
+=======
     "@types/swagger-ui-express": "^4.1.8",
     "@types/yamljs": "^0.2.34",
+>>>>>>> 6a412ca414434aafc0ffe61cd5ab8fb927d96da9
     "prisma": "^7.8.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^6.0.3"

@@ -1,4 +1,5 @@
 export { Button } from "./button";
-export { Input } from "./Input";
-export { Card } from "./Card";
-export { Spinner } from "./Spinner";
+export { Input } from "./input";
+export { Card } from "./card";
+export { Spinner } from "./spinner";
+
