@@ -26,6 +26,8 @@ router.get('/', authMiddleware, paginationMiddleware, RepositoryController.listR
 
 router.get('/:id', authMiddleware, RepositoryController.getRepository)
 
+router.get('/:id/threads', authMiddleware, paginationMiddleware, RepositoryController.listRepositoryThreads)
+
 router.delete('/:id', authMiddleware, RepositoryController.deleteRepository)
 
 

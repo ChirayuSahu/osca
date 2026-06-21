@@ -111,6 +111,42 @@ const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithP
   })
 })
 
+const listRepositoryThreads = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
+  const repositoryId = String(req.params.id)
+  const skip = req.pagination?.skip ?? 0
+  const take = req.pagination?.take ?? 10
+  
+  // ensure repository exists
+  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } })
+  assertFound(repo, 'Repository not found')
+
+  const [total, threads] = await Promise.all([
+    prisma.repositoryThread.count({ where: { repositoryId } }),
+    prisma.repositoryThread.findMany({
+      where: { repositoryId },
+      skip,
+      take,
+      include: {
+        author: {
+          select: { id: true, name: true, username: true, avatarUrl: true }
+        },
+        _count: { select: { comments: true } }
+      },
+      orderBy: [
+        { isPinned: 'desc' },
+        { updatedAt: 'desc' }
+      ]
+    })
+  ])
+
+  sendResponse(res, 200, true, 'Repository threads retrieved successfully', threads, {
+    page: req.pagination?.page ?? 1,
+    limit: req.pagination?.limit ?? 10,
+    total,
+    totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
+  })
+})
+
 export const RepositoryController = {
   queueRepositoryAnalysis,
   getRepository,
@@ -118,5 +154,6 @@ export const RepositoryController = {
   deleteRepository,
   listGithubRepositories,
   listPersonalGithubRepositories,
-  listOrganizationGithubRepositories
+  listOrganizationGithubRepositories,
+  listRepositoryThreads
 }
