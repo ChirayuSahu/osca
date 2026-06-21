@@ -12,6 +12,10 @@ interface GithubRepoSummary {
   forks_count: number
   open_issues_count: number
   private: boolean
+  owner: {
+    login: string
+    type: string
+  }
 }
 
 interface PaginatedGithubRepos {
@@ -66,11 +70,47 @@ const parseGithubLinkPagination = (
 const listGithubRepositories = async (
   userId: string,
   page: number,
-  limit: number
+  limit: number,
+  affiliation: string = 'owner,collaborator,organization_member',
+  search?: string
 ): Promise<PaginatedGithubRepos> => {
   const token = await getGithubAccessToken(userId)
+
+  if (search !== undefined && search.trim() !== '') {
+    const response = await githubGetResponse(
+      `/user/repos?sort=updated&per_page=100&affiliation=${affiliation}`,
+      token
+    )
+
+    let repos = await response.json() as GithubRepoSummary[]
+    if (!Array.isArray(repos)) {
+      throw new AppError('Unexpected GitHub response while listing repositories', 502)
+    }
+
+    const query = search.toLowerCase().trim()
+    repos = repos.filter(
+      (repo) =>
+        repo.name.toLowerCase().includes(query) ||
+        (repo.description !== null && repo.description.toLowerCase().includes(query)) ||
+        repo.full_name.toLowerCase().includes(query)
+    )
+
+    const total = repos.length
+    const totalPages = Math.ceil(total / limit)
+    const startIndex = (page - 1) * limit
+    const paginatedRepos = repos.slice(startIndex, startIndex + limit)
+
+    return {
+      repos: paginatedRepos,
+      page,
+      limit,
+      total,
+      totalPages
+    }
+  }
+
   const response = await githubGetResponse(
-    `/user/repos?sort=updated&page=${page}&per_page=${limit}`,
+    `/user/repos?sort=updated&page=${page}&per_page=${limit}&affiliation=${affiliation}`,
     token
   )
 

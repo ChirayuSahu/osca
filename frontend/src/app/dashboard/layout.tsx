@@ -1,4 +1,9 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+"use client";
+
+import React, { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/auth-context";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 
 export default function DashboardLayout({
@@ -6,21 +11,32 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { token, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !token) {
+      router.push("/login");
+    }
+  }, [token, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen w-screen bg-black">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!token) {
+    return null;
+  }
+
   return (
     <SidebarProvider>
-      <div className="flex bg-black h-screen w-screen text-white font-sans overflow-hidden">
+      <div className="flex bg-black min-h-screen w-screen text-white font-sans">
         <AppSidebar />
-        <main className="flex-1 p-6 h-full flex flex-col overflow-hidden relative">
-          {/* Top Header Row with Collapse/Expand Trigger */}
-          <div className="flex-shrink-0 flex items-center mb-2 z-30">
-            <SidebarTrigger className="text-neutral-400 hover:text-white hover:bg-white/[0.02] border border-white/[0.05] bg-neutral-950/40 p-2.5 rounded-xl transition-all duration-200" />
-          </div>
-          
-          {/* Dashboard Children Content */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            {children}
-          </div>
-        </main>
+        <main className="flex-1 p-6 min-h-screen flex flex-col">{children}</main>
       </div>
     </SidebarProvider>
   );

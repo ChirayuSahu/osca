@@ -1,186 +1,253 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { SlidersHorizontal, Sparkles } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { SlidersHorizontal } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 import { SearchHeader } from "@/components/repositories/search-header";
-import { RepositoryCard } from "@/components/repositories/repository-card";
+import { RepositoryCard, Repository } from "@/components/repositories/repository-card";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  Checkbox,
+} from "@/components/ui";
 
-// Mock repositories list for demo
-const MOCK_REPOSITORIES = [
-  {
-    id: 1,
-    name: "facebook/react",
-    description: "The library for web and native user interfaces.",
-    stars: 224000,
-    forks: 46200,
-    language: "JavaScript",
-    languageColor: "bg-yellow-500",
-    matchScore: 98,
-    issuesCount: 14,
-  },
-  {
-    id: 2,
-    name: "vercel/next.js",
-    description: "The React Framework for the Web.",
-    stars: 121000,
-    forks: 26800,
-    language: "TypeScript",
-    languageColor: "bg-blue-500",
-    matchScore: 95,
-    issuesCount: 8,
-  },
-  {
-    id: 3,
-    name: "tailwindlabs/tailwindcss",
-    description: "A utility-first CSS framework for rapid UI development.",
-    stars: 83500,
-    forks: 4100,
-    language: "TypeScript",
-    languageColor: "bg-blue-500",
-    matchScore: 91,
-    issuesCount: 5,
-  },
-  {
-    id: 4,
-    name: "shadcn/ui",
-    description: "Beautifully designed components that you can copy and paste into your apps.",
-    stars: 71000,
-    forks: 5300,
-    language: "TypeScript",
-    languageColor: "bg-blue-500",
-    matchScore: 88,
-    issuesCount: 12,
-  },
-  {
-    id: 5,
-    name: "nodejs/node",
-    description: "Node.js JavaScript runtime ✨🐢🚀",
-    stars: 104000,
-    forks: 29000,
-    language: "JavaScript",
-    languageColor: "bg-yellow-500",
-    matchScore: 84,
-    issuesCount: 22,
-  },
-  {
-    id: 6,
-    name: "rust-lang/rust",
-    description: "Empowering everyone to build reliable and efficient software.",
-    stars: 97000,
-    forks: 12500,
-    language: "Rust",
-    languageColor: "bg-orange-600",
-    matchScore: 78,
-    issuesCount: 45,
-  },
-  {
-    id: 7,
-    name: "golang/go",
-    description: "The Go programming language codebase.",
-    stars: 122000,
-    forks: 16900,
-    language: "Go",
-    languageColor: "bg-cyan-500",
-    matchScore: 75,
-    issuesCount: 38,
-  },
-  {
-    id: 8,
-    name: "denoland/deno",
-    description: "A modern, secure runtime for JavaScript and TypeScript.",
-    stars: 93000,
-    forks: 5100,
-    language: "TypeScript",
-    languageColor: "bg-blue-500",
-    matchScore: 74,
-    issuesCount: 18,
-  },
-  {
-    id: 9,
-    name: "kubernetes/kubernetes",
-    description: "Production-Grade Container Scheduling and Management.",
-    stars: 108000,
-    forks: 39000,
-    language: "Go",
-    languageColor: "bg-cyan-500",
-    matchScore: 70,
-    issuesCount: 52,
-  },
-  {
-    id: 10,
-    name: "python/cpython",
-    description: "The Python programming language implementation.",
-    stars: 62000,
-    forks: 28500,
-    language: "Python",
-    languageColor: "bg-blue-700",
-    matchScore: 68,
-    issuesCount: 30,
-  },
-  {
-    id: 11,
-    name: "django/django",
-    description: "The Web framework for perfectionists with deadlines.",
-    stars: 78000,
-    forks: 31000,
-    language: "Python",
-    languageColor: "bg-blue-700",
-    matchScore: 65,
-    issuesCount: 25,
-  },
-  {
-    id: 12,
-    name: "mrdoob/three.js",
-    description: "JavaScript 3D Library.",
-    stars: 102000,
-    forks: 35000,
-    language: "JavaScript",
-    languageColor: "bg-yellow-500",
-    matchScore: 62,
-    issuesCount: 15,
-  }
-];
+interface ExtendedRepository extends Repository {
+  ownerType: string;
+}
+
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
 
 function RepositoriesContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { token } = useAuth();
+  
   const queryParam = searchParams.get("q") || "";
+  const pageParam = parseInt(searchParams.get("page") || "1", 10);
+  const includeOrgParam = searchParams.get("includeOrg") === "true";
+  
   const [searchQuery, setSearchQuery] = useState(queryParam);
+  const [activePage, setActivePage] = useState(pageParam);
+  const [includeOrg, setIncludeOrg] = useState(includeOrgParam);
+  const [repos, setRepos] = useState<ExtendedRepository[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    limit: 8,
+    total: 0,
+    totalPages: 1
+  });
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+
+  // Sync state with URL when URL changes externally
   useEffect(() => {
     setSearchQuery(queryParam);
   }, [queryParam]);
 
-  const filteredRepos = MOCK_REPOSITORIES.filter(repo =>
-    repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    repo.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    repo.language.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    setActivePage(pageParam);
+  }, [pageParam]);
+
+  useEffect(() => {
+    setIncludeOrg(includeOrgParam);
+  }, [includeOrgParam]);
+
+  // Debounced search sync to URL
+  useEffect(() => {
+    if (searchQuery.trim() === queryParam.trim()) return;
+
+    const handler = setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      if (searchQuery.trim()) {
+        params.set("q", searchQuery.trim());
+      } else {
+        params.delete("q");
+      }
+      params.set("page", "1");
+      router.push(`/dashboard/repositories?${params.toString()}`);
+    }, 300);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery, queryParam, router]);
+
+  // Fetch GitHub repos from backend
+  useEffect(() => {
+    async function fetchRepos() {
+      if (!token) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const res = await fetch(
+          `${API_URL}/repositories/github?page=${activePage}&limit=8&q=${encodeURIComponent(queryParam)}&includeOrg=${includeOrg}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.data)) {
+            const mappedRepos: ExtendedRepository[] = data.data.map((repo: {
+              id: number;
+              full_name: string;
+              description: string | null;
+              stargazers_count: number;
+              forks_count: number;
+              language: string | null;
+              open_issues_count: number;
+              owner?: { type: string };
+            }, index: number) => {
+              const lang = repo.language || "TypeScript";
+              
+              // Map language to color
+              let langColor = "bg-neutral-500";
+              if (lang === "TypeScript") langColor = "bg-blue-500";
+              else if (lang === "JavaScript") langColor = "bg-yellow-500";
+              else if (lang === "Python") langColor = "bg-blue-700";
+              else if (lang === "Go") langColor = "bg-cyan-500";
+              else if (lang === "Rust") langColor = "bg-orange-600";
+              else if (lang === "HTML") langColor = "bg-red-500";
+              else if (lang === "CSS") langColor = "bg-purple-500";
+
+              return {
+                id: repo.id,
+                name: repo.full_name,
+                description: repo.description || "No description provided.",
+                stars: repo.stargazers_count || 0,
+                forks: repo.forks_count || 0,
+                language: lang,
+                languageColor: langColor,
+                matchScore: 95 - (index % 5) * 3, // Mock match score
+                issuesCount: repo.open_issues_count || 0,
+                ownerType: repo.owner?.type || "User"
+              };
+            });
+            setRepos(mappedRepos);
+            
+            if (data.pagination) {
+              setPagination(data.pagination);
+            }
+          } else {
+            setError("Failed to parse repository list.");
+          }
+        } else {
+          setError("Failed to load GitHub repositories.");
+        }
+      } catch (err) {
+        console.error("Error fetching repositories:", err);
+        setError("An error occurred while loading repositories.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchRepos();
+  }, [token, activePage, includeOrg, queryParam, API_URL]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > pagination.totalPages) return;
+    
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("page", newPage.toString());
+    router.push(`/dashboard/repositories?${params.toString()}`);
+  };
+
+  const handleIncludeOrgChange = (checked: boolean) => {
+    setIncludeOrg(checked);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("includeOrg", checked.toString());
+    params.set("page", "1");
+    router.push(`/dashboard/repositories?${params.toString()}`);
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const { page, totalPages } = pagination;
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+
+      if (start > 2) {
+        pages.push("ellipsis-start");
+      }
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (end < totalPages - 1) {
+        pages.push("ellipsis-end");
+      }
+
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   return (
-    <div className="max-w-5xl w-full mx-auto h-full flex flex-col select-none relative overflow-hidden">
+    <div className="max-w-7xl w-full mx-auto flex flex-col select-none relative space-y-8 pb-12">
       {/* Search Header component */}
       <SearchHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
-      {/* GitHub Repository Cards List (Scrollable) */}
-      <div className="flex-1 overflow-y-auto space-y-6 pb-6 pr-2 scrollbar-thin scrollbar-thumb-white/[0.05]">
+      {/* GitHub Repository Cards List */}
+      <div className="space-y-6">
         <div className="flex items-center justify-between border-b border-white/[0.04] pb-4 sticky top-0 bg-black/80 backdrop-blur-md z-10">
-          <div className="space-y-1">
-            <h2 className="text-lg font-normal text-white tracking-tight flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-emerald-400" />
-              Personalized Recommendations
-            </h2>
-            <p className="text-xs text-neutral-400 font-light">Matched against your profile</p>
+          {/* Include Org checkbox */}
+          <div className="flex items-center gap-2 mb-4">
+            <label className="flex items-center gap-2.5 text-xs text-neutral-400 font-light hover:text-white cursor-pointer select-none">
+              <Checkbox
+                checked={includeOrg}
+                onCheckedChange={handleIncludeOrgChange}
+              />
+              Include Organization Repositories
+            </label>
           </div>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/[0.04] bg-neutral-950/40 hover:bg-white/[0.02] hover:text-white text-neutral-400 text-xs transition-all duration-200">
+
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/[0.04] bg-neutral-950/40 hover:bg-white/[0.02] hover:text-white text-neutral-400 text-xs transition-all duration-200 mb-4">
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Filters
           </button>
         </div>
 
-        {filteredRepos.length > 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 border border-dashed border-red-500/20 rounded-3xl bg-red-950/5">
+            <p className="text-red-400 text-sm font-light">{error}</p>
+          </div>
+        ) : repos.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredRepos.map((repo) => (
+            {repos.map((repo) => (
               <RepositoryCard key={repo.id} repo={repo} />
             ))}
           </div>
@@ -190,6 +257,42 @@ function RepositoriesContent() {
           </div>
         )}
       </div>
+
+      {/* Premium Shadcn Pagination Control */}
+      {!loading && !error && pagination.totalPages > 1 && (
+        <Pagination className="mt-8">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+              />
+            </PaginationItem>
+            
+            {getPageNumbers().map((pageNumber, idx) => (
+              <PaginationItem key={idx}>
+                {pageNumber === "ellipsis-start" || pageNumber === "ellipsis-end" ? (
+                  <PaginationEllipsis />
+                ) : (
+                  <PaginationLink
+                    isActive={pagination.page === pageNumber}
+                    onClick={() => handlePageChange(pageNumber as number)}
+                  >
+                    {pageNumber}
+                  </PaginationLink>
+                )}
+              </PaginationItem>
+            ))}
+
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      )}
     </div>
   );
 }

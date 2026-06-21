@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ArrowRight, Code2 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 // Custom Github SVG Icon to bypass Lucide version export issues
 const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -24,6 +25,7 @@ const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export function ChatConsole() {
   const router = useRouter();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [greeting, setGreeting] = useState("Welcome back");
 
@@ -58,7 +60,7 @@ export function ChatConsole() {
     <form onSubmit={handleSearchSubmit} className="w-full flex flex-col items-center text-center space-y-8 max-w-2xl mx-auto z-10">
       <div className="space-y-3">
         <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white leading-none">
-          {greeting}, <span className="font-serif italic font-medium text-neutral-200">Developer</span>
+          {greeting}, <span className="font-serif italic font-medium text-neutral-200">{user?.name || "Developer"}</span>
         </h1>
         <p className="text-neutral-400 text-sm md:text-base font-light">
           Search repositories, verify match scores, and explore personalized roadmaps.

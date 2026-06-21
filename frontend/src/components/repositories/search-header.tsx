@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { useRouter } from "next/navigation";
-import { Search, ArrowLeft } from "lucide-react";
+import { Search } from "lucide-react";
 
 interface SearchHeaderProps {
   searchQuery: string;
@@ -10,17 +9,9 @@ interface SearchHeaderProps {
 }
 
 export function SearchHeader({ searchQuery, setSearchQuery }: SearchHeaderProps) {
-  const router = useRouter();
-
   return (
     <div className="flex-shrink-0 pt-4 pb-6 space-y-6">
       <div className="flex items-center gap-4">
-        <button 
-          onClick={() => router.push("/dashboard")}
-          className="p-2 rounded-xl border border-white/[0.04] bg-neutral-950/40 hover:bg-white/[0.02] text-neutral-400 hover:text-white transition-all duration-200"
-        >
-          <ArrowLeft className="w-4 h-4" />
-        </button>
         <div>
           <h1 className="text-2xl font-normal text-white tracking-tight">Search Repositories</h1>
           <p className="text-xs text-neutral-400 font-light">Enter terms or ask queries to refine recommendations</p>

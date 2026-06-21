@@ -1,12 +1,5 @@
 import { config } from './config'
 import app from './app'
-<<<<<<< HEAD
-
-const server = app.listen(config.port, () => {
-  console.log(`Server running in ${config.nodeEnv} mode on port ${config.port}`)
-})
-
-=======
 import { prisma } from './utils/prisma'
 import { initWorkers, shutdownWorkers } from './workers'
 import { closeAllQueues } from './config/queue'
@@ -35,7 +28,6 @@ const gracefulShutdown = async () => {
 process.on('SIGTERM', gracefulShutdown)
 process.on('SIGINT', gracefulShutdown)
 
->>>>>>> 6a412ca414434aafc0ffe61cd5ab8fb927d96da9
 process.on('unhandledRejection', (err: Error) => {
   console.error('Unhandled Rejection! Shutting down...')
   console.error(err.name, err.message)
