@@ -18,9 +18,7 @@ interface RepoAnalysis {
   fullName: string
   description: string | null
   url: string
-  stars: number
-  forks: number
-  openIssues: number
+  githubId: number
   languages: Record<string, number>
   frameworks: string[]
   techStack: string[]
@@ -28,6 +26,7 @@ interface RepoAnalysis {
 }
 
 interface GithubRepoResponse {
+  id: number
   name: string
   owner: { login: string }
   description: string | null
@@ -52,26 +51,36 @@ const analyzeRepository = async (
   userId: string,
   onProgress: ProgressCallback = noopProgress
 ) => {
+  console.log(`[RepoService] Starting analysis for ${url}`)
   await onProgress(5, 'Validating repository URL...')
   const { owner, repo } = parseGithubRepoUrl(url)
+  console.log(`[RepoService] Parsed URL: owner=${owner}, repo=${repo}`)
 
   await onProgress(8, 'Fetching user credentials...')
   const accessToken = await getGithubAccessToken(userId)
+  console.log(`[RepoService] Retrieved GitHub token for user ${userId}`)
 
+  console.log(`[RepoService] Fetching repository data from GitHub API...`)
   const analysis = await analyzeGithubRepo(owner, repo, accessToken, onProgress)
+  console.log(`[RepoService] GitHub API analysis complete for ${analysis.fullName}`)
 
   await onProgress(80, 'Saving repository data...')
+  console.log(`[RepoService] Saving repository ${analysis.fullName} to database...`)
 
   const saved = await prisma.repository.upsert({
-    where: { fullName: analysis.fullName },
+    where: { 
+      provider_fullName: {
+        provider: 'github',
+        fullName: analysis.fullName
+      }
+    },
     update: {
       name: analysis.name,
       owner: analysis.owner,
       description: analysis.description,
       url: analysis.url,
-      stars: analysis.stars,
-      forks: analysis.forks,
-      openIssues: analysis.openIssues,
+      provider: 'github',
+      githubId: analysis.githubId,
       languages: analysis.languages,
       frameworks: analysis.frameworks,
       techStack: analysis.techStack,
@@ -83,9 +92,8 @@ const analyzeRepository = async (
       fullName: analysis.fullName,
       description: analysis.description,
       url: analysis.url,
-      stars: analysis.stars,
-      forks: analysis.forks,
-      openIssues: analysis.openIssues,
+      provider: 'github',
+      githubId: analysis.githubId,
       languages: analysis.languages,
       frameworks: analysis.frameworks,
       techStack: analysis.techStack,
@@ -94,6 +102,7 @@ const analyzeRepository = async (
   })
 
   await onProgress(100, 'Repository analysis complete!')
+  console.log(`[RepoService] Repository ${saved.fullName} successfully saved to database.`)
   return saved
 }
 
@@ -135,9 +144,7 @@ const analyzeGithubRepo = async (
     fullName: `${owner}/${repo}`,
     description: repoData.description,
     url: String(repoData.html_url),
-    stars: Number(repoData.stargazers_count ?? 0),
-    forks: Number(repoData.forks_count ?? 0),
-    openIssues: Number(repoData.open_issues_count ?? 0),
+    githubId: Number(repoData.id),
     languages: languagesData,
     frameworks: Array.from(frameworks),
     techStack: Array.from(techStack),

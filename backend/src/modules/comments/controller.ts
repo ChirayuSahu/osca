@@ -86,7 +86,7 @@ const updateComment = asyncHandler(async (req: RequestWithUser, res: Response) =
   const id = String(req.params.id)
   
   const existingComment = await prisma.threadComment.findUnique({ where: { id } })
-  assertFound(existingComment, 'Comment not found')
+  if (!existingComment) throw new AppError('Comment not found', 404)
 
   if (existingComment.authorId !== userId) {
     throw new AppError('Forbidden: You can only update your own comments', 403)
@@ -113,7 +113,7 @@ const deleteComment = asyncHandler(async (req: RequestWithUser, res: Response) =
   const id = String(req.params.id)
   
   const existingComment = await prisma.threadComment.findUnique({ where: { id } })
-  assertFound(existingComment, 'Comment not found')
+  if (!existingComment) throw new AppError('Comment not found', 404)
 
   if (existingComment.authorId !== userId) {
     throw new AppError('Forbidden: You can only delete your own comments', 403)

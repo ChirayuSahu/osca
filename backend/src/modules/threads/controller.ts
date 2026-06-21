@@ -63,7 +63,7 @@ const updateThread = asyncHandler(async (req: RequestWithUser, res: Response) =>
   const id = String(req.params.id)
   
   const existingThread = await prisma.repositoryThread.findUnique({ where: { id } })
-  assertFound(existingThread, 'Thread not found')
+  if (!existingThread) throw new AppError('Thread not found', 404)
 
   if (existingThread.authorId !== userId) {
     throw new AppError('Forbidden: You can only update your own threads', 403)

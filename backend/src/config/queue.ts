@@ -4,8 +4,8 @@ import { getRedisConnectionOptions } from './redis'
 // ─── Queue Name Constants ────────────────────────────────────────
 
 export const QUEUE_NAMES = {
-  CONTRIBUTOR_ANALYSIS: 'contributor-analysis',
-  REPOSITORY_ANALYSIS: 'repository-analysis'
+  CONTRIBUTOR_ANALYSIS: 'dev-contributor-analysis',
+  REPOSITORY_ANALYSIS: 'dev-repository-analysis'
 } as const
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]
