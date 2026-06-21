@@ -10,5 +10,12 @@ export const config = {
   githubCallbackUrl: process.env.GITHUB_CALLBACK_URL ?? '',
   jwtSecret: process.env.JWT_SECRET ?? 'supersecretjwtkey',
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
-  databaseUrl: process.env.DATABASE_URL ?? ''
+  databaseUrl: process.env.DATABASE_URL ?? '',
+  redis: {
+    host: process.env.REDIS_HOST ?? 'localhost',
+    port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+    password: process.env.REDIS_PASSWORD || undefined,
+    tls: process.env.REDIS_TLS === 'true'
+  }
 }
+
