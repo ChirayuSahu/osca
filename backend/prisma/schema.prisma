@@ -65,6 +65,7 @@ model Repository {
   recommendations Recommendation[]
   threads         RepositoryThread[]
   likes           RepositoryLike[]
+  interactions    UserInteraction[]
 
   @@unique([provider, fullName])
 }
