@@ -6,6 +6,8 @@ import { SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { SearchHeader } from "@/components/repositories/search-header";
 import { RepositoryCard, Repository } from "@/components/repositories/repository-card";
+import { RepositoryFilters } from "@/components/repositories/repository-filters";
+import { RepositoryDetailsPopover } from "@/components/repositories/repository-details-popover";
 import {
   Pagination,
   PaginationContent,
@@ -43,6 +45,12 @@ function RepositoriesContent() {
   const [repos, setRepos] = useState<ExtendedRepository[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // New states for Hub Module features
+  const [activeTab, setActiveTab] = useState("recommended");
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState<ExtendedRepository | null>(null);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
   const [pagination, setPagination] = useState<PaginationMeta>({
     page: 1,
@@ -137,7 +145,7 @@ function RepositoriesContent() {
                 forks: repo.forks_count || 0,
                 language: lang,
                 languageColor: langColor,
-                matchScore: 95 - (index % 5) * 3, // Mock match score
+                matchScore: 0, // Backend logic coming soon
                 issuesCount: repo.open_issues_count || 0,
                 ownerType: repo.owner?.type || "User"
               };
@@ -219,19 +227,38 @@ function RepositoriesContent() {
 
       {/* GitHub Repository Cards List */}
       <div className="space-y-6">
-        <div className="flex items-center justify-between border-b border-white/[0.04] pb-4 sticky top-0 bg-black/80 backdrop-blur-md z-10">
-          {/* Include Org checkbox */}
-          <div className="flex items-center gap-2 mb-4">
-            <label className="flex items-center gap-2.5 text-xs text-neutral-400 font-light hover:text-white cursor-pointer select-none">
-              <Checkbox
-                checked={includeOrg}
-                onCheckedChange={handleIncludeOrgChange}
-              />
-              Include Organization Repositories
-            </label>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-white/[0.04] pb-4 sticky top-0 bg-black/80 backdrop-blur-md z-10 gap-4">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setActiveTab("recommended")}
+                className={`text-sm font-medium pb-1 transition-colors ${activeTab === "recommended" ? "text-emerald-400 border-b-2 border-emerald-400" : "text-neutral-400 hover:text-white"}`}
+              >
+                Recommended
+              </button>
+              <button 
+                onClick={() => setActiveTab("trending")}
+                className={`text-sm font-medium pb-1 transition-colors ${activeTab === "trending" ? "text-emerald-400 border-b-2 border-emerald-400" : "text-neutral-400 hover:text-white"}`}
+              >
+                Trending
+              </button>
+            </div>
+            {/* Include Org checkbox */}
+            <div className="hidden md:flex items-center gap-2">
+              <label className="flex items-center gap-2.5 text-xs text-neutral-400 font-light hover:text-white cursor-pointer select-none">
+                <Checkbox
+                  checked={includeOrg}
+                  onCheckedChange={handleIncludeOrgChange}
+                />
+                Include Organizations
+              </label>
+            </div>
           </div>
 
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/[0.04] bg-neutral-950/40 hover:bg-white/[0.02] hover:text-white text-neutral-400 text-xs transition-all duration-200 mb-4">
+          <button 
+            onClick={() => setIsFiltersOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/[0.04] bg-neutral-950/40 hover:bg-white/[0.02] hover:text-white text-neutral-400 text-xs transition-all duration-200"
+          >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Filters
           </button>
@@ -248,7 +275,14 @@ function RepositoriesContent() {
         ) : repos.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {repos.map((repo) => (
-              <RepositoryCard key={repo.id} repo={repo} />
+              <RepositoryCard 
+                key={repo.id} 
+                repo={repo} 
+                onClick={(r) => {
+                  setSelectedRepo(r as ExtendedRepository);
+                  setIsPopoverOpen(true);
+                }}
+              />
             ))}
           </div>
         ) : (
@@ -293,6 +327,22 @@ function RepositoriesContent() {
           </PaginationContent>
         </Pagination>
       )}
+
+      {/* Hub Module Dialogs */}
+      <RepositoryFilters 
+        isOpen={isFiltersOpen} 
+        onClose={() => setIsFiltersOpen(false)} 
+        onApply={(filters) => {
+          console.log("Applied filters:", filters);
+          // In a real app, we'd update URL search params and fetch new data
+        }} 
+      />
+      
+      <RepositoryDetailsPopover 
+        isOpen={isPopoverOpen} 
+        onClose={() => setIsPopoverOpen(false)} 
+        repo={selectedRepo} 
+      />
     </div>
   );
 }

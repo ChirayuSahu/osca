@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderGit2, User, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderGit2, User, Settings, LogOut, Globe2 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/context/auth-context";
 import {
@@ -23,6 +23,7 @@ export function AppSidebar() {
   const navItems = [
     { name: "Dashboard", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
     { name: "Repositories", href: "/dashboard/repositories", icon: FolderGit2 },
+    { name: "Community", href: "/dashboard/community", icon: Globe2 },
     { name: "Profile", href: ROUTES.PROFILE, icon: User },
     { name: "Settings", href: "#", icon: Settings },
   ];

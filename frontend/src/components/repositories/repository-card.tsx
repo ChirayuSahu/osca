@@ -17,11 +17,15 @@ export interface Repository {
 
 interface RepositoryCardProps {
   repo: Repository;
+  onClick?: (repo: Repository) => void;
 }
 
-export function RepositoryCard({ repo }: RepositoryCardProps) {
+export function RepositoryCard({ repo, onClick }: RepositoryCardProps) {
   return (
-    <div className="relative overflow-hidden bg-[#121212] border border-[#444444] hover:border-[#62BE8B]/50 transition-all duration-300 flex flex-col justify-between group p-8 rounded-[28px]">
+    <div 
+      onClick={() => onClick && onClick(repo)}
+      className="relative overflow-hidden bg-[#121212] border border-[#444444] hover:border-[#62BE8B]/50 transition-all duration-300 flex flex-col justify-between group p-8 rounded-[28px] cursor-pointer"
+    >
       {/* Hover Gradient Edge Highlight */}
       <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#00843C]/0 group-hover:via-[#00843C]/20 to-transparent transition-all duration-500" />
       

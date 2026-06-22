@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
-import { MessageSquarePlus, ExternalLink, ThumbsUp } from "lucide-react";
+import { MessageSquarePlus, ExternalLink, ThumbsUp, Users } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
+import { GroupChatPanel } from "@/components/threads/group-chat-panel";
 
 export default function RepositoryPage() {
   const params = useParams();
@@ -16,6 +17,7 @@ export default function RepositoryPage() {
   const [threads, setThreads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false);
+  const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
 
   useEffect(() => {
     if (!token || !repositoryId) return;
@@ -71,10 +73,19 @@ export default function RepositoryPage() {
             </div>
           </div>
           
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-neutral-200 rounded-full text-sm font-semibold transition-all shadow-lg shadow-white/10 active:scale-95">
-            <ThumbsUp className="w-4 h-4" />
-            Like Repository
-          </button>
+          <div className="flex flex-col gap-3">
+            <button className="flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-neutral-200 rounded-full text-sm font-semibold transition-all shadow-lg shadow-white/10 active:scale-95">
+              <ThumbsUp className="w-4 h-4" />
+              Like Repository
+            </button>
+            <button 
+              onClick={() => setIsGroupChatOpen(true)}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 text-black hover:bg-emerald-600 rounded-full text-sm font-semibold transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+            >
+              <Users className="w-4 h-4" />
+              Group Chat
+            </button>
+          </div>
         </div>
       </div>
 
@@ -132,6 +143,12 @@ export default function RepositoryPage() {
         onClose={() => setIsCreateThreadOpen(false)} 
         repositoryId={repositoryId}
         onThreadCreated={handleThreadCreated}
+      />
+
+      <GroupChatPanel 
+        isOpen={isGroupChatOpen}
+        onClose={() => setIsGroupChatOpen(false)}
+        repositoryId={repositoryId}
       />
     </div>
   );
