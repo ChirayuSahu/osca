@@ -22,8 +22,8 @@ export function AppSidebar() {
 
   const navItems = [
     { name: "Dashboard", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
-    { name: "Repositories", href: "/dashboard/repositories", icon: FolderGit2 },
-    { name: "Community", href: "/dashboard/community", icon: Globe2 },
+    { name: "Imported Repos", href: "/dashboard/imported-repos", icon: FolderGit2 },
+    { name: "GitHub Search", href: "/dashboard/repositories", icon: FolderGit2 },
     { name: "Profile", href: ROUTES.PROFILE, icon: User },
     { name: "Settings", href: "#", icon: Settings },
   ];

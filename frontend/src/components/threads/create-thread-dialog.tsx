@@ -3,7 +3,16 @@
 import React, { useState } from "react";
 import { ThreadService } from "@/services/thread.service";
 import { useAuth } from "@/context/auth-context";
-import { X, Loader2 } from "lucide-react";
+import { Loader2, MessageSquarePlus } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
 
 interface CreateThreadDialogProps {
   isOpen: boolean;
@@ -18,8 +27,6 @@ export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onTh
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,17 +48,21 @@ export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onTh
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-neutral-950 border border-white/[0.08] w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between p-6 border-b border-white/[0.04]">
-          <h2 className="text-xl font-medium text-white">Start a Discussion</h2>
-          <button onClick={onClose} className="p-2 text-neutral-500 hover:text-white transition-colors rounded-full hover:bg-white/[0.04]">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[500px] bg-neutral-950 border border-neutral-800 shadow-2xl text-neutral-100 rounded-2xl p-6">
+        <DialogHeader className="space-y-3 pb-4 border-b border-neutral-800/50">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+              <MessageSquarePlus className="w-4 h-4 text-emerald-400" />
+            </div>
+            <DialogTitle className="text-lg font-medium tracking-tight text-neutral-100">
+              Start a Discussion
+            </DialogTitle>
+          </div>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {error && <div className="text-red-400 text-sm bg-red-500/10 p-3 rounded-xl">{error}</div>}
+        <form onSubmit={handleSubmit} className="py-4 space-y-5">
+          {error && <div className="text-red-400 text-sm bg-red-500/10 p-3 rounded-xl border border-red-500/20">{error}</div>}
           
           <div className="space-y-2">
             <label className="text-sm font-medium text-neutral-300">Title</label>
@@ -60,7 +71,7 @@ export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onTh
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What do you want to discuss?"
-              className="w-full bg-neutral-900 border border-white/[0.06] rounded-xl px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+              className="w-full bg-neutral-900 border border-neutral-800/80 rounded-xl px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
               required
             />
           </div>
@@ -72,30 +83,31 @@ export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onTh
               onChange={(e) => setContent(e.target.value)}
               placeholder="Provide more details..."
               rows={5}
-              className="w-full bg-neutral-900 border border-white/[0.06] rounded-xl px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
+              className="w-full bg-neutral-900 border border-neutral-800/80 rounded-xl px-4 py-3 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
               required
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button 
-              type="button" 
-              onClick={onClose}
-              className="px-5 py-2.5 text-sm font-medium text-neutral-400 hover:text-white transition-colors"
-            >
-              Cancel
-            </button>
+          <DialogFooter className="sm:justify-end gap-3 pt-4 border-t border-neutral-800/50">
+            <DialogClose asChild>
+              <button 
+                type="button" 
+                className="px-4 py-2 rounded-lg border border-neutral-800 hover:bg-neutral-900 text-neutral-300 text-sm font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </DialogClose>
             <button 
               type="submit" 
               disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-xl text-sm transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500 text-neutral-950 hover:bg-emerald-400 text-sm font-medium transition-colors disabled:opacity-50"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               Post Thread
             </button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
