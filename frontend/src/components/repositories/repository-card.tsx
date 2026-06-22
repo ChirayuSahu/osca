@@ -72,6 +72,8 @@ export function RepositoryCard({ repo }: RepositoryCardProps) {
         </div>
 
         <a 
+          href={`/dashboard/repository/import?url=https://github.com/${repo.name}`}
+          className="text-xs font-normal text-neutral-400 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
           href={`/dashboard/repository/${repo.id}`}
           className="text-[13px] font-normal text-[#D9D9D9] hover:text-[#62BE8B] flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
         >

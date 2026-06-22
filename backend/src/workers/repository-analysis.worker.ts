@@ -9,21 +9,27 @@ const processRepositoryAnalysis = async (
 ): Promise<RepositoryAnalysisJobResult> => {
   const { url, userId } = job.data
 
-  console.log(`[RepositoryWorker] Starting analysis for ${url} (job ${job.id})`)
+  console.log(`\n[RepositoryWorker] 🚀 Starting job ${job.id} for ${url}`)
+  
+  try {
+    const repository = await RepositoryAnalysisService.analyzeRepository(url, userId, async (percent, message) => {
+      console.log(`[RepositoryWorker:${job.id}] ⏳ Progress: ${percent}% - ${message}`)
+      await job.updateProgress({ percent, message })
+    })
 
-  const repository = await RepositoryAnalysisService.analyzeRepository(url, userId, async (percent, message) => {
-    await job.updateProgress({ percent, message })
-  })
+    const languages = repository.languages as Record<string, number> | null
 
-  const languages = repository.languages as Record<string, number> | null
-
-  return {
-    repositoryId: repository.id,
-    name: repository.name,
-    url: repository.url,
-    languageCount: languages !== null ? Object.keys(languages).length : 0,
-    frameworkCount: repository.frameworks.length,
-    openIssues: repository.openIssues
+    console.log(`[RepositoryWorker:${job.id}] ✅ Job complete for ${repository.fullName}`)
+    return {
+      repositoryId: repository.id,
+      name: repository.name,
+      url: repository.url,
+      languageCount: languages !== null ? Object.keys(languages).length : 0,
+      frameworkCount: repository.frameworks.length
+    }
+  } catch (error) {
+    console.error(`[RepositoryWorker:${job.id}] ❌ Job failed for ${url}:`, error)
+    throw error
   }
 }
 
@@ -35,7 +41,10 @@ export const createRepositoryWorker = (): Worker => {
       connection: getRedisConnectionOptions(),
       concurrency: 2,
       removeOnComplete: { count: 500 },
-      removeOnFail: { count: 200 }
+      removeOnFail: { count: 200 },
+      stalledInterval: 300000,
+      drainDelay: 300,
+      metrics: undefined
     }
   )
 

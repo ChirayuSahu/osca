@@ -9,7 +9,6 @@ export interface RepositoryAnalysisJobResult {
   url: string
   languageCount: number
   frameworkCount: number
-  openIssues: number
 }
 
 export interface ContributorAnalysisJobData {

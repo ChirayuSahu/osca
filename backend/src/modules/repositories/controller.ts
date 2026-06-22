@@ -7,6 +7,7 @@ import { AppError, assertFound } from '../../lib/errors'
 import { resolveRepositoryUrl } from '../../lib/github/resolve-repo-input'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { RepositoryService } from './service'
+import { InteractionService } from '../../services/interaction.service'
 import { asyncHandler } from '../../utils/async-handler'
 
 const requireUserId = (req: RequestWithUser): string => {
@@ -111,6 +112,71 @@ const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithP
   })
 })
 
+const listRepositoryThreads = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
+  const repositoryId = String(req.params.id)
+  const skip = req.pagination?.skip ?? 0
+  const take = req.pagination?.take ?? 10
+  
+  // ensure repository exists
+  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } })
+  assertFound(repo, 'Repository not found')
+
+  const [total, threads] = await Promise.all([
+    prisma.repositoryThread.count({ where: { repositoryId } }),
+    prisma.repositoryThread.findMany({
+      where: { repositoryId },
+      skip,
+      take,
+      include: {
+        author: {
+          select: { id: true, name: true, username: true, avatarUrl: true }
+        },
+        _count: { select: { comments: true } }
+      },
+      orderBy: [
+        { isPinned: 'desc' },
+        { updatedAt: 'desc' }
+      ]
+    })
+  ])
+
+  sendResponse(res, 200, true, 'Repository threads retrieved successfully', threads, {
+    page: req.pagination?.page ?? 1,
+    limit: req.pagination?.limit ?? 10,
+    total,
+    totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
+  })
+})
+
+const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const repositoryId = String(req.params.id)
+
+  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } })
+  assertFound(repo, 'Repository not found')
+
+  const existingLike = await prisma.repositoryLike.findUnique({
+    where: {
+      userId_repositoryId: { userId, repositoryId }
+    }
+  })
+
+  if (existingLike) {
+    await prisma.repositoryLike.delete({ where: { id: existingLike.id } })
+    sendResponse(res, 200, true, 'Repository unliked successfully')
+    return
+  }
+
+  const like = await prisma.repositoryLike.create({
+    data: { userId, repositoryId }
+  })
+
+  // Automatically log interaction
+  await InteractionService.logInteraction(userId, repositoryId, 'REPOSITORY_LIKE')
+
+  sendResponse(res, 201, true, 'Repository liked successfully', like)
+})
+
 export const RepositoryController = {
   queueRepositoryAnalysis,
   getRepository,
@@ -118,5 +184,7 @@ export const RepositoryController = {
   deleteRepository,
   listGithubRepositories,
   listPersonalGithubRepositories,
-  listOrganizationGithubRepositories
+  listOrganizationGithubRepositories,
+  listRepositoryThreads,
+  toggleRepositoryLike
 }

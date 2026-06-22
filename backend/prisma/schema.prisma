@@ -7,70 +7,138 @@ generator client {
 }
 
 model User {
-  id                String             @id @default(uuid())
-  name              String
-  username          String             @unique
-  email             String             @unique
-  avatarUrl         String?
-  skills            String[]
-  contributionScore Float              @default(0.0)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  oauthAccounts     OAuthAccount[]
-  recommendations   Recommendation[]
+  id                 String              @id @default(uuid())
+  name               String
+  username           String              @unique
+  email              String              @unique
+  avatarUrl          String?
+  skills             String[]
+  contributionScore  Float               @default(0.0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  oauthAccounts      OAuthAccount[]
+  recommendations    Recommendation[]
   contributorProfile ContributorProfile?
+  repositoryThreads  RepositoryThread[]
+  threadComments     ThreadComment[]
+  commentVotes       CommentVote[]
+  repositoryLikes    RepositoryLike[]
+  interactions       UserInteraction[]
+  interests          UserInterest[]
 }
 
 model OAuthAccount {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   userId       String
-  provider     String   // e.g. "github" or "gitlab"
+  provider     String // e.g. "github" or "gitlab"
   providerId   String
   username     String
   accessToken  String
   refreshToken String?
   expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerId])
 }
 
 model Repository {
-  id              String           @id @default(uuid())
+  id              String   @id @default(uuid())
   name            String
   owner           String
-  fullName        String           @unique
+  fullName        String
+  provider        String   @default("github") // e.g. "github" or "gitlab"
+  githubId        Int?     @unique
+  gitlabId        Int?     @unique
   description     String?
   url             String
-  stars           Int              @default(0)
-  forks           Int              @default(0)
-  openIssues      Int              @default(0)
-  languages       Json?            // Detected languages & stats
+  languages       Json?
   frameworks      String[]
   techStack       String[]
-  dependencies    Json?            // Dependency name and version mappings
-  folderStructure Json?            // Identified layouts (e.g. frontend, backend)
-  ciCd            String[]         // e.g. ["github-actions", "docker"]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  dependencies    Json?
+  folderStructure Json?
+  ciCd            String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
   recommendations Recommendation[]
+  threads         RepositoryThread[]
+  likes           RepositoryLike[]
+  interactions    UserInteraction[]
+
+  @@unique([provider, fullName])
+}
+
+model RepositoryThread {
+  id           String @id @default(uuid())
+  repositoryId String
+  authorId     String
+
+  title   String
+  content String
+
+  isPinned Boolean @default(false)
+  isLocked Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author     User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  comments ThreadComment[]
+}
+
+model ThreadComment {
+  id       String @id @default(uuid())
+  threadId String
+  authorId String
+
+  content String
+
+  parentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  thread RepositoryThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  parent  ThreadComment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies ThreadComment[] @relation("CommentReplies")
+
+  votes CommentVote[]
+}
+
+model CommentVote {
+  id        String @id @default(uuid())
+  commentId String
+  userId    String
+
+  value Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  comment ThreadComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
 }
 
 model ContributorProfile {
-  id                  String   @id @default(uuid())
-  userId              String   @unique
-  contributionHistory Json?    // PRs, commits, issues count and details
-  repositoryExperience Json?   // Domains and depth mapping
-  skillScore          Float    @default(0.0)
-  activityScore       Float    @default(0.0)
-  diversityScore      Float    @default(0.0)
-  qualityScore        Float    @default(0.0)
-  overallScore        Float    @default(0.0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  contributionHistory  Json? // PRs, commits, issues count and details
+  repositoryExperience Json? // Domains and depth mapping
+  skillScore           Float    @default(0.0)
+  activityScore        Float    @default(0.0)
+  diversityScore       Float    @default(0.0)
+  qualityScore         Float    @default(0.0)
+  overallScore         Float    @default(0.0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Recommendation {
@@ -79,7 +147,7 @@ model Recommendation {
   repositoryId String
   fitScore     Float      @default(0.0)
   explanation  String
-  roadmap      Json?      // Step-by-step roadmap
+  roadmap      Json? // Step-by-step roadmap
   status       String     @default("PENDING") // e.g. PENDING, ACCEPTED, REJECTED, COMPLETED
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -87,4 +155,40 @@ model Recommendation {
   repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@unique([userId, repositoryId])
+}
+
+model RepositoryLike {
+  id           String     @id @default(uuid())
+  userId       String
+  repositoryId String
+  createdAt    DateTime   @default(now())
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repositoryId])
+}
+
+model UserInteraction {
+  id           String     @id @default(uuid())
+  userId       String
+  repositoryId String
+  action       String     // e.g., REPOSITORY_VIEW, REPOSITORY_LIKE, ISSUE_VIEW, ISSUE_COMMENT, CONTRIBUTION, REPOSITORY_SAVE
+  weight       Int
+  createdAt    DateTime   @default(now())
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+}
+
+model UserInterest {
+  id           String     @id @default(uuid())
+  userId       String
+  tag          String     // language or topic name
+  score        Float      @default(0.0)
+  updatedAt    DateTime   @updatedAt
+
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tag])
 }
