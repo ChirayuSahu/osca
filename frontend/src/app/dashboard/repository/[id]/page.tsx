@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
-import { MessageSquarePlus, ExternalLink, ThumbsUp } from "lucide-react";
+import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 
 export default function RepositoryPage() {
@@ -43,82 +43,143 @@ export default function RepositoryPage() {
     setThreads([newThread, ...threads]);
   };
 
-  if (loading) return <div className="p-12 text-center text-neutral-400 animate-pulse">Loading Repository...</div>;
-  if (!repo) return <div className="p-12 text-center text-red-400">Failed to load repository.</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl animate-pulse"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!repo) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+        <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.15)]">
+          <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <h2 className="text-2xl font-semibold text-neutral-200 mb-2">Repository Not Found</h2>
+        <p className="text-neutral-400 max-w-md">We couldn't load the details for this repository. It may have been deleted or you don't have access.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12">
-      <div className="relative pt-12 pb-8">
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent blur-3xl pointer-events-none -z-10" />
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="space-y-3">
-            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white flex items-center gap-4">
+    <div className="max-w-[1400px] w-full mx-auto px-4 sm:px-6 md:px-8 space-y-12 pb-16 pt-8 relative">
+      {/* Immersive background glow */}
+      <div className="absolute top-0 inset-x-0 h-[500px] bg-gradient-to-b from-emerald-500/10 via-emerald-500/[0.02] to-transparent pointer-events-none blur-3xl -z-10" />
+
+      {/* Header Section */}
+      <div className="relative bg-neutral-900/40 backdrop-blur-2xl border border-neutral-800/60 rounded-3xl p-8 sm:p-10 shadow-2xl overflow-hidden group">
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+          <div className="space-y-4 max-w-4xl">
+            <h1 className="text-4xl md:text-5xl font-medium tracking-tight text-neutral-100 flex items-center gap-4 break-words">
               {repo.name}
-              <a href={repo.url} target="_blank" rel="noreferrer" className="text-neutral-600 hover:text-emerald-400 transition-colors">
-                <ExternalLink className="w-6 h-6" />
+              <a href={repo.url} target="_blank" rel="noreferrer" className="p-2 rounded-full bg-neutral-800/50 text-neutral-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all">
+                <ExternalLink className="w-5 h-5" />
               </a>
             </h1>
-            <p className="text-neutral-400 text-base md:text-lg max-w-3xl font-light leading-relaxed">
+            <p className="text-neutral-400 text-lg font-light leading-relaxed">
               {repo.description || "No description provided."}
             </p>
             
-            <div className="flex flex-wrap items-center gap-2 mt-4">
-              {repo.techStack?.map((tech: string) => (
-                <span key={tech} className="px-3 py-1 text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400">
-                  {tech}
+            <div className="flex flex-wrap items-center gap-3 mt-6">
+              {repo.techStack?.length > 0 ? (
+                repo.techStack.map((tech: string) => (
+                  <span key={tech} className="px-3.5 py-1.5 text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.05)]">
+                    {tech}
+                  </span>
+                ))
+              ) : (
+                <span className="px-3.5 py-1.5 text-xs font-medium bg-neutral-800/50 border border-neutral-700/50 rounded-full text-neutral-400">
+                  Codebase
                 </span>
-              ))}
+              )}
             </div>
           </div>
           
-          <button className="flex items-center gap-2 px-5 py-2.5 bg-white text-black hover:bg-neutral-200 rounded-full text-sm font-semibold transition-all shadow-lg shadow-white/10 active:scale-95">
-            <ThumbsUp className="w-4 h-4" />
-            Like Repository
-          </button>
+          <div className="flex flex-col gap-4 min-w-[200px]">
+            <button className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-sm font-semibold transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transform hover:-translate-y-0.5">
+              <ThumbsUp className="w-4 h-4" />
+              Like Repository
+            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-neutral-900/80 border border-neutral-800/60 rounded-xl p-3 flex flex-col items-center justify-center">
+                <GitMerge className="w-4 h-4 text-emerald-400 mb-1" />
+                <span className="text-xs text-neutral-400 font-medium">Active</span>
+              </div>
+              <div className="bg-neutral-900/80 border border-neutral-800/60 rounded-xl p-3 flex flex-col items-center justify-center">
+                <Star className="w-4 h-4 text-emerald-400 mb-1" />
+                <span className="text-xs text-neutral-400 font-medium">Favorite</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="space-y-6 pt-8">
-        <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
-          <h2 className="text-xl font-medium text-white flex items-center gap-3">
+      {/* Discussions Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between pb-2 border-b border-neutral-800/50">
+          <h2 className="text-2xl font-medium tracking-tight text-neutral-100 flex items-center gap-3">
+            <MessageSquarePlus className="w-6 h-6 text-emerald-500" />
             Discussions
-            <span className="px-2 py-0.5 rounded-full bg-white/[0.05] text-xs text-neutral-400">{threads.length}</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-sm font-medium border border-emerald-500/20">
+              {threads.length}
+            </span>
           </h2>
           <button 
             onClick={() => setIsCreateThreadOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-medium rounded-full text-sm transition-all active:scale-95 shadow-md shadow-emerald-500/20"
+            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-900 border border-neutral-800 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-400 text-neutral-300 font-medium rounded-xl text-sm transition-all shadow-lg"
           >
             <MessageSquarePlus className="w-4 h-4" />
             New Thread
           </button>
         </div>
 
-        <div className="bg-neutral-950 border border-white/[0.06] rounded-2xl overflow-hidden shadow-2xl">
+        <div className="bg-neutral-900/40 backdrop-blur-xl border border-neutral-800/60 rounded-2xl overflow-hidden shadow-xl">
           {threads.length === 0 ? (
-            <div className="text-center py-20 bg-neutral-950/50">
-              <MessageSquarePlus className="w-8 h-8 text-neutral-600 mx-auto mb-3" />
-              <p className="text-neutral-400 text-sm">No discussions yet. Be the first to start one!</p>
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-16 h-16 bg-neutral-800/50 rounded-2xl flex items-center justify-center mb-6 border border-neutral-700/50">
+                <MessageSquarePlus className="w-8 h-8 text-neutral-500" />
+              </div>
+              <p className="text-neutral-300 text-lg font-medium mb-2">No discussions yet</p>
+              <p className="text-neutral-500 text-sm max-w-sm">Be the first to start a conversation, report an issue, or suggest a feature for this repository.</p>
+              <button 
+                onClick={() => setIsCreateThreadOpen(true)}
+                className="mt-6 px-6 py-2.5 bg-emerald-500/10 text-emerald-400 font-medium text-sm rounded-xl border border-emerald-500/20 hover:bg-emerald-500 hover:text-neutral-950 transition-all duration-300"
+              >
+                Start Discussion
+              </button>
             </div>
           ) : (
-            <div className="divide-y divide-white/[0.04]">
+            <div className="divide-y divide-neutral-800/50">
               {threads.map(thread => (
                 <a 
                   key={thread.id} 
                   href={`/dashboard/repository/${repositoryId}/threads/${thread.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-5 hover:bg-white/[0.02] transition-colors group"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-6 hover:bg-neutral-800/40 transition-colors group relative overflow-hidden"
                 >
-                  <div className="flex-1 min-w-0 pr-6">
-                    <h3 className="text-base font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 transform scale-y-0 group-hover:scale-y-100 transition-transform origin-center duration-300" />
+                  
+                  <div className="flex-1 min-w-0 pr-6 pl-2">
+                    <h3 className="text-lg font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1.5">
                       {thread.title}
                     </h3>
                     <p className="text-neutral-500 text-sm font-light truncate">
                       {thread.content}
                     </p>
                   </div>
-                  <div className="flex items-center gap-4 mt-3 sm:mt-0 whitespace-nowrap text-xs text-neutral-500 font-medium">
-                    <span className="hidden sm:inline-block px-2.5 py-1 rounded-full bg-white/[0.03] border border-white/[0.05]">
+                  
+                  <div className="flex items-center gap-4 mt-4 sm:mt-0 whitespace-nowrap text-xs text-neutral-500 font-medium">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-950/50 border border-neutral-800/80">
+                      <Clock className="w-3.5 h-3.5 text-neutral-400" />
                       {new Date(thread.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
+                    </div>
                   </div>
                 </a>
               ))}

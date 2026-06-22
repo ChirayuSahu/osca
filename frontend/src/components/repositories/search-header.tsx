@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Search } from "lucide-react";
+import { Search, Globe } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 
 interface SearchHeaderProps {
   searchQuery: string;
@@ -10,14 +11,11 @@ interface SearchHeaderProps {
 
 export function SearchHeader({ searchQuery, setSearchQuery }: SearchHeaderProps) {
   return (
-    <div className="flex-shrink-0 pt-4 pb-6 space-y-6">
-      <div className="flex items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-normal text-white tracking-tight">Search Repositories</h1>
-          <p className="text-xs text-neutral-400 font-light">Enter terms or ask queries to refine recommendations</p>
-        </div>
-      </div>
-
+    <PageHeader 
+      title="Search Repositories" 
+      description="Explore and discover public repositories from GitHub."
+      icon={<Globe className="w-5 h-5" />}
+    >
       {/* Minimal Search Input Box */}
       <div className="relative w-full max-w-xl group">
         <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-neutral-500 group-focus-within:text-emerald-400 transition-colors">
@@ -39,6 +37,6 @@ export function SearchHeader({ searchQuery, setSearchQuery }: SearchHeaderProps)
           </button>
         )}
       </div>
-    </div>
+    </PageHeader>
   );
 }
