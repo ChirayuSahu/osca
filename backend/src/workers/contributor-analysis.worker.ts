@@ -30,7 +30,12 @@ export const createContributorWorker = (): Worker => {
       connection: getRedisConnectionOptions(),
       concurrency: 3,
       removeOnComplete: { count: 500 },
-      removeOnFail: { count: 200 }
+      removeOnFail: { count: 200 },
+      settings: {
+        stalledInterval: 300000,
+        drainDelay: 300,
+      },
+      metrics: undefined
     }
   )
 
