@@ -21,39 +21,39 @@ interface RepositoryCardProps {
 
 export function RepositoryCard({ repo }: RepositoryCardProps) {
   return (
-    <div className="relative overflow-hidden bg-neutral-950/30 border border-white/[0.04] hover:border-emerald-500/20 transition-all duration-300 flex flex-col justify-between group p-6 rounded-[24px]">
+    <div className="relative overflow-hidden bg-[#121212] border border-[#444444] hover:border-[#62BE8B]/50 transition-all duration-300 flex flex-col justify-between group p-8 rounded-[28px]">
       {/* Hover Gradient Edge Highlight */}
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/0 group-hover:via-emerald-500/20 to-transparent transition-all duration-500" />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#00843C]/0 group-hover:via-[#00843C]/20 to-transparent transition-all duration-500" />
       
       {/* Subtle Radial Card Glow */}
-      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/[0.02] rounded-full blur-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="absolute top-0 right-0 w-24 h-24 bg-[#00843C]/[0.02] rounded-full blur-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div className="font-normal text-neutral-200 group-hover:text-white text-base md:text-lg flex items-center gap-1.5 transition-colors">
-            {repo.name}
-            <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-emerald-400 transition-all" />
+          <div className="font-normal text-[#D9D9D9] group-hover:text-[#FFFFFF] text-lg md:text-xl flex items-center gap-1.5 transition-colors" title={repo.name}>
+            {repo.name.length > 20 ? `${repo.name.slice(0, 19)}...` : repo.name}
+            <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 text-[#D9D9D9]/50 hover:text-[#62BE8B] transition-all flex-shrink-0" />
           </div>
           
           {/* Glowing Match Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/[0.06] border border-emerald-500/10 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] font-medium text-emerald-400 tracking-wide">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#00843C]/[0.06] border border-[#00843C]/10 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#62BE8B] animate-pulse" />
+            <span className="text-[12px] font-medium text-[#62BE8B] tracking-wide">
               {repo.matchScore}% Match
             </span>
           </div>
         </div>
 
         {/* Description */}
-        <p className="text-neutral-400 text-sm font-light leading-relaxed line-clamp-2 min-h-[40px]">
+        <p className="text-[#D9D9D9] text-base font-light leading-relaxed line-clamp-2 min-h-[48px]">
           {repo.description}
         </p>
       </div>
 
       {/* Footer Metrics */}
-      <div className="flex items-center justify-between pt-6 border-t border-white/[0.03] mt-6">
-        <div className="flex items-center gap-4 text-xs text-neutral-500 font-light">
+      <div className="flex items-center justify-between pt-7 border-t border-[#444444] mt-7">
+        <div className="flex items-center gap-5 text-[13px] text-[#D9D9D9] font-light">
           {/* Language */}
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${repo.languageColor}`} />
@@ -61,12 +61,12 @@ export function RepositoryCard({ repo }: RepositoryCardProps) {
           </div>
           {/* Stars */}
           <div className="flex items-center gap-1">
-            <Star className="w-3.5 h-3.5 text-neutral-500" />
+            <Star className="w-4 h-4 text-[#D9D9D9]" />
             {repo.stars >= 1000 ? `${(repo.stars / 1000).toFixed(1)}k` : repo.stars}
           </div>
           {/* Forks */}
           <div className="flex items-center gap-1">
-            <GitFork className="w-3.5 h-3.5 text-neutral-500" />
+            <GitFork className="w-4 h-4 text-[#D9D9D9]" />
             {repo.forks >= 1000 ? `${(repo.forks / 1000).toFixed(1)}k` : repo.forks}
           </div>
         </div>
@@ -74,9 +74,11 @@ export function RepositoryCard({ repo }: RepositoryCardProps) {
         <a 
           href={`/dashboard/repository/import?url=https://github.com/${repo.name}`}
           className="text-xs font-normal text-neutral-400 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
+          href={`/dashboard/repository/${repo.id}`}
+          className="text-[13px] font-normal text-[#D9D9D9] hover:text-[#62BE8B] flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
         >
-          View / Import Repository
-          <ArrowRight className="w-3.5 h-3.5" />
+          View Issues
+          <ArrowRight className="w-4 h-4" />
         </a>
       </div>
     </div>
