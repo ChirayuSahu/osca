@@ -31,10 +31,8 @@ export const createContributorWorker = (): Worker => {
       concurrency: 3,
       removeOnComplete: { count: 500 },
       removeOnFail: { count: 200 },
-      settings: {
-        stalledInterval: 300000,
-        drainDelay: 300,
-      },
+      stalledInterval: 300000,
+      drainDelay: 300,
       metrics: undefined
     }
   )
