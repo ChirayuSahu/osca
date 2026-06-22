@@ -1,85 +1,117 @@
 "use client";
 
-import React from "react";
-import { Star, GitFork, ArrowRight, ExternalLink } from "lucide-react";
+import React, { useState } from "react";
+import { Star, GitFork, ArrowRight, ExternalLink, Download, Loader2 } from "lucide-react";
 
 export interface Repository {
-  id: number;
+  id: number | string;
   name: string;
   description: string;
   stars: number;
   forks: number;
-  language: string;
-  languageColor: string;
-  matchScore: number;
-  issuesCount: number;
+  language?: string;
+  languageColor?: string;
+  matchScore?: number;
+  issuesCount?: number;
+  url?: string;
 }
 
 interface RepositoryCardProps {
   repo: Repository;
+  mode?: "import" | "view";
+  onAction?: (repo: Repository) => void | Promise<void>;
 }
 
-export function RepositoryCard({ repo }: RepositoryCardProps) {
+export function RepositoryCard({ repo, mode = "view", onAction }: RepositoryCardProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleAction = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (onAction) {
+      setIsLoading(true);
+      try {
+        await onAction(repo);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const isImportMode = mode === "import";
+
   return (
-    <div className="relative overflow-hidden bg-[#121212] border border-[#444444] hover:border-[#62BE8B]/50 transition-all duration-300 flex flex-col justify-between group p-8 rounded-[28px]">
+    <div className="relative overflow-hidden bg-neutral-900/50 backdrop-blur-xl border border-neutral-800/50 hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group p-6 rounded-2xl shadow-xl hover:shadow-emerald-900/20">
       {/* Hover Gradient Edge Highlight */}
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-[#00843C]/0 group-hover:via-[#00843C]/20 to-transparent transition-all duration-500" />
+      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/0 group-hover:via-emerald-500/40 to-transparent transition-all duration-500" />
       
       {/* Subtle Radial Card Glow */}
-      <div className="absolute top-0 right-0 w-24 h-24 bg-[#00843C]/[0.02] rounded-full blur-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/[0.03] rounded-full blur-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-      <div className="space-y-5">
+      <div className="space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between">
-          <div className="font-normal text-[#D9D9D9] group-hover:text-[#FFFFFF] text-lg md:text-xl flex items-center gap-1.5 transition-colors" title={repo.name}>
-            {repo.name.length > 20 ? `${repo.name.slice(0, 19)}...` : repo.name}
-            <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 text-[#D9D9D9]/50 hover:text-[#62BE8B] transition-all flex-shrink-0" />
-          </div>
+          <a href={repo.url || `https://github.com/${repo.name}`} target="_blank" rel="noopener noreferrer" className="font-medium text-neutral-200 group-hover:text-emerald-400 text-lg flex items-start gap-2 transition-colors pr-2 break-all" title={repo.name}>
+            {repo.name}
+            <ExternalLink className="w-4 h-4 mt-1 opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-emerald-400 transition-all flex-shrink-0" />
+          </a>
           
           {/* Glowing Match Badge */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#00843C]/[0.06] border border-[#00843C]/10 rounded-full">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#62BE8B] animate-pulse" />
-            <span className="text-[12px] font-medium text-[#62BE8B] tracking-wide">
-              {repo.matchScore}% Match
-            </span>
-          </div>
+          {repo.matchScore !== undefined && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/[0.08] border border-emerald-500/20 rounded-full whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[11px] font-medium text-emerald-400 tracking-wide">
+                {repo.matchScore}% Match
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Description */}
-        <p className="text-[#D9D9D9] text-base font-light leading-relaxed line-clamp-2 min-h-[48px]">
-          {repo.description}
+        <p className="text-neutral-400 text-sm font-light leading-relaxed line-clamp-2 min-h-[40px]">
+          {repo.description || "No description provided."}
         </p>
       </div>
 
       {/* Footer Metrics */}
-      <div className="flex items-center justify-between pt-7 border-t border-[#444444] mt-7">
-        <div className="flex items-center gap-5 text-[13px] text-[#D9D9D9] font-light">
+      <div className="flex items-center justify-between pt-5 border-t border-neutral-800 mt-5">
+        <div className="flex items-center gap-4 text-xs text-neutral-400 font-light">
           {/* Language */}
-          <div className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${repo.languageColor}`} />
-            {repo.language}
-          </div>
+          {repo.language && (
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${repo.languageColor || 'bg-blue-400'}`} />
+              {repo.language}
+            </div>
+          )}
           {/* Stars */}
-          <div className="flex items-center gap-1">
-            <Star className="w-4 h-4 text-[#D9D9D9]" />
+          <div className="flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 text-neutral-500" />
             {repo.stars >= 1000 ? `${(repo.stars / 1000).toFixed(1)}k` : repo.stars}
           </div>
           {/* Forks */}
-          <div className="flex items-center gap-1">
-            <GitFork className="w-4 h-4 text-[#D9D9D9]" />
+          <div className="flex items-center gap-1.5">
+            <GitFork className="w-3.5 h-3.5 text-neutral-500" />
             {repo.forks >= 1000 ? `${(repo.forks / 1000).toFixed(1)}k` : repo.forks}
           </div>
         </div>
 
-        <a 
-          href={`/dashboard/repository/import?url=https://github.com/${repo.name}`}
-          className="text-xs font-normal text-neutral-400 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
-          href={`/dashboard/repository/${repo.id}`}
-          className="text-[13px] font-normal text-[#D9D9D9] hover:text-[#62BE8B] flex items-center gap-1 group-hover:translate-x-0.5 transition-all duration-200"
-        >
-          View Issues
-          <ArrowRight className="w-4 h-4" />
-        </a>
+        {isImportMode ? (
+          <button
+            onClick={handleAction}
+            disabled={isLoading}
+            className="text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-neutral-950 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed z-10 relative"
+          >
+            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            {isLoading ? "Importing..." : "Import Repo"}
+          </button>
+        ) : (
+          <a 
+            href={`/dashboard/repository/${repo.id}`}
+            className="text-xs font-medium text-neutral-300 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-all duration-300 z-10 relative"
+          >
+            View Issues
+            <ArrowRight className="w-3.5 h-3.5" />
+          </a>
+        )}
       </div>
     </div>
   );
