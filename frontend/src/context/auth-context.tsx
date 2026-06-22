@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 export interface User {
@@ -70,23 +70,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadUser();
   }, [API_URL]);
 
-  const loginWithGithub = () => {
+  const loginWithGithub = useCallback(() => {
     // Redirect browser to Express GitHub OAuth initiation endpoint
     window.location.href = `${API_URL}/auth/github`;
-  };
+  }, [API_URL]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem("osca_token");
     setToken(null);
     setUser(null);
     router.push("/");
-  };
+  }, [router]);
 
-  const setAuth = (newToken: string, newUser: User) => {
+  const setAuth = useCallback((newToken: string, newUser: User) => {
     localStorage.setItem("osca_token", newToken);
     setToken(newToken);
     setUser(newUser);
-  };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, token, loading, loginWithGithub, logout, setAuth }}>
