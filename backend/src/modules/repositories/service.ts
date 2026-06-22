@@ -78,7 +78,7 @@ const listGithubRepositories = async (
 
   if (search !== undefined && search.trim() !== '') {
     const response = await githubGetResponse(
-      `/user/repos?sort=updated&per_page=100&affiliation=${affiliation}`,
+      `/user/repos?sort=updated&per_page=100&affiliation=${affiliation}&visibility=public`,
       token
     )
 
@@ -110,7 +110,7 @@ const listGithubRepositories = async (
   }
 
   const response = await githubGetResponse(
-    `/user/repos?sort=updated&page=${page}&per_page=${limit}&affiliation=${affiliation}`,
+    `/user/repos?sort=updated&page=${page}&per_page=${limit}&affiliation=${affiliation}&visibility=public`,
     token
   )
 
