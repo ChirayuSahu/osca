@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, FolderGit2, User, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, FolderGit2, User, Settings, LogOut, Globe2 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 import { useAuth } from "@/context/auth-context";
 import {

@@ -6,6 +6,8 @@ import { SlidersHorizontal, Globe, BookMarked } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { SearchHeader } from "@/components/repositories/search-header";
 import { RepositoryCard, Repository } from "@/components/repositories/repository-card";
+import { RepositoryFilters } from "@/components/repositories/repository-filters";
+import { RepositoryDetailsPopover } from "@/components/repositories/repository-details-popover";
 import {
   Pagination,
   PaginationContent,

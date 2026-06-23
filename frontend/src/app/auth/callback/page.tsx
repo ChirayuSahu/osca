@@ -9,7 +9,11 @@ function AuthCallbackContent() {
   const router = useRouter();
   const { setAuth } = useAuth();
 
+  const processed = React.useRef(false);
+
   useEffect(() => {
+    if (processed.current) return;
+    
     const token = searchParams.get("token");
     const userJson = searchParams.get("user");
 
@@ -27,6 +31,7 @@ function AuthCallbackContent() {
             parsedUser = JSON.parse(decodeURIComponent(decodeURIComponent(userJson)));
           }
         }
+        processed.current = true;
         setAuth(token, parsedUser);
         router.push("/dashboard");
       } catch (err) {
@@ -34,6 +39,7 @@ function AuthCallbackContent() {
         router.push("/login?error=session_error");
       }
     } else {
+      processed.current = true;
       router.push("/login?error=invalid_params");
     }
   }, [searchParams, setAuth, router]);

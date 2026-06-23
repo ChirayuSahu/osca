@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 
 export default function Hero() {
   return (
@@ -19,13 +20,12 @@ export default function Hero() {
           <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
           <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
           <a href="#features" className="hover:text-white transition-colors duration-200">Features</a>
-          <a href="/developer-dashboard" className="hover:text-white transition-colors duration-200 text-emerald-400 hover:text-emerald-300">Dashboard</a>
         </div>
 
         <div>
-          <button className="bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
+          <Link href="/login" className="bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
             Sign up
-          </button>
+          </Link>
         </div>
       </nav>
 
@@ -33,14 +33,14 @@ export default function Hero() {
         
         <div className="flex flex-col justify-center w-full max-w-[677px] min-h-[406px] rounded-[32.5px] space-y-6">
           <h1 className="text-4xl md:text-5xl lg:text-[56px] font-normal tracking-tight text-white leading-[1.15]">
-            Lorem Ipsum Dolor sit{" "}
-            <span className="font-serif italic text-neutral-200 block mt-3">
-              is a dummy text used as a placeholder
+            Find the Right Open Source Project.{" "}
+            <span className="text-2xl md:text-3xl lg:text-[40px] font-serif italic text-neutral-200 block mt-4 leading-snug">
+              AI-powered matching for contributors and maintainers
             </span>
           </h1>
           
           <p className="text-base md:text-lg text-neutral-400 font-normal leading-relaxed max-w-xl">
-            An intelligent matchmaking layer that understands both sides and brings them together faster.
+            Connect your GitHub or GitLab account, analyze your skills, and discover repositories where you can make meaningful contributions.
           </p>
 
           <div className="pt-4">

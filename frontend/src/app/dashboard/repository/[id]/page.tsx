@@ -6,6 +6,7 @@ import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
 import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
+import { GroupChatPanel } from "@/components/threads/group-chat-panel";
 
 export default function RepositoryPage() {
   const params = useParams();
@@ -16,6 +17,7 @@ export default function RepositoryPage() {
   const [threads, setThreads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false);
+  const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
 
   useEffect(() => {
     if (!token || !repositoryId) return;
@@ -193,6 +195,12 @@ export default function RepositoryPage() {
         onClose={() => setIsCreateThreadOpen(false)} 
         repositoryId={repositoryId}
         onThreadCreated={handleThreadCreated}
+      />
+
+      <GroupChatPanel 
+        isOpen={isGroupChatOpen}
+        onClose={() => setIsGroupChatOpen(false)}
+        repositoryId={repositoryId}
       />
     </div>
   );

@@ -38,9 +38,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-mono bg-black text-white", jetbrainsMono.variable)}>
+    <html lang="en" className={cn("font-mono bg-black text-white", jetbrainsMono.variable)} suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} font-sans antialiased bg-black text-white`}
+        suppressHydrationWarning
       >
         <AuthProvider>
           <TooltipProvider>

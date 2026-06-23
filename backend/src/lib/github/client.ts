@@ -89,3 +89,18 @@ export const githubPostJson = async <T>(url: string, body: unknown): Promise<T> 
 
   return response.json() as Promise<T>
 }
+
+export const githubGraphQL = async <T>(query: string, token: string, variables: Record<string, unknown> = {}): Promise<T> => {
+  const response = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: buildHeaders(token),
+    body: JSON.stringify({ query, variables })
+  })
+
+  if (!response.ok) {
+    throw parseGithubError(response.status, 'graphql')
+  }
+
+  return response.json() as Promise<T>
+}
+
