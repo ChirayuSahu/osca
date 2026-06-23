@@ -20,7 +20,6 @@ export default function Hero() {
           <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
           <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
           <a href="#features" className="hover:text-white transition-colors duration-200">Features</a>
-          <a href="/developer-dashboard" className="hover:text-white transition-colors duration-200 text-emerald-400 hover:text-emerald-300">Dashboard</a>
         </div>
 
         <div>
