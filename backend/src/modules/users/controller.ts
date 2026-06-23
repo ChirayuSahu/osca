@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
@@ -13,7 +13,8 @@ const requireSelf = (req: RequestWithUser, userId: string): void => {
   }
 }
 
-const getUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const getUser = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const id = String(req.params.id)
   requireSelf(req, id)
 
@@ -24,9 +25,13 @@ const getUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
 
   assertFound(user, 'User not found')
   sendResponse(res, 200, true, 'User retrieved successfully', user)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const updateUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const updateUser = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const id = String(req.params.id)
   requireSelf(req, id)
 
@@ -46,9 +51,13 @@ const updateUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
   })
 
   sendResponse(res, 200, true, 'User updated successfully', user)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const analyzeProfile = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const analyzeProfile = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const id = String(req.params.id)
   requireSelf(req, id)
 
@@ -57,6 +66,9 @@ const analyzeProfile = asyncHandler(async (req: RequestWithUser, res: Response) 
 
   const queued = await JobEnqueueService.enqueueContributorAnalysis(id)
   sendResponse(res, 202, true, 'Contributor analysis queued', queued)
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const UserController = {

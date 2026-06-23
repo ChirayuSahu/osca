@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { AppError, assertFound } from '../../lib/errors'
@@ -15,7 +15,8 @@ const requireUserId = (req: RequestWithUser): string => {
   return userId
 }
 
-const createComment = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const createComment = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const { threadId, content, parentId } = req.body
 
@@ -45,9 +46,13 @@ const createComment = asyncHandler(async (req: RequestWithUser, res: Response) =
   })
 
   sendResponse(res, 201, true, 'Comment added successfully', comment)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const getComments = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
+const getComments = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
+  try {
   const threadId = req.query.threadId as string
   if (!threadId) {
     throw new AppError('threadId query parameter is required', 400)
@@ -79,9 +84,13 @@ const getComments = asyncHandler(async (req: RequestWithPaginationAndUser, res: 
     total,
     totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
   })
+  } catch (error) {
+    next(error)
+  }
 })
 
-const updateComment = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const updateComment = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const id = String(req.params.id)
   
@@ -106,9 +115,13 @@ const updateComment = asyncHandler(async (req: RequestWithUser, res: Response) =
   })
 
   sendResponse(res, 200, true, 'Comment updated successfully', comment)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const deleteComment = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const deleteComment = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const id = String(req.params.id)
   
@@ -122,9 +135,13 @@ const deleteComment = asyncHandler(async (req: RequestWithUser, res: Response) =
   await prisma.threadComment.delete({ where: { id } })
 
   sendResponse(res, 200, true, 'Comment deleted successfully')
+  } catch (error) {
+    next(error)
+  }
 })
 
-const voteComment = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const voteComment = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const commentId = String(req.params.id)
   const { value } = req.body
@@ -161,6 +178,9 @@ const voteComment = asyncHandler(async (req: RequestWithUser, res: Response) => 
   })
 
   sendResponse(res, 200, true, 'Vote recorded successfully', vote)
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const CommentController = {

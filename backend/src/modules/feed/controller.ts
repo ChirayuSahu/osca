@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { asyncHandler } from '../../utils/async-handler'
@@ -13,13 +13,17 @@ const requireUserId = (req: RequestWithUser): string => {
   return userId
 }
 
-const getFeed = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const getFeed = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const limit = parseInt(req.query.limit as string, 10) || 20
 
   const feed = await RecommendationEngineService.generateFeed(userId, limit)
 
   sendResponse(res, 200, true, 'Feed retrieved successfully', feed)
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const FeedController = {

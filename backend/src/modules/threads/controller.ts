@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
@@ -14,7 +14,8 @@ const requireUserId = (req: RequestWithUser): string => {
   return userId
 }
 
-const createThread = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const createThread = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const { repositoryId, title, content } = req.body
 
@@ -39,9 +40,13 @@ const createThread = asyncHandler(async (req: RequestWithUser, res: Response) =>
   })
 
   sendResponse(res, 201, true, 'Thread created successfully', thread)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const getThread = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const getThread = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const id = String(req.params.id)
   
   const thread = await prisma.repositoryThread.findUnique({
@@ -56,9 +61,13 @@ const getThread = asyncHandler(async (req: RequestWithUser, res: Response) => {
 
   assertFound(thread, 'Thread not found')
   sendResponse(res, 200, true, 'Thread retrieved successfully', thread)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const updateThread = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const updateThread = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const id = String(req.params.id)
   
@@ -86,6 +95,9 @@ const updateThread = asyncHandler(async (req: RequestWithUser, res: Response) =>
   })
 
   sendResponse(res, 200, true, 'Thread updated successfully', thread)
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const ThreadController = {
