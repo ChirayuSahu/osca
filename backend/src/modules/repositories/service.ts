@@ -1,5 +1,5 @@
-import { getGithubAccessToken } from '../../lib/github/get-access-token'
-import { githubGetResponse } from '../../lib/github/client'
+import { getGithubAccessToken } from '../../modules/github/get-access-token'
+import { githubGetResponse } from '../../modules/github/client'
 import { AppError } from '../../lib/errors'
 
 interface GithubRepoSummary {

@@ -5,12 +5,12 @@ import {
   detectPythonFrameworks,
   parsePackageJson,
   parseRawContent
-} from '../lib/github/detect-frameworks'
-import { getGithubAccessToken } from '../lib/github/get-access-token'
-import { githubGetJson, githubPathExists, githubTryGetRaw } from '../lib/github/client'
-import { parseGithubRepoUrl } from '../lib/github/parse-github-url'
-import type { ProgressCallback } from '../lib/github/types'
-import { noopProgress } from '../lib/github/types'
+} from '../modules/github/detect-frameworks'
+import { getGithubAccessToken } from '../modules/github/get-access-token'
+import { githubGetJson, githubPathExists, githubTryGetRaw } from '../modules/github/client'
+import { parseGithubRepoUrl } from '../modules/github/parse-github-url'
+import type { ProgressCallback } from '../modules/github/types'
+import { noopProgress } from '../modules/github/types'
 
 interface RepoAnalysis {
   name: string

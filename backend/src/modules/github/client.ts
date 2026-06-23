@@ -1,13 +1,18 @@
-import { AppError } from '../errors'
+import { AppError } from '../../lib/errors'
 
 const GITHUB_API = 'https://api.github.com'
 const USER_AGENT = 'Open-Source-Contributor-Matching-Platform'
 
-const buildHeaders = (token: string, accept = 'application/vnd.github.v3+json'): Record<string, string> => ({
-  Accept: accept,
-  'User-Agent': USER_AGENT,
-  Authorization: `Bearer ${token}`
-})
+const buildHeaders = (token?: string, accept = 'application/vnd.github.v3+json'): Record<string, string> => {
+  const headers: Record<string, string> = {
+    Accept: accept,
+    'User-Agent': USER_AGENT
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
+}
 
 const parseGithubError = (status: number, context: string): AppError => {
   if (status === 401) {
@@ -16,34 +21,20 @@ const parseGithubError = (status: number, context: string): AppError => {
   return new AppError(`GitHub API error (${context}): HTTP ${status}`, 502)
 }
 
-export const githubGetJson = async <T>(path: string, token: string): Promise<T> => {
-  const response = await fetch(`${GITHUB_API}${path}`, {
-    headers: buildHeaders(token)
-  })
+/**
+ * A generalized fetch wrapper for GitHub API.
+ */
+export const fetchGithub = async (
+  path: string,
+  options: RequestInit & { token?: string } = {}
+): Promise<Response> => {
+  const { token, headers: customHeaders, ...fetchOptions } = options
+  const url = path.startsWith('http') ? path : `${GITHUB_API}${path}`
 
-  if (!response.ok) {
-    throw parseGithubError(response.status, path)
-  }
+  const defaultHeaders = buildHeaders(token)
+  const headers = { ...defaultHeaders, ...customHeaders } as HeadersInit
 
-  return response.json() as Promise<T>
-}
-
-export const githubGetRaw = async (path: string, token: string): Promise<string> => {
-  const response = await fetch(`${GITHUB_API}${path}`, {
-    headers: buildHeaders(token, 'application/vnd.github.v3.raw')
-  })
-
-  if (!response.ok) {
-    throw parseGithubError(response.status, path)
-  }
-
-  return response.text()
-}
-
-export const githubGetResponse = async (path: string, token: string): Promise<Response> => {
-  const response = await fetch(`${GITHUB_API}${path}`, {
-    headers: buildHeaders(token)
-  })
+  const response = await fetch(url, { ...fetchOptions, headers })
 
   if (!response.ok) {
     throw parseGithubError(response.status, path)
@@ -52,24 +43,38 @@ export const githubGetResponse = async (path: string, token: string): Promise<Re
   return response
 }
 
-export const githubTryGetRaw = async (path: string, token: string): Promise<string | null> => {
-  const response = await fetch(`${GITHUB_API}${path}`, {
-    headers: buildHeaders(token, 'application/vnd.github.v3.raw')
+export const githubGetJson = async <T>(path: string, token: string): Promise<T> => {
+  const response = await fetchGithub(path, { token })
+  return response.json() as Promise<T>
+}
+
+export const githubGetRaw = async (path: string, token: string): Promise<string> => {
+  const response = await fetchGithub(path, {
+    token,
+    headers: { Accept: 'application/vnd.github.v3.raw' }
   })
-
-  if (!response.ok) {
-    return null
-  }
-
   return response.text()
 }
 
-export const githubPathExists = async (path: string, token: string): Promise<boolean> => {
-  const response = await fetch(`${GITHUB_API}${path}`, {
-    headers: buildHeaders(token)
-  })
+export const githubGetResponse = async (path: string, token: string): Promise<Response> => {
+  return fetchGithub(path, { token })
+}
 
-  return response.ok
+export const githubTryGetRaw = async (path: string, token: string): Promise<string | null> => {
+  try {
+    return await githubGetRaw(path, token)
+  } catch {
+    return null
+  }
+}
+
+export const githubPathExists = async (path: string, token: string): Promise<boolean> => {
+  try {
+    await fetchGithub(path, { token, method: 'HEAD' })
+    return true
+  } catch {
+    return false
+  }
 }
 
 export const githubPostJson = async <T>(url: string, body: unknown): Promise<T> => {
@@ -91,16 +96,11 @@ export const githubPostJson = async <T>(url: string, body: unknown): Promise<T> 
 }
 
 export const githubGraphQL = async <T>(query: string, token: string, variables: Record<string, unknown> = {}): Promise<T> => {
-  const response = await fetch('https://api.github.com/graphql', {
+  const response = await fetchGithub('/graphql', {
     method: 'POST',
-    headers: buildHeaders(token),
+    token,
     body: JSON.stringify({ query, variables })
   })
-
-  if (!response.ok) {
-    throw parseGithubError(response.status, 'graphql')
-  }
-
   return response.json() as Promise<T>
 }
 
