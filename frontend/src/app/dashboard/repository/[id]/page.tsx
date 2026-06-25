@@ -4,9 +4,11 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
-import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock } from "lucide-react";
+import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GroupChatPanel } from "@/components/threads/group-chat-panel";
+import { VisualMap } from "@/components/visual-map";
+import { RepositoryInsights } from "@/components/repository-insights";
 
 export default function RepositoryPage() {
   const params = useParams();
@@ -121,6 +123,35 @@ export default function RepositoryPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Two Column Layout: Map & Insights */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Column: Visual Map (takes up 2/3 on xl screens) */}
+        <div className="xl:col-span-2 flex flex-col space-y-4">
+          {(repo.folderStructure || (repo.dependencies && repo.dependencies.length > 0)) && (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-neutral-200 flex items-center gap-2">
+                  <Network className="w-5 h-5 text-emerald-500" />
+                  Codebase Architecture Map
+                </h2>
+              </div>
+              <VisualMap folderStructure={repo.folderStructure} dependencies={repo.dependencies} />
+            </>
+          )}
+        </div>
+
+        {/* Right Column: Insights (takes up 1/3 on xl screens) */}
+        <div className="xl:col-span-1 flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-neutral-200 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-emerald-500" />
+              Repository Insights
+            </h2>
+          </div>
+          <RepositoryInsights repo={repo} />
         </div>
       </div>
 

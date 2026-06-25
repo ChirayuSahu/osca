@@ -41,18 +41,17 @@ export default function HeroSection() {
             osca
           </div>
 
-          <div className="hidden lg:flex items-center gap-10 text-[13px] font-normal text-neutral-400">
-            <a href="#home" className="text-white transition-colors duration-200">Home</a>
-            <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
-            <a href="#benefits" className="hover:text-white transition-colors duration-200">About</a>
-            <a href="#benefits" className="hover:text-white transition-colors duration-200">Features</a>
-          </div>
+        <div className="hidden lg:flex items-center gap-12 text-sm font-medium text-neutral-400">
+          <a href="#home" className="text-white transition-colors duration-200">Home</a>
+          <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
+          <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
+          <a href="#benefits" className="hover:text-white transition-colors duration-200">Benefits</a>
+        </div>
 
-          <div>
-            <div>
-          <button className="bg-emerald-500 text-[#FFFFFF]font-medium px-6 py-2.5 rounded-full text-sm hover:bg-emerald-600 transition-all duration-200">
+        <div>
+          <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
             Sign up
-          </button>
+          </a>
         </div>
           </div>
         </nav>
