@@ -16,13 +16,12 @@ export default function HeroSection() {
           <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
           <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
           <a href="#benefits" className="hover:text-white transition-colors duration-200">Benefits</a>
-          <a href="/developer-dashboard" className="hover:text-white transition-colors duration-200 text-emerald-400 hover:text-emerald-300">Dashboard</a>
         </div>
 
         <div>
-          <button className="bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
+          <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
             Sign up
-          </button>
+          </a>
         </div>
       </nav>
 

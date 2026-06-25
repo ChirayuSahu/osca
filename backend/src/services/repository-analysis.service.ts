@@ -7,7 +7,7 @@ import {
   parseRawContent
 } from '../lib/github/detect-frameworks'
 import { getGithubAccessToken } from '../lib/github/get-access-token'
-import { githubGetJson, githubPathExists, githubTryGetRaw } from '../lib/github/client'
+import { githubGetJson, githubPathExists, githubTryGetRaw, githubGraphQL } from '../lib/github/client'
 import { parseGithubRepoUrl } from '../lib/github/parse-github-url'
 import type { ProgressCallback } from '../lib/github/types'
 import { noopProgress } from '../lib/github/types'
@@ -23,6 +23,8 @@ interface RepoAnalysis {
   frameworks: string[]
   techStack: string[]
   ciCd: string[]
+  folderStructure: any
+  dependencies: any
 }
 
 interface GithubRepoResponse {
@@ -34,6 +36,41 @@ interface GithubRepoResponse {
   stargazers_count: number
   forks_count: number
   open_issues_count: number
+  default_branch: string
+}
+
+interface GithubDependencyGraphResponse {
+  data?: {
+    repository?: {
+      dependencyGraphManifests?: {
+        nodes?: Array<{
+          blobPath: string
+          dependencies?: {
+            nodes?: Array<{
+              packageName: string
+              requirements: string
+              hasDependencies: boolean
+              packageManager: string
+            }>
+          }
+        }>
+      }
+    }
+  }
+}
+
+interface GithubTreeResponse {
+  sha: string
+  url: string
+  tree: Array<{
+    path: string
+    mode: string
+    type: string
+    sha: string
+    size?: number
+    url: string
+  }>
+  truncated: boolean
 }
 
 const CI_FILES = [
@@ -84,7 +121,9 @@ const analyzeRepository = async (
       languages: analysis.languages,
       frameworks: analysis.frameworks,
       techStack: analysis.techStack,
-      ciCd: analysis.ciCd
+      ciCd: analysis.ciCd,
+      folderStructure: analysis.folderStructure,
+      dependencies: analysis.dependencies
     },
     create: {
       name: analysis.name,
@@ -97,7 +136,9 @@ const analyzeRepository = async (
       languages: analysis.languages,
       frameworks: analysis.frameworks,
       techStack: analysis.techStack,
-      ciCd: analysis.ciCd
+      ciCd: analysis.ciCd,
+      folderStructure: analysis.folderStructure,
+      dependencies: analysis.dependencies
     }
   })
 
@@ -136,7 +177,71 @@ const analyzeGithubRepo = async (
   await onProgress(50, 'Detecting CI/CD pipelines...')
   const ciCd = await detectCiCdPipelines(owner, repo, token)
 
-  await onProgress(60, 'Repository tech stack analysis complete')
+  await onProgress(60, 'Fetching deep dependency graph...')
+  let dependenciesData: any[] = []
+  try {
+    const query = `
+      query getRepoDependencies($owner: String!, $repo: String!) {
+        repository(owner: $owner, name: $repo) {
+          dependencyGraphManifests {
+            nodes {
+              blobPath
+              dependencies {
+                nodes {
+                  packageName
+                  requirements
+                  hasDependencies
+                  packageManager
+                }
+              }
+            }
+          }
+        }
+      }
+    `
+    const depRes = await githubGraphQL<GithubDependencyGraphResponse>(query, token, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json')
+    dependenciesData = depRes.data?.repository?.dependencyGraphManifests?.nodes || []
+    
+    // Auto-detect frameworks from deep dependencies if missed by root scan
+    dependenciesData.forEach((manifest: any) => {
+      manifest.dependencies?.nodes?.forEach((dep: any) => {
+        const pkg = dep.packageName.toLowerCase()
+        if (pkg.includes('react')) frameworks.add('React')
+        if (pkg === 'next') frameworks.add('Next.js')
+        if (pkg === 'vue') frameworks.add('Vue')
+        if (pkg.includes('django')) frameworks.add('Django')
+      })
+    })
+  } catch (err) {
+    console.error(`[RepoService] Dependency graph error:`, err)
+  }
+
+  await onProgress(70, 'Fetching repository file tree for visual map...')
+  let folderStructure = null
+  try {
+    const branch = repoData.default_branch || 'main'
+    const treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}?recursive=1`, token)
+    
+    const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.github', '.vscode', '.idea', 'target', 'bin', 'obj'])
+    const IGNORED_FILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.DS_Store', 'Thumbs.db'])
+
+    folderStructure = treeRes.tree.filter(node => {
+      const parts = node.path.split('/')
+      
+      // Filter out ignored directories
+      if (parts.some(part => IGNORED_DIRS.has(part))) return false
+      
+      const filename = parts[parts.length - 1]
+      // Filter out ignored files
+      if (IGNORED_FILES.has(filename)) return false
+
+      return true
+    })
+  } catch (err) {
+    console.error(`[RepoService] Tree fetch error:`, err)
+  }
+
+  await onProgress(75, 'Repository tech stack analysis complete')
 
   return {
     name: String(repoData.name),
@@ -148,7 +253,9 @@ const analyzeGithubRepo = async (
     languages: languagesData,
     frameworks: Array.from(frameworks),
     techStack: Array.from(techStack),
-    ciCd
+    ciCd,
+    folderStructure,
+    dependencies: dependenciesData
   }
 }
 
