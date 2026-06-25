@@ -609,6 +609,43 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/v1/recommendations/chat:
+    post:
+      tags: [Recommendations]
+      summary: Chat with AI to get repository recommendations
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        type: string
+      responses:
+        '200':
+          description: AI response retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiSuccessResponse'
+                  - type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/recommendations/{id}:
     get:
       tags: [Recommendations]

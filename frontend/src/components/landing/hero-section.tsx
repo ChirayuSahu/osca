@@ -4,20 +4,20 @@ export default function HeroSection() {
   return (
     <section id="home" className="relative w-full h-full bg-[#020503] flex flex-col overflow-hidden select-none">
       <div className="absolute inset-0 pointer-events-none z-0">
-        <div 
-          className="absolute inset-0 bg-[radial-gradient(160%_140%_at_85%_25%,#104025_0%,#041e10_35%,#020503_70%)]" 
+        <div
+          className="absolute inset-0 bg-[radial-gradient(160%_140%_at_85%_25%,#104025_0%,#041e10_35%,#020503_70%)]"
         />
-        <div 
+        <div
           className="absolute inset-x-0 bottom-0 h-[20%] bg-gradient-to-t from-[#020503] to-transparent z-10"
         />
-        <div 
+        <div
           className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: `radial-gradient(circle at center, rgba(255,255,255,0.6) 1px, transparent 1px)`,
             backgroundSize: '24px 24px'
           }}
         />
-        <div 
+        <div
           className="absolute left-0 top-0 bottom-0 w-32 border-r border-dashed border-white/[0.04]"
           style={{
             backgroundImage: `radial-gradient(circle at center, rgba(255,255,255,0.2) 1px, transparent 1px)`,
@@ -25,7 +25,7 @@ export default function HeroSection() {
             backgroundPosition: 'center'
           }}
         />
-        <div 
+        <div
           className="absolute right-0 top-0 bottom-0 w-32 border-l border-dashed border-white/[0.04]"
           style={{
             backgroundImage: `radial-gradient(circle at center, rgba(255,255,255,0.2) 1px, transparent 1px)`,
@@ -41,18 +41,17 @@ export default function HeroSection() {
             osca
           </div>
 
-        <div className="hidden lg:flex items-center gap-12 text-sm font-medium text-neutral-400">
-          <a href="#home" className="text-white transition-colors duration-200">Home</a>
-          <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
-          <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
-          <a href="#benefits" className="hover:text-white transition-colors duration-200">Benefits</a>
-        </div>
+          <div className="hidden lg:flex items-center gap-12 text-sm font-medium text-neutral-400">
+            <a href="#home" className="text-white transition-colors duration-200">Home</a>
+            <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
+            <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
+            <a href="#benefits" className="hover:text-white transition-colors duration-200">Benefits</a>
+          </div>
 
-        <div>
-          <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
-            Sign up
-          </a>
-        </div>
+          <div>
+            <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
+              Sign up
+            </a>
           </div>
         </nav>
       </div>
@@ -77,12 +76,12 @@ export default function HeroSection() {
 
         <div className="flex justify-center lg:justify-end w-full">
           <div className="w-full max-w-[640px] bg-[#020d06] border-10 border-emerald-500/30 rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] grid grid-cols-[180px_1fr] font-sans overflow-hidden">
-            
+
             <div className="border-r border border-neutral-800/80 px-4 py-6 flex flex-col gap-6 bg-[#010804]">
               <div className="text-xl font-bold italic text-white font-serif pl-2">
                 osca
               </div>
-              
+
               <div className="flex flex-col gap-1.5 w-full">
                 <button className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-neutral-900 bg-white rounded-lg transition-colors">
                   <svg className="w-3.5 h-3.5 stroke-current fill-none" viewBox="0 0 24 24" strokeWidth="2">
@@ -107,13 +106,13 @@ export default function HeroSection() {
                 <h2 className="text-xl font-semibold text-white tracking-wide mb-3">
                   Welcome, Varada
                 </h2>
-                
+
                 <div className="w-full h-6 bg-neutral-950/40 border border-white/[0.06] rounded-full mb-6" />
 
                 <p className="text-xs font-semibold text-neutral-200 tracking-wide mb-3">
                   Your repositories
                 </p>
-                
+
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   <div className="bg-[#020503]/40 border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-2">
                     <div className="w-6 h-6 bg-orange-500/20 text-orange-400 rounded-md flex items-center justify-center">
