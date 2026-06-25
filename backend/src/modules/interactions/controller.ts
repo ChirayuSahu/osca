@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { asyncHandler } from '../../utils/async-handler'
@@ -13,7 +13,8 @@ const requireUserId = (req: RequestWithUser): string => {
   return userId
 }
 
-const logInteraction = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const logInteraction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = requireUserId(req)
   const { repositoryId, action } = req.body
 
@@ -24,6 +25,9 @@ const logInteraction = asyncHandler(async (req: RequestWithUser, res: Response) 
   await InteractionService.logInteraction(userId, String(repositoryId), action as InteractionAction)
 
   sendResponse(res, 201, true, 'Interaction logged successfully')
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const InteractionController = {

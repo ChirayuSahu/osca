@@ -1,4 +1,4 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
@@ -26,7 +26,8 @@ const assertRecommendationOwner = async (recommendationId: string, userId: strin
   }
 }
 
-const createRecommendation = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const createRecommendation = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const requesterId = requireUserId(req)
   const { userId, repositoryId, fitScore, explanation, roadmap } = req.body
 
@@ -63,9 +64,13 @@ const createRecommendation = asyncHandler(async (req: RequestWithUser, res: Resp
   })
 
   sendResponse(res, 201, true, 'Recommendation created successfully', recommendation)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const getRecommendation = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const getRecommendation = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const requesterId = requireUserId(req)
   const id = String(req.params.id)
 
@@ -77,9 +82,13 @@ const getRecommendation = asyncHandler(async (req: RequestWithUser, res: Respons
   })
 
   sendResponse(res, 200, true, 'Recommendation retrieved successfully', assertFound(recommendation, 'Recommendation not found'))
+  } catch (error) {
+    next(error)
+  }
 })
 
-const listRecommendations = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
+const listRecommendations = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
+  try {
   const requesterId = requireUserId(req)
   const skip = req.pagination?.skip
   const take = req.pagination?.take
@@ -102,9 +111,13 @@ const listRecommendations = asyncHandler(async (req: RequestWithPaginationAndUse
     total,
     totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
   })
+  } catch (error) {
+    next(error)
+  }
 })
 
-const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const requesterId = requireUserId(req)
   const id = String(req.params.id)
   const { status } = req.body
@@ -121,9 +134,13 @@ const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res
   })
 
   sendResponse(res, 200, true, 'Recommendation status updated successfully', recommendation)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const deleteRecommendation = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const deleteRecommendation = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const requesterId = requireUserId(req)
   const id = String(req.params.id)
 
@@ -131,6 +148,9 @@ const deleteRecommendation = asyncHandler(async (req: RequestWithUser, res: Resp
   await prisma.recommendation.delete({ where: { id } })
 
   sendResponse(res, 200, true, 'Recommendation deleted successfully')
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const RecommendationController = {

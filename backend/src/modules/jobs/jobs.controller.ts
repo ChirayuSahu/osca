@@ -1,11 +1,12 @@
-import { Response } from 'express'
+import { NextFunction,  Response } from 'express'
 import { JobsService } from './jobs.service'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { AppError } from '../../lib/errors'
 import { asyncHandler } from '../../utils/async-handler'
 
-const getStatus = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const getStatus = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const queueName = req.params.queueName as string
   const jobId = req.params.jobId as string
   const requesterId = req.user?.id
@@ -23,6 +24,9 @@ const getStatus = asyncHandler(async (req: RequestWithUser, res: Response) => {
 
   const status = await JobsService.getJobStatus(queueName, jobId, requesterId)
   sendResponse(res, 200, true, 'Job status retrieved', status)
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const JobsController = {

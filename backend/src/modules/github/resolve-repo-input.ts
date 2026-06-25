@@ -1,4 +1,4 @@
-import { AppError } from '../errors'
+import { AppError } from '../../lib/errors'
 import { parseGithubRepoUrl } from './parse-github-url'
 
 interface RepoInput {

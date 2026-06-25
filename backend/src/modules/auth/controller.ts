@@ -1,9 +1,9 @@
-import { Request, Response } from 'express'
+import { NextFunction,  Request, Response } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../../config'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
-import { githubGetJson, githubPostJson } from '../../lib/github/client'
+import { githubGetJson, githubPostJson } from '../../modules/github/client'
 import { AppError } from '../../lib/errors'
 import { asyncHandler } from '../../utils/async-handler'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
@@ -28,7 +28,8 @@ const redirectToGithub = (req: Request, res: Response): void => {
   res.redirect(authorizeUrl)
 }
 
-const handleGithubCallback = asyncHandler(async (req: Request, res: Response) => {
+const handleGithubCallback = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  try {
   const { code } = req.query
 
   if (typeof code !== 'string') {
@@ -111,9 +112,13 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
     email: user.email,
     avatarUrl: user.avatarUrl
   }))}`)
+  } catch (error) {
+    next(error)
+  }
 })
 
-const getCurrentUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
+const getCurrentUser = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
   const userId = req.user?.id
   if (userId === undefined) {
     throw new AppError('Unauthorized', 401)
@@ -138,6 +143,9 @@ const getCurrentUser = asyncHandler(async (req: RequestWithUser, res: Response) 
   }
 
   sendResponse(res, 200, true, 'User profile retrieved successfully', { user })
+  } catch (error) {
+    next(error)
+  }
 })
 
 export const AuthController = {
