@@ -197,7 +197,7 @@ function GitHubReposContent() {
       });
       const data = await res.json();
       if (!data.success) {
-        setDialogState({ isOpen: true, type: "error", message: "Failed to queue repository for import." });
+        setDialogState({ isOpen: true, type: "error", message: data.message || "Failed to queue repository for import." });
       } else {
         setDialogState({ isOpen: true, type: "success", message: "Repository successfully queued for import! It will appear in your Imported Repositories soon." });
       }

@@ -8,6 +8,7 @@ import { config } from './index'
 export const getRedisConnectionOptions = (): ConnectionOptions => ({
   host: config.redis.host,
   port: config.redis.port,
+  username: config.redis.username || 'default',
   password: config.redis.password,
   maxRetriesPerRequest: null,
   ...(config.redis.tls ? { tls: {} } : {})
