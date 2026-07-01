@@ -1,0 +1,10 @@
+backend/postman
+node_modules
+dist
+build
+.next
+.cache
+coverage
+.env*
+*.log
+graphify-out

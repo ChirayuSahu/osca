@@ -4,13 +4,16 @@ import {
   detectNpmFrameworks,
   detectPythonFrameworks,
   parsePackageJson,
-  parseRawContent
-} from '../lib/github/detect-frameworks'
-import { getGithubAccessToken } from '../lib/github/get-access-token'
-import { githubGetJson, githubPathExists, githubTryGetRaw, githubGraphQL } from '../lib/github/client'
-import { parseGithubRepoUrl } from '../lib/github/parse-github-url'
-import type { ProgressCallback } from '../lib/github/types'
-import { noopProgress } from '../lib/github/types'
+  parseRawContent,
+  getGithubAccessToken,
+  githubGetJson,
+  githubPathExists,
+  githubTryGetRaw,
+  githubGraphQL,
+  parseGithubRepoUrl,
+  type ProgressCallback,
+  noopProgress
+} from '../lib/github'
 
 interface RepoAnalysis {
   name: string
@@ -91,7 +94,24 @@ const analyzeRepository = async (
   console.log(`[RepoService] Starting analysis for ${url}`)
   await onProgress(5, 'Validating repository URL...')
   const { owner, repo } = parseGithubRepoUrl(url)
+  const fullName = `${owner}/${repo}`
   console.log(`[RepoService] Parsed URL: owner=${owner}, repo=${repo}`)
+
+  // Check if repository already exists and has folderStructure
+  const existingRepo = await prisma.repository.findUnique({
+    where: {
+      provider_fullName: {
+        provider: 'github',
+        fullName: fullName
+      }
+    }
+  })
+
+  if (existingRepo && existingRepo.folderStructure && Object.keys(existingRepo.folderStructure).length > 0) {
+    console.log(`[RepoService] Repository ${fullName} already fully analyzed. Skipping.`)
+    await onProgress(100, 'Repository already analyzed.')
+    return existingRepo
+  }
 
   await onProgress(8, 'Fetching user credentials...')
   const accessToken = await getGithubAccessToken(userId)
@@ -166,12 +186,60 @@ const analyzeGithubRepo = async (
     languagesData = {}
   }
 
-  await onProgress(25, 'Detecting frameworks and tech stack...')
+  await onProgress(25, 'Fetching repository file tree for visual map...')
+  let folderStructure = null
+  try {
+    const branch = repoData.default_branch || 'main'
+    let treeRes: GithubTreeResponse
+    
+    try {
+      treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}?recursive=1`, token)
+    } catch (err: any) {
+      console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow fetch.`)
+      treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}`, token)
+    }
+    
+    const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.github', '.vscode', '.idea', 'target', 'bin', 'obj'])
+    const IGNORED_FILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.DS_Store', 'Thumbs.db'])
+
+    folderStructure = treeRes.tree.filter(node => {
+      const parts = node.path.split('/')
+      if (parts.some(part => IGNORED_DIRS.has(part))) return false
+      const filename = parts[parts.length - 1]
+      if (IGNORED_FILES.has(filename)) return false
+      return true
+    })
+  } catch (err) {
+    console.error(`[RepoService] Tree fetch error (both recursive and shallow failed):`, err)
+  }
+
+  await onProgress(40, 'Detecting frameworks and tech stack...')
   const frameworks = new Set<string>()
   const techStack = new Set<string>()
+  const fallbackDependencies: any[] = []
 
-  await detectNodeStack(owner, repo, token, frameworks, techStack)
-  await detectPythonStack(owner, repo, token, frameworks, techStack)
+  if (folderStructure) {
+    const packageJsonPaths = folderStructure.filter(n => n.path.endsWith('package.json') && n.path.split('/').length <= 3).map(n => n.path)
+    if (packageJsonPaths.length === 0) packageJsonPaths.push('package.json')
+    for (const path of packageJsonPaths) {
+      const nodeDeps = await detectNodeStack(owner, repo, path, token, frameworks, techStack)
+      if (nodeDeps) fallbackDependencies.push(nodeDeps)
+    }
+
+    const reqPaths = folderStructure.filter(n => n.path.endsWith('requirements.txt') && n.path.split('/').length <= 3).map(n => n.path)
+    if (reqPaths.length === 0) reqPaths.push('requirements.txt')
+    for (const path of reqPaths) {
+      const pyDeps = await detectPythonStack(owner, repo, path, token, frameworks, techStack)
+      if (pyDeps) fallbackDependencies.push(pyDeps)
+    }
+  } else {
+    const nodeDeps = await detectNodeStack(owner, repo, 'package.json', token, frameworks, techStack)
+    if (nodeDeps) fallbackDependencies.push(nodeDeps)
+
+    const pyDeps = await detectPythonStack(owner, repo, 'requirements.txt', token, frameworks, techStack)
+    if (pyDeps) fallbackDependencies.push(pyDeps)
+  }
+
   await detectOtherStacks(owner, repo, token, frameworks, techStack)
 
   await onProgress(50, 'Detecting CI/CD pipelines...')
@@ -216,29 +284,8 @@ const analyzeGithubRepo = async (
     console.error(`[RepoService] Dependency graph error:`, err)
   }
 
-  await onProgress(70, 'Fetching repository file tree for visual map...')
-  let folderStructure = null
-  try {
-    const branch = repoData.default_branch || 'main'
-    const treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}?recursive=1`, token)
-    
-    const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.github', '.vscode', '.idea', 'target', 'bin', 'obj'])
-    const IGNORED_FILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.DS_Store', 'Thumbs.db'])
-
-    folderStructure = treeRes.tree.filter(node => {
-      const parts = node.path.split('/')
-      
-      // Filter out ignored directories
-      if (parts.some(part => IGNORED_DIRS.has(part))) return false
-      
-      const filename = parts[parts.length - 1]
-      // Filter out ignored files
-      if (IGNORED_FILES.has(filename)) return false
-
-      return true
-    })
-  } catch (err) {
-    console.error(`[RepoService] Tree fetch error:`, err)
+  if (dependenciesData.length === 0) {
+    dependenciesData = fallbackDependencies
   }
 
   await onProgress(75, 'Repository tech stack analysis complete')
@@ -262,29 +309,71 @@ const analyzeGithubRepo = async (
 const detectNodeStack = async (
   owner: string,
   repo: string,
+  filePath: string,
   token: string,
   frameworks: Set<string>,
   techStack: Set<string>
-): Promise<void> => {
-  const raw = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/package.json`, token)
-  if (raw === null) return
+): Promise<any | null> => {
+  const raw = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/${filePath}`, token)
+  if (raw === null) return null
 
-  detectNpmFrameworks(parsePackageJson(raw), frameworks)
-  techStack.add('Node.js')
+  try {
+    const pkgJson = parsePackageJson(raw)
+    detectNpmFrameworks(pkgJson, frameworks)
+    techStack.add('Node.js')
+
+    const nodes = []
+    const allDeps = { ...pkgJson.dependencies, ...pkgJson.devDependencies }
+    for (const [name, req] of Object.entries(allDeps)) {
+      if (typeof req === 'string') {
+        nodes.push({ packageName: name, requirements: req, packageManager: 'NPM', hasDependencies: false })
+      }
+    }
+
+    return {
+      blobPath: filePath,
+      dependencies: { nodes }
+    }
+  } catch (err) {
+    return null
+  }
 }
 
 const detectPythonStack = async (
   owner: string,
   repo: string,
+  filePath: string,
   token: string,
   frameworks: Set<string>,
   techStack: Set<string>
-): Promise<void> => {
-  const raw = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/requirements.txt`, token)
-  if (raw === null) return
+): Promise<any | null> => {
+  const raw = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/${filePath}`, token)
+  if (raw === null) return null
 
-  detectPythonFrameworks(parseRawContent(raw), frameworks)
-  techStack.add('Python')
+  try {
+    const content = parseRawContent(raw)
+    detectPythonFrameworks(content, frameworks)
+    techStack.add('Python')
+
+    const nodes = []
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const parts = trimmed.split(/[=<>!~]/)
+      const name = parts[0].trim()
+      const req = trimmed.substring(name.length).trim() || '*'
+      if (name) {
+        nodes.push({ packageName: name, requirements: req, packageManager: 'PIP', hasDependencies: false })
+      }
+    }
+
+    return {
+      blobPath: filePath,
+      dependencies: { nodes }
+    }
+  } catch (err) {
+    return null
+  }
 }
 
 const detectOtherStacks = async (

@@ -1,17 +1,20 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../utils/prisma'
 import { assertFound } from '../lib/errors'
-import { buildSkillList } from '../modules/github/build-skills'
 import {
+  buildSkillList,
   detectNpmFrameworks,
   detectPythonFrameworks,
   parsePackageJson,
-  parseRawContent
-} from '../modules/github/detect-frameworks'
-import { getGithubAccessToken } from '../modules/github/get-access-token'
-import { githubGetJson, githubTryGetRaw, githubGraphQL } from '../modules/github/client'
-import type { ProgressCallback, Skill } from '../modules/github/types'
-import { noopProgress } from '../modules/github/types'
+  parseRawContent,
+  getGithubAccessToken,
+  githubGetJson,
+  githubTryGetRaw,
+  githubGraphQL,
+  type ProgressCallback,
+  type Skill,
+  noopProgress
+} from '../lib/github'
 
 interface GitHubRepo {
   name: string

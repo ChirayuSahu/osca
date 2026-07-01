@@ -1,9 +1,6 @@
-import { getGithubAccessToken } from '../../modules/github/get-access-token'
-import { githubGetResponse } from '../../modules/github/client'
+import { getGithubAccessToken, githubGetResponse, parseGithubRepoUrl } from '../../lib/github'
 import { AppError } from '../../lib/errors'
 import { prisma } from '../../utils/prisma'
-import { parseGithubRepoUrl } from '../../modules/github/parse-github-url'
-import { fetchGithub } from '../../modules/github/client'
 
 interface GithubRepoSummary {
   id: number
@@ -134,8 +131,48 @@ const listGithubRepositories = async (
   }
 }
 
+const searchEasyContributionRepos = async (
+  userId: string,
+  page: number,
+  limit: number,
+  language?: string
+): Promise<PaginatedGithubRepos> => {
+  const token = await getGithubAccessToken(userId)
+  
+  let query = 'good-first-issues:>0 state:open'
+  if (language && language.trim() !== '') {
+    query += ` language:${language.trim()}`
+  }
+
+  // GitHub Search API requires URL encoding for the query
+  const encodedQuery = encodeURIComponent(query)
+  const response = await githubGetResponse(
+    `/search/repositories?q=${encodedQuery}&sort=updated&order=desc&page=${page}&per_page=${limit}`,
+    token
+  )
+
+  const data = await response.json()
+  const repos = data.items as GithubRepoSummary[] || []
+  
+  const linkHeader = response.headers.get('Link') ?? response.headers.get('link')
+  const pagination = parseGithubLinkPagination(linkHeader, page, limit, repos.length)
+
+  // Wait, GitHub search API also returns `total_count`. We can use it.
+  const total = data.total_count ?? pagination.total
+  const totalPages = Math.ceil(total / limit)
+
+  return {
+    repos,
+    page,
+    limit,
+    total,
+    totalPages
+  }
+}
+
 export const RepositoryService = {
-  listGithubRepositories
+  listGithubRepositories,
+  searchEasyContributionRepos
 }
 
 export type { PaginatedGithubRepos, GithubRepoSummary }

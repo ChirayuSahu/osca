@@ -4,10 +4,11 @@ import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
 import { AppError, assertFound } from '../../lib/errors'
-import { resolveRepositoryUrl } from '../../modules/github/resolve-repo-input'
+import { resolveRepositoryUrl } from '../../lib/github'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { RepositoryService } from './service'
 import { InteractionService } from '../../services/interaction.service'
+import { githubGetJson } from '../../lib/github/client'
 import { asyncHandler } from '../../utils/async-handler'
 
 const requireUserId = (req: RequestWithUser): string => {
@@ -36,6 +37,71 @@ const getRepository = asyncHandler(async (req: RequestWithUser, res: Response, n
   const repository = await prisma.repository.findUnique({ where: { id } })
   assertFound(repository, 'Repository not found')
   sendResponse(res, 200, true, 'Repository retrieved successfully', repository)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const { owner, repo } = req.params
+    const fullName = `${owner}/${repo}`
+    
+    const repository = await prisma.repository.findUnique({ 
+      where: { 
+        provider_fullName: {
+          provider: 'github',
+          fullName
+        }
+      } 
+    })
+    
+    if (repository) {
+      sendResponse(res, 200, true, 'Repository retrieved successfully', {
+        ...repository,
+        imported: true
+      })
+      return
+    }
+
+    // Not found in our DB, try fetching from GitHub
+    const account = await prisma.oAuthAccount.findFirst({
+      where: { userId: req.user!.id, provider: 'github' }
+    })
+
+    if (!account || !account.accessToken) {
+      throw new AppError('GitHub account not connected', 400)
+    }
+
+    try {
+      const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, account.accessToken)
+      
+      const previewRepo = {
+        id: `gh-${ghRepo.id}`,
+        name: ghRepo.name,
+        owner: ghRepo.owner.login,
+        fullName: ghRepo.full_name,
+        provider: 'github',
+        githubId: ghRepo.id,
+        description: ghRepo.description,
+        url: ghRepo.html_url,
+        languages: ghRepo.language ? { [ghRepo.language]: 100 } : null,
+        frameworks: [],
+        techStack: ghRepo.topics || [],
+        dependencies: null,
+        folderStructure: null,
+        ciCd: [],
+        createdAt: ghRepo.created_at,
+        updatedAt: ghRepo.updated_at,
+        imported: false,
+        _count: { likes: 0, interactions: 0 }
+      }
+
+      sendResponse(res, 200, true, 'Repository preview retrieved from GitHub', previewRepo)
+    } catch (ghError) {
+      throw new AppError('Repository not found on GitHub or unauthorized', 404)
+    }
+
   } catch (error) {
     next(error)
   }
@@ -140,45 +206,6 @@ const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithP
   }
 })
 
-const listRepositoryThreads = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
-  const repositoryId = String(req.params.id)
-  const skip = req.pagination?.skip ?? 0
-  const take = req.pagination?.take ?? 10
-  
-  // ensure repository exists
-  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } })
-  assertFound(repo, 'Repository not found')
-
-  const [total, threads] = await Promise.all([
-    prisma.repositoryThread.count({ where: { repositoryId } }),
-    prisma.repositoryThread.findMany({
-      where: { repositoryId },
-      skip,
-      take,
-      include: {
-        author: {
-          select: { id: true, name: true, username: true, avatarUrl: true }
-        },
-        _count: { select: { comments: true } }
-      },
-      orderBy: [
-        { isPinned: 'desc' },
-        { updatedAt: 'desc' }
-      ]
-    })
-  ])
-
-  sendResponse(res, 200, true, 'Repository threads retrieved successfully', threads, {
-    page: req.pagination?.page ?? 1,
-    limit: req.pagination?.limit ?? 10,
-    total,
-    totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
-  })
-  } catch (error) {
-    next(error)
-  }
-})
 
 const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
@@ -213,14 +240,37 @@ const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Resp
   }
 })
 
+const searchEasyContributions = asyncHandler(
+  async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.id
+      const page = req.pagination?.page ?? 1
+      const limit = req.pagination?.limit ?? 10
+      const language = req.query.language as string | undefined
+
+      const result = await RepositoryService.searchEasyContributionRepos(userId, page, limit, language)
+      
+      sendResponse(res, 200, true, 'Easy contribution repositories retrieved successfully', result.repos, {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
 export const RepositoryController = {
   queueRepositoryAnalysis,
   getRepository,
+  getRepositoryByFullName,
   listRepositories,
   deleteRepository,
   listGithubRepositories,
   listPersonalGithubRepositories,
   listOrganizationGithubRepositories,
-  listRepositoryThreads,
-  toggleRepositoryLike
+  toggleRepositoryLike,
+  searchEasyContributions
 }

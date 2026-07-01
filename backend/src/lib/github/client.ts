@@ -109,3 +109,26 @@ export const githubGraphQL = async <T>(
   return response.json() as Promise<T>
 }
 
+export const fetchGithub = async (
+  path: string,
+  options: { token: string; method?: string; body?: string | object }
+): Promise<Response> => {
+  const { token, method = 'GET', body } = options
+  const headers = buildHeaders(token)
+
+  if (body) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    method,
+    headers,
+    body: typeof body === 'object' ? JSON.stringify(body) : body
+  })
+
+  if (!response.ok) {
+    throw parseGithubError(response.status, path)
+  }
+
+  return response
+}

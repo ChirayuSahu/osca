@@ -1,5 +1,4 @@
-import { getGithubAccessToken } from '../../modules/github/get-access-token'
-import { fetchGithub } from '../../modules/github/client'
+import { getGithubAccessToken, fetchGithub } from '../../lib/github'
 
 const listIssues = async (userId: string, owner: string, repo: string, page: number, limit: number) => {
   const token = await getGithubAccessToken(userId)
@@ -16,6 +15,12 @@ const listIssues = async (userId: string, owner: string, repo: string, page: num
   }
   
   return { issues, page, limit, totalPages }
+}
+
+const getIssue = async (userId: string, owner: string, repo: string, issueNumber: number) => {
+  const token = await getGithubAccessToken(userId)
+  const response = await fetchGithub(`/repos/${owner}/${repo}/issues/${issueNumber}`, { token })
+  return response.json()
 }
 
 const listIssueComments = async (userId: string, owner: string, repo: string, issueNumber: number, page: number, limit: number) => {
@@ -56,9 +61,21 @@ const createIssueComment = async (userId: string, owner: string, repo: string, i
   return response.json()
 }
 
+const deleteIssueComment = async (userId: string, owner: string, repo: string, commentId: number) => {
+  const token = await getGithubAccessToken(userId)
+  
+  await fetchGithub(`/repos/${owner}/${repo}/issues/comments/${commentId}`, {
+    method: 'DELETE',
+    token
+  })
+  return { success: true }
+}
+
 export const IssuesService = {
   listIssues,
+  getIssue,
   listIssueComments,
   createIssue,
-  createIssueComment
+  createIssueComment,
+  deleteIssueComment
 }

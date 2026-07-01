@@ -19,9 +19,6 @@ model User {
   oauthAccounts      OAuthAccount[]
   recommendations    Recommendation[]
   contributorProfile ContributorProfile?
-  repositoryThreads  RepositoryThread[]
-  threadComments     ThreadComment[]
-  commentVotes       CommentVote[]
   repositoryLikes    RepositoryLike[]
   interactions       UserInteraction[]
   interests          UserInterest[]
@@ -63,67 +60,10 @@ model Repository {
   updatedAt       DateTime @updatedAt
 
   recommendations Recommendation[]
-  threads         RepositoryThread[]
   likes           RepositoryLike[]
   interactions    UserInteraction[]
 
   @@unique([provider, fullName])
-}
-
-model RepositoryThread {
-  id           String @id @default(uuid())
-  repositoryId String
-  authorId     String
-
-  title   String
-  content String
-
-  isPinned Boolean @default(false)
-  isLocked Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-  author     User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
-
-  comments ThreadComment[]
-}
-
-model ThreadComment {
-  id       String @id @default(uuid())
-  threadId String
-  authorId String
-
-  content String
-
-  parentId String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  thread RepositoryThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  author User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
-
-  parent  ThreadComment?  @relation("CommentReplies", fields: [parentId], references: [id])
-  replies ThreadComment[] @relation("CommentReplies")
-
-  votes CommentVote[]
-}
-
-model CommentVote {
-  id        String @id @default(uuid())
-  commentId String
-  userId    String
-
-  value Int @default(1)
-
-  createdAt DateTime @default(now())
-
-  comment ThreadComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([commentId, userId])
 }
 
 model ContributorProfile {
@@ -158,37 +98,37 @@ model Recommendation {
 }
 
 model RepositoryLike {
-  id           String     @id @default(uuid())
+  id           String   @id @default(uuid())
   userId       String
   repositoryId String
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime @default(now())
 
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
   @@unique([userId, repositoryId])
 }
 
 model UserInteraction {
-  id           String     @id @default(uuid())
+  id           String   @id @default(uuid())
   userId       String
   repositoryId String
-  action       String     // e.g., REPOSITORY_VIEW, REPOSITORY_LIKE, ISSUE_VIEW, ISSUE_COMMENT, CONTRIBUTION, REPOSITORY_SAVE
+  action       String // e.g., REPOSITORY_VIEW, REPOSITORY_LIKE, ISSUE_VIEW, ISSUE_COMMENT, CONTRIBUTION, REPOSITORY_SAVE
   weight       Int
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime @default(now())
 
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 }
 
 model UserInterest {
-  id           String     @id @default(uuid())
-  userId       String
-  tag          String     // language or topic name
-  score        Float      @default(0.0)
-  updatedAt    DateTime   @updatedAt
+  id        String   @id @default(uuid())
+  userId    String
+  tag       String // language or topic name
+  score     Float    @default(0.0)
+  updatedAt DateTime @updatedAt
 
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, tag])
 }

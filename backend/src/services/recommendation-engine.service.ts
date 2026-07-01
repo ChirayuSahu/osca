@@ -42,9 +42,23 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
   // 2. Fetch candidate repositories
   // Fetching all for MVP. In production, we'd limit this to recently active or via a materialized view.
   const repositories = await prisma.repository.findMany({
-    include: {
+    select: {
+      id: true,
+      name: true,
+      owner: true,
+      fullName: true,
+      provider: true,
+      githubId: true,
+      description: true,
+      url: true,
+      languages: true,
+      frameworks: true,
+      techStack: true,
+      ciCd: true,
+      createdAt: true,
+      updatedAt: true,
       _count: {
-        select: { likes: true, threads: true }
+        select: { likes: true, interactions: true }
       }
     }
   })
@@ -55,7 +69,7 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
   
   repositories.forEach(repo => {
     maxLikes = Math.max(maxLikes, repo._count.likes)
-    const activity = repo._count.threads
+    const activity = repo._count.interactions
     maxActivity = Math.max(maxActivity, activity)
   })
 
@@ -90,7 +104,7 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
     topicMatchScore = Math.min(topicMatchScore, 100)
 
     const popularityScore = normalize(repo._count.likes, 0, maxLikes)
-    const activityScore = normalize(repo._count.threads, 0, maxActivity)
+    const activityScore = normalize(repo._count.interactions, 0, maxActivity)
 
     const totalScore = 
       (languageMatchScore * 0.4) + 
@@ -113,10 +127,20 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
     }
   })
 
-  // 4. Sort and return
-  scoredRepos.sort((a, b) => b.scoreInfo.totalScore - a.scoreInfo.totalScore)
+  // 4. Filter, Sort and return
+  let relevantRepos = scoredRepos
 
-  return scoredRepos.slice(0, limit)
+  // If the user has any explicit skills or interests, filter out completely irrelevant repositories
+  if (interestMap.size > 0) {
+    relevantRepos = scoredRepos.filter(r => 
+      r.scoreInfo.breakdown.languageMatchScore > 0 || 
+      r.scoreInfo.breakdown.topicMatchScore > 0
+    )
+  }
+
+  relevantRepos.sort((a, b) => b.scoreInfo.totalScore - a.scoreInfo.totalScore)
+
+  return relevantRepos.slice(0, limit)
 }
 
 export const RecommendationEngineService = {

@@ -7,11 +7,10 @@ import { authRouter } from './modules/auth/route'
 import { repositoriesRouter } from './modules/repositories/route'
 import { recommendationsRouter } from './modules/recommendations/route'
 import { jobsRouter } from './modules/jobs/jobs.route'
-import { threadsRouter } from './modules/threads/route'
-import { commentsRouter } from './modules/comments/route'
 import { feedRouter } from './modules/feed/route'
 import { interactionsRouter } from './modules/interactions/route'
 import { issuesRouter } from './modules/issues/route'
+import { pullsRouter } from './modules/pulls/route'
 import { errorMiddleware, CustomError } from './middlewares/error.middleware'
 
 const app: Application = express()
@@ -19,6 +18,14 @@ const app: Application = express()
 app.use(cors())
 app.use(express.json())
 
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`)
+  })
+  next()
+})
 mountSwaggerDocs(app)
 
 app.use('/api/v1/health', healthRouter)
@@ -27,11 +34,10 @@ app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/repositories', repositoriesRouter)
 app.use('/api/v1/recommendations', recommendationsRouter)
 app.use('/api/v1/jobs', jobsRouter)
-app.use('/api/v1/threads', threadsRouter)
-app.use('/api/v1/comments', commentsRouter)
 app.use('/api/v1/feed', feedRouter)
 app.use('/api/v1/interactions', interactionsRouter)
 app.use('/api/v1/issues', issuesRouter)
+app.use('/api/v1/pulls', pullsRouter)
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const error: CustomError = new Error(`Cannot ${req.method} ${req.originalUrl}`)

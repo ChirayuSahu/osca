@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { getQueue, QUEUE_NAMES, type QueueName } from '../config/queue'
 import type {
   ContributorAnalysisJobData,
@@ -14,7 +15,7 @@ const enqueue = async (
   data: RepositoryAnalysisJobData | ContributorAnalysisJobData
 ): Promise<QueuedJobResponse> => {
   const queue = getQueue(queueName)
-  const job = await queue.add(jobName, data)
+  const job = await queue.add(jobName, data, { jobId: randomUUID() })
 
   return {
     jobId: job.id,

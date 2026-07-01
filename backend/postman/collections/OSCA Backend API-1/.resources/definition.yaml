@@ -1,4 +1,0 @@
-$kind: collection
-name: OSCA Backend API
-variables:
-  BASE_URL: http://localhost:8000
