@@ -1,8 +1,5 @@
 name: Globals
 values:
-  - key: osca_access_token
-    value: ''
-    enabled: true
   - key: JWT_TOKEN
-    value: ''
     enabled: true
+    secret: true
