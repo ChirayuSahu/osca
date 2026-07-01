@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ArrowRight, Code2, Bot, User as UserIcon, Loader2, ExternalLink, Github } from "lucide-react";
+import { Search, ArrowRight, Code2, Bot, User as UserIcon, Loader2, ExternalLink } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -179,8 +179,12 @@ export function ChatConsole() {
 
               {/* User Avatar */}
               {msg.role === 'user' && (
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 mt-1 border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] backdrop-blur-md">
-                  <UserIcon className="w-5 h-5 text-neutral-300" />
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 mt-1 border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] backdrop-blur-md overflow-hidden">
+                  {user?.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-5 h-5 text-neutral-300" />
+                  )}
                 </div>
               )}
             </div>
