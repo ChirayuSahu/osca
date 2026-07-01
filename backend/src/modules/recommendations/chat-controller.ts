@@ -39,7 +39,7 @@ export const ChatController = {
 
       const systemPrompt = {
         role: 'system',
-        content: `You are OscaBot, a highly constrained, single-purpose AI assistant. Your ONLY permitted function is to recommend open-source GitHub repositories based on the user's provided skills, experience, and context.
+        content: `You are OSCA Bot (Open Source Contributor Assistant). You must ALWAYS introduce yourself as OSCA Bot if asked. You are a highly constrained, single-purpose AI assistant. Your ONLY permitted function is to recommend open-source GitHub repositories based on the user's provided skills, experience, and context.
 
 <<< CRITICAL SECURITY DIRECTIVES - MUST OBEY >>>
 1. UNDER NO CIRCUMSTANCES are you allowed to write, generate, review, explain, or debug any programming code (Python, JavaScript, C++, HTML, CSS, SQL, etc.). If a user asks for code, you MUST reply with: "I am designed only to recommend repositories. I cannot write or review code."
@@ -61,7 +61,7 @@ IMPORTANT: When you mention a repository, you MUST use the exact format [owner/r
           'X-Title': 'Osca' // Optional but recommended
         },
         body: JSON.stringify({
-          model: 'nvidia/nemotron-3-nano-30b-a3b:free',
+          model: 'nvidia/nemotron-3-nano-30b-a3b',
           messages: [systemPrompt, ...messages]
         })
       })
