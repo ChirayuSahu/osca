@@ -44,7 +44,7 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
   const repositories = await prisma.repository.findMany({
     include: {
       _count: {
-        select: { likes: true, threads: true }
+        select: { likes: true, interactions: true }
       }
     }
   })
@@ -55,7 +55,7 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
   
   repositories.forEach(repo => {
     maxLikes = Math.max(maxLikes, repo._count.likes)
-    const activity = repo._count.threads
+    const activity = repo._count.interactions
     maxActivity = Math.max(maxActivity, activity)
   })
 
@@ -90,7 +90,7 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
     topicMatchScore = Math.min(topicMatchScore, 100)
 
     const popularityScore = normalize(repo._count.likes, 0, maxLikes)
-    const activityScore = normalize(repo._count.threads, 0, maxActivity)
+    const activityScore = normalize(repo._count.interactions, 0, maxActivity)
 
     const totalScore = 
       (languageMatchScore * 0.4) + 
