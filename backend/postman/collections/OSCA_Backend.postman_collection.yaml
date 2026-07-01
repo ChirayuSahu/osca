@@ -310,13 +310,20 @@ item:
               type: text
           url:
             raw: "{{BASE_URL}}/api/v1/issues/facebook/react?page=1&limit=10"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "issues", "facebook", "react"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - issues
+              - facebook
+              - react
             query:
               - key: page
                 value: "1"
               - key: limit
                 value: "10"
+        response: []
       - name: Get Issue
         request:
           method: GET
@@ -326,8 +333,16 @@ item:
               type: text
           url:
             raw: "{{BASE_URL}}/api/v1/issues/facebook/react/123"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "issues", "facebook", "react", "123"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - issues
+              - facebook
+              - react
+              - "123"
+        response: []
       - name: List Issue Comments
         request:
           method: GET
@@ -337,13 +352,22 @@ item:
               type: text
           url:
             raw: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments?page=1&limit=10"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "issues", "facebook", "react", "123", "comments"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - issues
+              - facebook
+              - react
+              - "123"
+              - comments
             query:
               - key: page
                 value: "1"
               - key: limit
                 value: "10"
+        response: []
       - name: Create Issue
         request:
           method: POST
@@ -363,8 +387,15 @@ item:
               }
           url:
             raw: "{{BASE_URL}}/api/v1/issues/facebook/react"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "issues", "facebook", "react"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - issues
+              - facebook
+              - react
+        response: []
       - name: Create Issue Comment
         request:
           method: POST
@@ -383,8 +414,17 @@ item:
               }
           url:
             raw: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "issues", "facebook", "react", "123", "comments"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - issues
+              - facebook
+              - react
+              - "123"
+              - comments
+        response: []
   - name: Jobs
     item:
       - name: List Jobs
@@ -396,13 +436,18 @@ item:
               type: text
           url:
             raw: "{{BASE_URL}}/api/v1/jobs?page=1&limit=10"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "jobs"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - jobs
             query:
               - key: page
                 value: "1"
               - key: limit
                 value: "10"
+        response: []
       - name: Sync Github Jobs
         request:
           method: POST
@@ -412,8 +457,15 @@ item:
               type: text
           url:
             raw: "{{BASE_URL}}/api/v1/jobs/github/sync"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "jobs", "github", "sync"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - jobs
+              - github
+              - sync
+        response: []
   - name: Feed
     item:
       - name: Get Feed
@@ -425,13 +477,18 @@ item:
               type: text
           url:
             raw: "{{BASE_URL}}/api/v1/feed?page=1&limit=10"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "feed"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - feed
             query:
               - key: page
                 value: "1"
               - key: limit
                 value: "10"
+        response: []
   - name: Interactions
     item:
       - name: Log Interaction
@@ -453,8 +510,13 @@ item:
               }
           url:
             raw: "{{BASE_URL}}/api/v1/interactions"
-            host: ["{{BASE_URL}}"]
-            path: ["api", "v1", "interactions"]
+            host: 
+              - "{{BASE_URL}}"
+            path: 
+              - api
+              - v1
+              - interactions
+        response: []
 variable:
   - key: BASE_URL
     value: http://localhost:8000
