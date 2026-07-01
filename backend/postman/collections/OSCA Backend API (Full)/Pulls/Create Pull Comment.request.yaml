@@ -1,5 +1,5 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/pulls/facebook/react/123/comments"
+url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/comments"
 method: POST
 headers:
   Authorization: Bearer {{JWT_TOKEN}}

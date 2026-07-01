@@ -1,14 +1,15 @@
 $kind: http-request
+name: Log Interaction
 url: "{{BASE_URL}}/api/v1/interactions"
 method: POST
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
   Content-Type: application/json
 body:
-  type: text
+  type: json
   content: |-
     {
-      "repositoryId": "REPO_ID",
-      "type": "REPOSITORY_VIEW"
+      "repositoryId": "79799657-deac-455a-a1b9-6a45b086af61",
+      "action": "REPOSITORY_LIKE"
     }
 order: 1000

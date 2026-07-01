@@ -1,6 +1,6 @@
 $kind: http-request
 name: Create Issue Comment
-url: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments"
+url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}/comments"
 method: POST
 headers:
   Authorization: Bearer {{JWT_TOKEN}}

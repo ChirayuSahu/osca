@@ -1,5 +1,5 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/issues/facebook/react/comments/12345"
+url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/comments/{{comment_id}}"
 method: DELETE
 headers:
   Authorization: Bearer {{JWT_TOKEN}}

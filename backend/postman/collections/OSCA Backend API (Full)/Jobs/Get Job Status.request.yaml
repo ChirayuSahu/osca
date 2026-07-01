@@ -1,6 +1,6 @@
 $kind: http-request
 name: Get Job Status
-url: "{{BASE_URL}}/api/v1/jobs/dev-repository-analysis/7247a464-8a85-48ab-96fb-7cf42d53ab0d"
+url: "{{BASE_URL}}/api/v1/jobs/{{queue_name}}/{{job_id}}"
 method: GET
 headers:
   Authorization: Bearer {{JWT_TOKEN}}

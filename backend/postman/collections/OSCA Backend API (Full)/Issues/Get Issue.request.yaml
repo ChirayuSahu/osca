@@ -1,5 +1,5 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/issues/facebook/react/123"
+url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}"
 method: GET
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
