@@ -1,0 +1,7 @@
+$kind: http-request
+name: Search Easy Contributions
+url: "{{BASE_URL}}/api/v1/repositories/discover/easy-contributions?page=1&limit=10&language=typescript"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 3500

@@ -1,0 +1,11 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/pulls/facebook/react/123/comments"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body: |-
+  {
+    "body": "This is a comment on a pull request from the OSCA API"
+  }
+order: 4000
