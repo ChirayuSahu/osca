@@ -5,7 +5,7 @@ headers:
   Authorization: Bearer {{JWT_TOKEN}}
   Content-Type: application/json
 body:
-  type: text
+  type: json
   content: |-
     {
       "title": "New Issue",
