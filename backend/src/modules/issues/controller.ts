@@ -14,7 +14,11 @@ const listIssues = asyncHandler(async (req: RequestWithPaginationAndUser, res: R
     const limit = req.pagination?.limit ?? 10
 
     const result = await IssuesService.listIssues(userId, owner, repo, page, limit)
-    sendResponse(res, 200, true, 'Issues retrieved successfully', result)
+    sendResponse(res, 200, true, 'Issues retrieved successfully', result.issues, {
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages
+    })
   } catch (error) {
     next(error)
   }
@@ -44,7 +48,11 @@ const listIssueComments = asyncHandler(async (req: RequestWithPaginationAndUser,
     const limit = req.pagination?.limit ?? 10
 
     const result = await IssuesService.listIssueComments(userId, owner, repo, issueNumber, page, limit)
-    sendResponse(res, 200, true, 'Issue comments retrieved successfully', result)
+    sendResponse(res, 200, true, 'Issue comments retrieved successfully', result.comments, {
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages
+    })
   } catch (error) {
     next(error)
   }
@@ -79,10 +87,25 @@ const createIssueComment = asyncHandler(async (req: RequestWithUser, res: Respon
   }
 })
 
+const deleteIssueComment = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+
+    await IssuesService.deleteIssueComment(userId, owner, repo, commentId)
+    sendResponse(res, 200, true, 'Issue comment deleted successfully')
+  } catch (error) {
+    next(error)
+  }
+})
+
 export const IssuesController = {
   listIssues,
   getIssue,
   listIssueComments,
   createIssue,
-  createIssueComment
+  createIssueComment,
+  deleteIssueComment
 }

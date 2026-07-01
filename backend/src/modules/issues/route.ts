@@ -10,5 +10,6 @@ router.get('/:owner/:repo/:issueNumber', authMiddleware, IssuesController.getIss
 router.get('/:owner/:repo/:issueNumber/comments', authMiddleware, paginationMiddleware, IssuesController.listIssueComments)
 router.post('/:owner/:repo', authMiddleware, IssuesController.createIssue)
 router.post('/:owner/:repo/:issueNumber/comments', authMiddleware, IssuesController.createIssueComment)
+router.delete('/:owner/:repo/comments/:commentId', authMiddleware, IssuesController.deleteIssueComment)
 
 export const issuesRouter = router

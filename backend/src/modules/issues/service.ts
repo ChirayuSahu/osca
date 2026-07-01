@@ -61,10 +61,21 @@ const createIssueComment = async (userId: string, owner: string, repo: string, i
   return response.json()
 }
 
+const deleteIssueComment = async (userId: string, owner: string, repo: string, commentId: number) => {
+  const token = await getGithubAccessToken(userId)
+  
+  await fetchGithub(`/repos/${owner}/${repo}/issues/comments/${commentId}`, {
+    method: 'DELETE',
+    token
+  })
+  return { success: true }
+}
+
 export const IssuesService = {
   listIssues,
   getIssue,
   listIssueComments,
   createIssue,
-  createIssueComment
+  createIssueComment,
+  deleteIssueComment
 }
