@@ -94,7 +94,24 @@ const analyzeRepository = async (
   console.log(`[RepoService] Starting analysis for ${url}`)
   await onProgress(5, 'Validating repository URL...')
   const { owner, repo } = parseGithubRepoUrl(url)
+  const fullName = `${owner}/${repo}`
   console.log(`[RepoService] Parsed URL: owner=${owner}, repo=${repo}`)
+
+  // Check if repository already exists and has folderStructure
+  const existingRepo = await prisma.repository.findUnique({
+    where: {
+      provider_fullName: {
+        provider: 'github',
+        fullName: fullName
+      }
+    }
+  })
+
+  if (existingRepo && existingRepo.folderStructure && Object.keys(existingRepo.folderStructure).length > 0) {
+    console.log(`[RepoService] Repository ${fullName} already fully analyzed. Skipping.`)
+    await onProgress(100, 'Repository already analyzed.')
+    return existingRepo
+  }
 
   await onProgress(8, 'Fetching user credentials...')
   const accessToken = await getGithubAccessToken(userId)
