@@ -8,6 +8,7 @@ import { resolveRepositoryUrl } from '../../lib/github'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { RepositoryService } from './service'
 import { InteractionService } from '../../services/interaction.service'
+import { githubGetJson } from '../../lib/github/client'
 import { asyncHandler } from '../../utils/async-handler'
 
 const requireUserId = (req: RequestWithUser): string => {
@@ -36,6 +37,71 @@ const getRepository = asyncHandler(async (req: RequestWithUser, res: Response, n
   const repository = await prisma.repository.findUnique({ where: { id } })
   assertFound(repository, 'Repository not found')
   sendResponse(res, 200, true, 'Repository retrieved successfully', repository)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const { owner, repo } = req.params
+    const fullName = `${owner}/${repo}`
+    
+    const repository = await prisma.repository.findUnique({ 
+      where: { 
+        provider_fullName: {
+          provider: 'github',
+          fullName
+        }
+      } 
+    })
+    
+    if (repository) {
+      sendResponse(res, 200, true, 'Repository retrieved successfully', {
+        ...repository,
+        imported: true
+      })
+      return
+    }
+
+    // Not found in our DB, try fetching from GitHub
+    const account = await prisma.oAuthAccount.findFirst({
+      where: { userId: req.user!.id, provider: 'github' }
+    })
+
+    if (!account || !account.accessToken) {
+      throw new AppError('GitHub account not connected', 400)
+    }
+
+    try {
+      const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, account.accessToken)
+      
+      const previewRepo = {
+        id: `gh-${ghRepo.id}`,
+        name: ghRepo.name,
+        owner: ghRepo.owner.login,
+        fullName: ghRepo.full_name,
+        provider: 'github',
+        githubId: ghRepo.id,
+        description: ghRepo.description,
+        url: ghRepo.html_url,
+        languages: ghRepo.language ? { [ghRepo.language]: 100 } : null,
+        frameworks: [],
+        techStack: ghRepo.topics || [],
+        dependencies: null,
+        folderStructure: null,
+        ciCd: [],
+        createdAt: ghRepo.created_at,
+        updatedAt: ghRepo.updated_at,
+        imported: false,
+        _count: { likes: 0, interactions: 0 }
+      }
+
+      sendResponse(res, 200, true, 'Repository preview retrieved from GitHub', previewRepo)
+    } catch (ghError) {
+      throw new AppError('Repository not found on GitHub or unauthorized', 404)
+    }
+
   } catch (error) {
     next(error)
   }
@@ -199,6 +265,7 @@ const searchEasyContributions = asyncHandler(
 export const RepositoryController = {
   queueRepositoryAnalysis,
   getRepository,
+  getRepositoryByFullName,
   listRepositories,
   deleteRepository,
   listGithubRepositories,

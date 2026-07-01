@@ -12,6 +12,7 @@ router.get('/github/organization', authMiddleware, paginationMiddleware, Reposit
 router.get('/github', authMiddleware, paginationMiddleware, RepositoryController.listGithubRepositories)
 router.get('/discover/easy-contributions', authMiddleware, paginationMiddleware, RepositoryController.searchEasyContributions)
 router.get('/', authMiddleware, paginationMiddleware, RepositoryController.listRepositories)
+router.get('/:owner/:repo', authMiddleware, RepositoryController.getRepositoryByFullName)
 router.get('/:id', authMiddleware, RepositoryController.getRepository)
 router.post('/:id/like', authMiddleware, RepositoryController.toggleRepositoryLike)
 router.delete('/:id', authMiddleware, RepositoryController.deleteRepository)
