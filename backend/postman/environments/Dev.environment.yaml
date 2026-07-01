@@ -1,0 +1,6 @@
+name: Dev
+values:
+  - key: JWT_TOKEN
+    value: 'Error:getaddrinfo ENOTFOUND {{base_url}}'
+  - key: BASE_URL
+    value: ''

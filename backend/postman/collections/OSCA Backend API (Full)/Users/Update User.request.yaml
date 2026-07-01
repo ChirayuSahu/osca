@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/users/USER_ID_HERE"
+method: PUT
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "name": "Updated Name",
+      "skills": ["JavaScript", "React"]
+    }
+order: 2000

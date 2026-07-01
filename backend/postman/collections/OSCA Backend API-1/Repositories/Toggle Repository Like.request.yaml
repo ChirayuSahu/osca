@@ -1,5 +1,0 @@
-$kind: http-request
-name: Toggle Repository Like
-url: "{{BASE_URL}}/api/v1/repositories/REPO_ID/like"
-method: POST
-order: 6000

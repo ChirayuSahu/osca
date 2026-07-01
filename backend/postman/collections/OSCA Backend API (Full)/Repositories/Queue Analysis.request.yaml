@@ -1,0 +1,13 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/repositories"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "url": "https://github.com/facebook/react"
+    }
+order: 2000

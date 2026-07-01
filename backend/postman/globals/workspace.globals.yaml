@@ -1,5 +1,0 @@
-name: Globals
-values:
-  - key: JWT_TOKEN
-    enabled: true
-    secret: true

@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/jobs/QUEUE_NAME/JOB_ID"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 1000

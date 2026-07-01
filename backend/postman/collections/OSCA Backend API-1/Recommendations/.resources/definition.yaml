@@ -1,9 +1,0 @@
-$kind: collection
-name: Recommendations
-auth:
-  - id: 76496b19-20fb-46ab-91c7-58cfc4b64dec
-    type: bearer
-    name: Bearer Token
-    credentials:
-      token: "{{osca_access_token}}"
-order: 5000

@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/issues/facebook/react"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "title": "New Issue",
+      "body": "Issue details"
+    }
+order: 4000

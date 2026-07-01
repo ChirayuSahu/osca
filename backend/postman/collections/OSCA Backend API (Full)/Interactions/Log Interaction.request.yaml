@@ -1,0 +1,14 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/interactions"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "repositoryId": "REPO_ID",
+      "type": "REPOSITORY_VIEW"
+    }
+order: 1000

@@ -1,8 +1,0 @@
-$kind: http-request
-name: List Personal GitHub Repositories
-url: "{{BASE_URL}}/api/v1/repositories/github/personal?page=1&limit=10"
-method: GET
-queryParams:
-  page: 1
-  limit: 10
-order: 10000

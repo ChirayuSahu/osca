@@ -1,5 +1,0 @@
-$kind: http-request
-name: Get Issue
-url: "{{BASE_URL}}/api/v1/issues/facebook/react/123"
-method: GET
-order: 2000
