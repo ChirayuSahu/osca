@@ -20,6 +20,20 @@ const listIssues = asyncHandler(async (req: RequestWithPaginationAndUser, res: R
   }
 })
 
+const getIssue = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const issueNumber = parseInt(String(req.params.issueNumber), 10)
+
+    const result = await IssuesService.getIssue(userId, owner, repo, issueNumber)
+    sendResponse(res, 200, true, 'Issue retrieved successfully', result)
+  } catch (error) {
+    next(error)
+  }
+})
+
 const listIssueComments = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id
@@ -67,6 +81,7 @@ const createIssueComment = asyncHandler(async (req: RequestWithUser, res: Respon
 
 export const IssuesController = {
   listIssues,
+  getIssue,
   listIssueComments,
   createIssue,
   createIssueComment
