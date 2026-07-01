@@ -1,0 +1,11 @@
+$kind: http-request
+name: Analyze Repository (Alias)
+url: "{{BASE_URL}}/api/v1/repositories/analyze"
+method: POST
+body:
+  type: raw
+  raw: |
+    {
+      "url": "https://github.com/facebook/react"
+    }
+order: 8000

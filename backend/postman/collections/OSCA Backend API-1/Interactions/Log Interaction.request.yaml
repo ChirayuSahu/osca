@@ -1,0 +1,12 @@
+$kind: http-request
+name: Log Interaction
+url: "{{BASE_URL}}/api/v1/interactions"
+method: POST
+body:
+  type: raw
+  raw: |
+    {
+      "repositoryId": "REPO_ID",
+      "type": "REPOSITORY_VIEW"
+    }
+order: 1000

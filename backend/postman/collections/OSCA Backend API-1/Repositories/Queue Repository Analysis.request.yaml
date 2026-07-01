@@ -1,0 +1,11 @@
+$kind: http-request
+name: Queue Repository Analysis
+url: "{{BASE_URL}}/api/v1/repositories"
+method: POST
+body:
+  type: raw
+  raw: |
+    {
+      "url": "https://github.com/facebook/react"
+    }
+order: 7000

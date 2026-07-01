@@ -1,0 +1,12 @@
+$kind: http-request
+name: Create Issue
+url: "{{BASE_URL}}/api/v1/issues/facebook/react"
+method: POST
+body:
+  type: raw
+  raw: |
+    {
+      "title": "New Issue",
+      "body": "Issue details"
+    }
+order: 4000

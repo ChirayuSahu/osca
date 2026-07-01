@@ -299,6 +299,162 @@ item:
               - recommendations
               - REC_ID_HERE
         response: []
+  - name: Issues
+    item:
+      - name: List Issues
+        request:
+          method: GET
+          header:
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          url:
+            raw: "{{BASE_URL}}/api/v1/issues/facebook/react?page=1&limit=10"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "issues", "facebook", "react"]
+            query:
+              - key: page
+                value: "1"
+              - key: limit
+                value: "10"
+      - name: Get Issue
+        request:
+          method: GET
+          header:
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          url:
+            raw: "{{BASE_URL}}/api/v1/issues/facebook/react/123"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "issues", "facebook", "react", "123"]
+      - name: List Issue Comments
+        request:
+          method: GET
+          header:
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          url:
+            raw: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments?page=1&limit=10"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "issues", "facebook", "react", "123", "comments"]
+            query:
+              - key: page
+                value: "1"
+              - key: limit
+                value: "10"
+      - name: Create Issue
+        request:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              type: text
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          body:
+            mode: raw
+            raw: |
+              {
+                "title": "New Issue",
+                "body": "Details"
+              }
+          url:
+            raw: "{{BASE_URL}}/api/v1/issues/facebook/react"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "issues", "facebook", "react"]
+      - name: Create Issue Comment
+        request:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              type: text
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          body:
+            mode: raw
+            raw: |
+              {
+                "body": "New Comment"
+              }
+          url:
+            raw: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "issues", "facebook", "react", "123", "comments"]
+  - name: Jobs
+    item:
+      - name: List Jobs
+        request:
+          method: GET
+          header:
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          url:
+            raw: "{{BASE_URL}}/api/v1/jobs?page=1&limit=10"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "jobs"]
+            query:
+              - key: page
+                value: "1"
+              - key: limit
+                value: "10"
+      - name: Sync Github Jobs
+        request:
+          method: POST
+          header:
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          url:
+            raw: "{{BASE_URL}}/api/v1/jobs/github/sync"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "jobs", "github", "sync"]
+  - name: Feed
+    item:
+      - name: Get Feed
+        request:
+          method: GET
+          header:
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          url:
+            raw: "{{BASE_URL}}/api/v1/feed?page=1&limit=10"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "feed"]
+            query:
+              - key: page
+                value: "1"
+              - key: limit
+                value: "10"
+  - name: Interactions
+    item:
+      - name: Log Interaction
+        request:
+          method: POST
+          header:
+            - key: Content-Type
+              value: application/json
+              type: text
+            - key: Authorization
+              value: Bearer {{JWT_TOKEN}}
+              type: text
+          body:
+            mode: raw
+            raw: |
+              {
+                "repositoryId": "REPO_ID_HERE",
+                "type": "REPOSITORY_VIEW"
+              }
+          url:
+            raw: "{{BASE_URL}}/api/v1/interactions"
+            host: ["{{BASE_URL}}"]
+            path: ["api", "v1", "interactions"]
 variable:
   - key: BASE_URL
     value: http://localhost:8000

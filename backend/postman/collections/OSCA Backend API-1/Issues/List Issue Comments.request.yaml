@@ -1,0 +1,8 @@
+$kind: http-request
+name: List Issue Comments
+url: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments?page=1&limit=10"
+method: GET
+queryParams:
+  page: 1
+  limit: 10
+order: 3000

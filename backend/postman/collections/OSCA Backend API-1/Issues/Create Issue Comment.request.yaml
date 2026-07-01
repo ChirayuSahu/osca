@@ -1,0 +1,11 @@
+$kind: http-request
+name: Create Issue Comment
+url: "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments"
+method: POST
+body:
+  type: raw
+  raw: |
+    {
+      "body": "New comment"
+    }
+order: 5000

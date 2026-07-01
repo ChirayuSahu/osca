@@ -1,0 +1,8 @@
+$kind: http-request
+name: List Organization GitHub Repositories
+url: "{{BASE_URL}}/api/v1/repositories/github/organization?page=1&limit=10"
+method: GET
+queryParams:
+  page: 1
+  limit: 10
+order: 9000
