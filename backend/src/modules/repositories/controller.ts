@@ -4,7 +4,7 @@ import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
 import { AppError, assertFound } from '../../lib/errors'
-import { resolveRepositoryUrl } from '../../modules/github/resolve-repo-input'
+import { resolveRepositoryUrl } from '../../lib/github'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { RepositoryService } from './service'
 import { InteractionService } from '../../services/interaction.service'
@@ -140,45 +140,6 @@ const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithP
   }
 })
 
-const listRepositoryThreads = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
-  const repositoryId = String(req.params.id)
-  const skip = req.pagination?.skip ?? 0
-  const take = req.pagination?.take ?? 10
-  
-  // ensure repository exists
-  const repo = await prisma.repository.findUnique({ where: { id: repositoryId } })
-  assertFound(repo, 'Repository not found')
-
-  const [total, threads] = await Promise.all([
-    prisma.repositoryThread.count({ where: { repositoryId } }),
-    prisma.repositoryThread.findMany({
-      where: { repositoryId },
-      skip,
-      take,
-      include: {
-        author: {
-          select: { id: true, name: true, username: true, avatarUrl: true }
-        },
-        _count: { select: { comments: true } }
-      },
-      orderBy: [
-        { isPinned: 'desc' },
-        { updatedAt: 'desc' }
-      ]
-    })
-  ])
-
-  sendResponse(res, 200, true, 'Repository threads retrieved successfully', threads, {
-    page: req.pagination?.page ?? 1,
-    limit: req.pagination?.limit ?? 10,
-    total,
-    totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
-  })
-  } catch (error) {
-    next(error)
-  }
-})
 
 const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
@@ -221,6 +182,5 @@ export const RepositoryController = {
   listGithubRepositories,
   listPersonalGithubRepositories,
   listOrganizationGithubRepositories,
-  listRepositoryThreads,
   toggleRepositoryLike
 }
