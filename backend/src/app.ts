@@ -10,6 +10,7 @@ import { jobsRouter } from './modules/jobs/jobs.route'
 import { feedRouter } from './modules/feed/route'
 import { interactionsRouter } from './modules/interactions/route'
 import { issuesRouter } from './modules/issues/route'
+import { pullsRouter } from './modules/pulls/route'
 import { errorMiddleware, CustomError } from './middlewares/error.middleware'
 
 const app: Application = express()
@@ -36,6 +37,7 @@ app.use('/api/v1/jobs', jobsRouter)
 app.use('/api/v1/feed', feedRouter)
 app.use('/api/v1/interactions', interactionsRouter)
 app.use('/api/v1/issues', issuesRouter)
+app.use('/api/v1/pulls', pullsRouter)
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const error: CustomError = new Error(`Cannot ${req.method} ${req.originalUrl}`)
