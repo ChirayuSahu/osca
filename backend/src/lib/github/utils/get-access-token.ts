@@ -1,5 +1,5 @@
-import { prisma } from '../../utils/prisma'
-import { AppError } from '../errors'
+import { prisma } from '../../../utils/prisma'
+import { AppError } from '../../errors'
 
 export const getGithubAccessToken = async (userId: string): Promise<string> => {
   const oauthAccount = await prisma.oAuthAccount.findFirst({

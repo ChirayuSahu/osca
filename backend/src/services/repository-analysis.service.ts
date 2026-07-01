@@ -4,13 +4,16 @@ import {
   detectNpmFrameworks,
   detectPythonFrameworks,
   parsePackageJson,
-  parseRawContent
-} from '../lib/github/detect-frameworks'
-import { getGithubAccessToken } from '../lib/github/get-access-token'
-import { githubGetJson, githubPathExists, githubTryGetRaw, githubGraphQL } from '../lib/github/client'
-import { parseGithubRepoUrl } from '../lib/github/parse-github-url'
-import type { ProgressCallback } from '../lib/github/types'
-import { noopProgress } from '../lib/github/types'
+  parseRawContent,
+  getGithubAccessToken,
+  githubGetJson,
+  githubPathExists,
+  githubTryGetRaw,
+  githubGraphQL,
+  parseGithubRepoUrl,
+  type ProgressCallback,
+  noopProgress
+} from '../lib/github'
 
 interface RepoAnalysis {
   name: string
@@ -228,11 +231,9 @@ const analyzeGithubRepo = async (
     folderStructure = treeRes.tree.filter(node => {
       const parts = node.path.split('/')
       
-      // Filter out ignored directories
       if (parts.some(part => IGNORED_DIRS.has(part))) return false
       
       const filename = parts[parts.length - 1]
-      // Filter out ignored files
       if (IGNORED_FILES.has(filename)) return false
 
       return true

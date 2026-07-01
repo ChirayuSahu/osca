@@ -1,4 +1,4 @@
-import { AppError } from '../errors'
+import { AppError } from '../../errors'
 
 export interface ParsedGithubRepo {
   owner: string
