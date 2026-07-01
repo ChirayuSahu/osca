@@ -10,6 +10,7 @@ router.post('/analyze', authMiddleware, RepositoryController.queueRepositoryAnal
 router.get('/github/personal', authMiddleware, paginationMiddleware, RepositoryController.listPersonalGithubRepositories)
 router.get('/github/organization', authMiddleware, paginationMiddleware, RepositoryController.listOrganizationGithubRepositories)
 router.get('/github', authMiddleware, paginationMiddleware, RepositoryController.listGithubRepositories)
+router.get('/discover/easy-contributions', authMiddleware, paginationMiddleware, RepositoryController.searchEasyContributions)
 router.get('/', authMiddleware, paginationMiddleware, RepositoryController.listRepositories)
 router.get('/:id', authMiddleware, RepositoryController.getRepository)
 router.post('/:id/like', authMiddleware, RepositoryController.toggleRepositoryLike)

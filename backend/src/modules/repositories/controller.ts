@@ -174,6 +174,28 @@ const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Resp
   }
 })
 
+const searchEasyContributions = asyncHandler(
+  async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
+    try {
+      const userId = req.user!.id
+      const page = req.pagination?.page ?? 1
+      const limit = req.pagination?.limit ?? 10
+      const language = req.query.language as string | undefined
+
+      const result = await RepositoryService.searchEasyContributionRepos(userId, page, limit, language)
+      
+      sendResponse(res, 200, true, 'Easy contribution repositories retrieved successfully', result.repos, {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages
+      })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
 export const RepositoryController = {
   queueRepositoryAnalysis,
   getRepository,
@@ -182,5 +204,6 @@ export const RepositoryController = {
   listGithubRepositories,
   listPersonalGithubRepositories,
   listOrganizationGithubRepositories,
-  toggleRepositoryLike
+  toggleRepositoryLike,
+  searchEasyContributions
 }
