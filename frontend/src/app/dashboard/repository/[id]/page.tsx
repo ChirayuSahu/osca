@@ -29,7 +29,10 @@ export default function RepositoryPage() {
         setLoading(true);
         const [repoRes, threadsRes] = await Promise.all([
           RepositoryService.getRepository(repositoryId, token),
-          RepositoryService.getRepositoryThreads(repositoryId, token)
+          RepositoryService.getRepositoryThreads(repositoryId, token).catch(e => {
+            console.error("Failed to load threads", e);
+            return { data: [] };
+          })
         ]);
         setRepo(repoRes.data);
         setThreads(threadsRes.data || []);

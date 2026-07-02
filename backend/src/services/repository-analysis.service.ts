@@ -187,7 +187,8 @@ const analyzeGithubRepo = async (
   }
 
   await onProgress(25, 'Fetching repository file tree for visual map...')
-  let folderStructure = null
+  let folderStructure: any = null
+  let isShallow = false
   try {
     const branch = repoData.default_branch || 'main'
     let treeRes: GithubTreeResponse
@@ -197,6 +198,7 @@ const analyzeGithubRepo = async (
     } catch (err: any) {
       console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow fetch.`)
       treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}`, token)
+      isShallow = true
     }
     
     const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.github', '.vscode', '.idea', 'target', 'bin', 'obj'])
@@ -219,14 +221,14 @@ const analyzeGithubRepo = async (
   const fallbackDependencies: any[] = []
 
   if (folderStructure) {
-    const packageJsonPaths = folderStructure.filter(n => n.path.endsWith('package.json') && n.path.split('/').length <= 3).map(n => n.path)
+    const packageJsonPaths = folderStructure.filter((n: any) => n.path.endsWith('package.json') && n.path.split('/').length <= 3).map((n: any) => n.path)
     if (packageJsonPaths.length === 0) packageJsonPaths.push('package.json')
     for (const path of packageJsonPaths) {
       const nodeDeps = await detectNodeStack(owner, repo, path, token, frameworks, techStack)
       if (nodeDeps) fallbackDependencies.push(nodeDeps)
     }
 
-    const reqPaths = folderStructure.filter(n => n.path.endsWith('requirements.txt') && n.path.split('/').length <= 3).map(n => n.path)
+    const reqPaths = folderStructure.filter((n: any) => n.path.endsWith('requirements.txt') && n.path.split('/').length <= 3).map((n: any) => n.path)
     if (reqPaths.length === 0) reqPaths.push('requirements.txt')
     for (const path of reqPaths) {
       const pyDeps = await detectPythonStack(owner, repo, path, token, frameworks, techStack)
@@ -286,6 +288,31 @@ const analyzeGithubRepo = async (
 
   if (dependenciesData.length === 0) {
     dependenciesData = fallbackDependencies
+  }
+
+  if (isShallow && folderStructure && dependenciesData.length > 0) {
+    const existingPaths = new Set(folderStructure.map((n: any) => n.path));
+    dependenciesData.forEach((manifest: any) => {
+      let manifestPath = manifest.blobPath;
+      if (manifestPath.startsWith('/')) manifestPath = manifestPath.substring(1);
+      
+      const parts = manifestPath.split('/');
+      let currentPath = '';
+      for (let i = 0; i < parts.length; i++) {
+        currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`;
+        if (!existingPaths.has(currentPath)) {
+          existingPaths.add(currentPath);
+          folderStructure.push({
+            path: currentPath,
+            mode: '100644',
+            type: i === parts.length - 1 ? 'blob' : 'tree',
+            sha: 'dummy-sha-' + currentPath,
+            size: 100,
+            url: ''
+          });
+        }
+      }
+    });
   }
 
   await onProgress(75, 'Repository tech stack analysis complete')

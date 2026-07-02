@@ -8,7 +8,7 @@ import { resolveRepositoryUrl } from '../../lib/github'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { RepositoryService } from './service'
 import { InteractionService } from '../../services/interaction.service'
-import { githubGetJson } from '../../lib/github/client'
+import { githubGetJson, githubTryGetRaw, githubGraphQL } from '../../lib/github/client'
 import { asyncHandler } from '../../utils/async-handler'
 
 const requireUserId = (req: RequestWithUser): string => {
@@ -76,6 +76,113 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
     try {
       const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, account.accessToken)
       
+      let dependencies: any[] = [];
+      try {
+        const query = `
+          query getRepoDependencies($owner: String!, $repo: String!) {
+            repository(owner: $owner, name: $repo) {
+              dependencyGraphManifests {
+                nodes {
+                  blobPath
+                  dependencies {
+                    nodes {
+                      packageName
+                      requirements
+                      hasDependencies
+                      packageManager
+                    }
+                  }
+                }
+              }
+            }
+          }
+        `;
+        const depRes = await githubGraphQL<any>(query, account.accessToken, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json');
+        dependencies = depRes.data?.repository?.dependencyGraphManifests?.nodes || [];
+      } catch (err) {
+        console.error(`[RepoPreview] Dependency graph error:`, err);
+      }
+
+      if (dependencies.length === 0) {
+        try {
+          const rawPkg = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/package.json`, account.accessToken);
+          if (rawPkg) {
+            const pkgJson = typeof rawPkg === 'string' ? JSON.parse(rawPkg) : rawPkg;
+            const nodes = [];
+            const allDeps = { ...(pkgJson.dependencies || {}), ...(pkgJson.devDependencies || {}) };
+            for (const [name, req] of Object.entries(allDeps)) {
+              if (typeof req === 'string') {
+                nodes.push({ packageName: name, requirements: req, packageManager: 'NPM', hasDependencies: false });
+              }
+            }
+            if (nodes.length > 0) {
+              dependencies = [{
+                blobPath: 'package.json',
+                dependencies: { nodes }
+              }];
+            }
+          }
+        } catch (err) {
+          console.error(`[RepoPreview] Dependency fetch error:`, err);
+        }
+      }
+
+      let folderStructure: any = null;
+      let isShallow = false;
+      try {
+        const branch = ghRepo.default_branch || 'main';
+        const repoPath = `/repos/${owner}/${repo}`;
+        let treeRes: any;
+        
+        try {
+          treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}?recursive=1`, account.accessToken);
+        } catch (err: any) {
+          console.warn(`[RepoPreview] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow fetch.`);
+          treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}`, account.accessToken);
+          isShallow = true;
+        }
+        
+        const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.github', '.vscode', '.idea', 'target', 'bin', 'obj']);
+        const IGNORED_FILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.DS_Store', 'Thumbs.db']);
+
+        if (treeRes && treeRes.tree) {
+          folderStructure = treeRes.tree.filter((node: any) => {
+            const parts = node.path.split('/');
+            if (parts.some((part: string) => IGNORED_DIRS.has(part))) return false;
+            const filename = parts[parts.length - 1];
+            if (IGNORED_FILES.has(filename)) return false;
+            return true;
+          });
+        }
+      } catch (err) {
+        console.error(`[RepoPreview] Tree fetch error:`, err);
+      }
+
+      if (isShallow && folderStructure && dependencies.length > 0) {
+        const existingPaths = new Set(folderStructure.map((n: any) => n.path));
+        dependencies.forEach((manifest: any) => {
+          let manifestPath = manifest.blobPath;
+          if (manifestPath.startsWith('/')) manifestPath = manifestPath.substring(1);
+          
+          const parts = manifestPath.split('/');
+          let currentPath = '';
+          for (let i = 0; i < parts.length; i++) {
+            currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`;
+            if (!existingPaths.has(currentPath)) {
+              existingPaths.add(currentPath);
+              folderStructure.push({
+                path: currentPath,
+                mode: '100644',
+                type: i === parts.length - 1 ? 'blob' : 'tree',
+                sha: 'dummy-sha-' + currentPath,
+                size: 100,
+                url: ''
+              });
+            }
+          }
+        });
+      }
+      
       const previewRepo = {
         id: `gh-${ghRepo.id}`,
         name: ghRepo.name,
@@ -88,8 +195,8 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
         languages: ghRepo.language ? { [ghRepo.language]: 100 } : null,
         frameworks: [],
         techStack: ghRepo.topics || [],
-        dependencies: null,
-        folderStructure: null,
+        dependencies: dependencies,
+        folderStructure: folderStructure,
         ciCd: [],
         createdAt: ghRepo.created_at,
         updatedAt: ghRepo.updated_at,
