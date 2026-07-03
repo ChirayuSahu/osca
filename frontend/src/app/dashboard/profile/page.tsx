@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
 import { Sparkles, BookOpen, RefreshCw, UserCheck, Shield, ArrowUpRight, ArrowDownRight, FileCode, GitMerge, Code2 } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback, Badge, Progress } from "@/components/ui";
+import { Avatar, AvatarImage, AvatarFallback, Badge } from "@/components/ui";
 import { GitHubCalendar } from 'react-github-calendar';
 
 interface ContributorProfile {

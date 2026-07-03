@@ -20,6 +20,15 @@ interface ExtendedRepository extends Repository {
   ownerType?: string;
 }
 
+interface APIRepository {
+  id: string;
+  name?: string;
+  fullName?: string;
+  description?: string;
+  languages?: string | Record<string, number>;
+  url?: string;
+}
+
 interface PaginationMeta {
   page: number;
   limit: number;
@@ -55,13 +64,13 @@ function ImportedReposContent() {
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.data)) {
-            const mappedRepos = data.data.map((repo: any) => {
+            const mappedRepos = data.data.map((repo: APIRepository) => {
               // Extract primary language if possible, else default
               let lang = "Unknown";
               if (repo.languages) {
                 const parsed = typeof repo.languages === 'string' ? JSON.parse(repo.languages) : repo.languages;
                 if (parsed && Object.keys(parsed).length > 0) {
-                  const sortedLangs = Object.entries(parsed).sort((a: any, b: any) => b[1] - a[1]);
+                  const sortedLangs = Object.entries(parsed as Record<string, number>).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
                   lang = sortedLangs[0][0];
                 }
               }

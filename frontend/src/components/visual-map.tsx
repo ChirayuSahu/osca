@@ -8,13 +8,13 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false 
 import { Maximize, Minimize } from 'lucide-react'
 
 // Types based on the backend data structures
-interface TreeNode {
+export interface TreeNode {
   path: string
   type: string
   size?: number
 }
 
-interface ManifestNode {
+export interface ManifestNode {
   blobPath: string
   dependencies: {
     nodes: Array<{
@@ -55,8 +55,11 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
 
   // Process data into nodes and links for the force graph
   const graphData = useMemo(() => {
-    const nodes: any[] = [{ id: 'root', name: 'Repository Root', val: 10, color: colorMap.tree }]
-    const links: any[] = []
+    interface GraphNode { id: string; name: string; val: number; color: string; path?: string }
+    interface GraphLink { source: string; target: string; label?: string }
+
+    const nodes: GraphNode[] = [{ id: 'root', name: 'Repository Root', val: 10, color: colorMap.tree }]
+    const links: GraphLink[] = []
     const addedNodes = new Set<string>(['root'])
 
     // 1. Process Folder Structure
@@ -135,7 +138,8 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
     return { nodes, links }
   }, [folderStructure, dependencies, showFolders, showFiles, showDependencies])
 
-  const fgRef = useRef<any>()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fgRef = useRef<any>(null)
 
   useEffect(() => {
     // Tweak the d3 physics to spread nodes out and prevent the "clumpy" look

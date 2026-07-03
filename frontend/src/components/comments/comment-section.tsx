@@ -5,9 +5,16 @@ import { useAuth } from "@/context/auth-context";
 import { CommentService } from "@/services/comment.service";
 import { Loader2, MessageSquare } from "lucide-react";
 
+interface Comment {
+  id: string;
+  content: string;
+  createdAt: string | number | Date;
+  author?: { name?: string };
+}
+
 export default function CommentSection({ threadId }: { threadId: string }) {
   const { token, user } = useAuth();
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Users, GitPullRequest, ArrowRight, Clock } from "lucide-react";
+import { Users, ArrowRight, Clock } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Collaboration {

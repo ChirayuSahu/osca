@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ArrowRight, Code2, Bot, User as UserIcon, Loader2, ExternalLink } from "lucide-react";
+import { Search, ArrowRight, Code2, Bot, User as UserIcon, ExternalLink } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import Image from 'next/image';
 
 // Custom Github SVG Icon
 const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -93,12 +94,12 @@ export function ChatConsole() {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSearchSubmit(e as any);
+      handleSearchSubmit(e as unknown as React.FormEvent);
     }
   };
 
   // Render a beautiful card for GitHub links
-  const renderLink = (props: any) => {
+  const renderLink = (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
     const { href, children } = props;
     if (href?.startsWith('https://github.com/')) {
       const repoName = String(children);
@@ -143,7 +144,7 @@ export function ChatConsole() {
             {greeting}, <span className="font-serif italic font-medium text-emerald-400">{user?.name.split(" ")[0] || "Developer"}</span>
           </h1>
           <p className="text-neutral-400 text-base md:text-lg font-light max-w-xl mx-auto leading-relaxed">
-            I am OscaBot. Tell me about your skills and let's find the perfect open-source repository for your next contribution.
+            I am OscaBot. Tell me about your skills and let&apos;s find the perfect open-source repository for your next contribution.
           </p>
         </div>
       ) : (
@@ -179,9 +180,9 @@ export function ChatConsole() {
 
               {/* User Avatar */}
               {msg.role === 'user' && (
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 mt-1 border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] backdrop-blur-md overflow-hidden">
+                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center flex-shrink-0 mt-1 border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)] backdrop-blur-md overflow-hidden relative">
                   {user?.avatarUrl ? (
-                    <img src={user.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                    <Image src={user.avatarUrl} alt="User Avatar" fill className="object-cover" />
                   ) : (
                     <UserIcon className="w-5 h-5 text-neutral-300" />
                   )}
