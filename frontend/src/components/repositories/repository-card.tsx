@@ -20,9 +20,10 @@ interface RepositoryCardProps {
   repo: Repository;
   mode?: "import" | "view";
   onAction?: (repo: Repository) => void | Promise<void>;
+  onDelete?: (repo: Repository) => void | Promise<void>;
 }
 
-export function RepositoryCard({ repo, mode = "view", onAction }: RepositoryCardProps) {
+export function RepositoryCard({ repo, mode = "view", onAction, onDelete }: RepositoryCardProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAction = async (e: React.MouseEvent) => {
@@ -104,13 +105,23 @@ export function RepositoryCard({ repo, mode = "view", onAction }: RepositoryCard
             {isLoading ? "Importing..." : "Import Repo"}
           </button>
         ) : (
-          <a 
-            href={`/dashboard/repository/${repo.id}`}
-            className="text-xs font-medium text-neutral-300 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-all duration-300 z-10 relative"
-          >
-            View Issues
-            <ArrowRight className="w-3.5 h-3.5" />
-          </a>
+          <div className="flex items-center gap-4">
+            {onDelete && (
+              <button
+                onClick={(e) => { e.preventDefault(); onDelete(repo); }}
+                className="text-xs font-medium text-red-400 hover:text-red-300 flex items-center gap-1 transition-all duration-300 z-10 relative"
+              >
+                Remove
+              </button>
+            )}
+            <a 
+              href={`/dashboard/repository/${repo.id}`}
+              className="text-xs font-medium text-neutral-300 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-all duration-300 z-10 relative"
+            >
+              View Issues
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
         )}
       </div>
     </div>

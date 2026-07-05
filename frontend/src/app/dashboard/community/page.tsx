@@ -5,9 +5,32 @@ import { Users, Globe2, Sparkles, Filter } from "lucide-react";
 import { ContributorCard } from "@/components/community/contributor-card";
 import { CollaborationCard } from "@/components/community/collaboration-card";
 
+interface Contributor {
+  id: string;
+  name: string;
+  username: string;
+  avatarUrl: string;
+  role: string;
+  location?: string;
+  skills: string[];
+  matchScore: number;
+}
+
+interface Collaboration {
+  id: string;
+  repoName: string;
+  repoOwner: string;
+  title: string;
+  description: string;
+  requestedRoles: string[];
+  activeContributors: number;
+  timeAgo: string;
+  ownerAvatarUrl?: string;
+}
+
 // Backend integration coming soon
-const MOCK_CONTRIBUTORS: any[] = [];
-const MOCK_COLLABORATIONS: any[] = [];
+const MOCK_CONTRIBUTORS: Contributor[] = [];
+const MOCK_COLLABORATIONS: Collaboration[] = [];
 
 export default function CommunityPage() {
   const [activeTab, setActiveTab] = useState<"contributors" | "collaborations">("contributors");

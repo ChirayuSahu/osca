@@ -2,11 +2,16 @@ import React from 'react'
 import { Code2, Server } from 'lucide-react'
 
 interface RepositoryInsightsProps {
-  repo: any
+  repo: {
+    languages?: Record<string, number>;
+    frameworks?: string[];
+    ciCd?: string[];
+    [key: string]: unknown;
+  }
 }
 
 export function RepositoryInsights({ repo }: RepositoryInsightsProps) {
-  if (!repo.languages && !repo.frameworks?.length && !repo.ciCd?.length) {
+  if (!repo.languages && !(repo.frameworks && repo.frameworks.length > 0) && !(repo.ciCd && repo.ciCd.length > 0)) {
     return null
   }
 
@@ -20,11 +25,11 @@ export function RepositoryInsights({ repo }: RepositoryInsightsProps) {
           </h3>
           <div className="space-y-4">
             {Object.entries(repo.languages)
-              .sort(([, a]: any, [, b]: any) => b - a)
+              .sort(([, a]: [string, unknown], [, b]: [string, unknown]) => (b as number) - (a as number))
               .slice(0, 5) // top 5
-              .map(([lang, bytes]: any) => {
-                const total: number = Object.values(repo.languages).reduce((acc: any, val: any) => acc + val, 0) as number;
-                const percent = ((bytes / total) * 100).toFixed(1);
+              .map(([lang, bytes]: [string, unknown]) => {
+                const total: number = Object.values(repo.languages!).reduce((acc: number, val: unknown) => acc + (val as number), 0);
+                const percent = (((bytes as number) / total) * 100).toFixed(1);
                 return (
                   <div key={lang}>
                     <div className="flex justify-between text-sm mb-1.5">
@@ -41,7 +46,7 @@ export function RepositoryInsights({ repo }: RepositoryInsightsProps) {
         </div>
       )}
 
-      {(repo.ciCd?.length > 0 || repo.frameworks?.length > 0) && (
+      {((repo.ciCd && repo.ciCd.length > 0) || (repo.frameworks && repo.frameworks.length > 0)) && (
         <div className="bg-neutral-900/40 backdrop-blur-xl border border-neutral-800/60 rounded-2xl p-6 shadow-xl flex flex-col justify-start">
           <h3 className="text-lg font-medium text-neutral-200 mb-6 flex items-center gap-2">
             <Server className="w-5 h-5 text-emerald-500" />
@@ -49,7 +54,7 @@ export function RepositoryInsights({ repo }: RepositoryInsightsProps) {
           </h3>
           
           <div className="space-y-6">
-            {repo.frameworks?.length > 0 && (
+            {repo.frameworks && repo.frameworks.length > 0 && (
               <div>
                 <span className="text-sm font-medium text-neutral-500 block mb-3 uppercase tracking-wider">Detected Frameworks</span>
                 <div className="flex flex-wrap gap-2.5">
@@ -62,7 +67,7 @@ export function RepositoryInsights({ repo }: RepositoryInsightsProps) {
               </div>
             )}
 
-            {repo.ciCd?.length > 0 && (
+            {repo.ciCd && repo.ciCd.length > 0 && (
               <div>
                 <span className="text-sm font-medium text-neutral-500 block mb-3 uppercase tracking-wider">CI/CD Pipelines</span>
                 <div className="flex flex-wrap gap-2.5">

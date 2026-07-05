@@ -7,13 +7,22 @@ import { ThreadService } from "@/services/thread.service";
 import { ArrowLeft } from "lucide-react";
 import CommentSection from "@/components/comments/comment-section";
 
+interface ThreadDetail {
+  id?: string;
+  title?: string;
+  content?: string;
+  createdAt: string | number | Date;
+  author?: { name?: string };
+  [key: string]: unknown;
+}
+
 export default function ThreadPage() {
   const params = useParams();
   const repositoryId = params.id as string;
   const threadId = params.threadId as string;
   const { token } = useAuth();
   
-  const [thread, setThread] = useState<any>(null);
+  const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
@@ -18,7 +17,7 @@ interface CreateThreadDialogProps {
   isOpen: boolean;
   onClose: () => void;
   repositoryId: string;
-  onThreadCreated: (thread: any) => void;
+  onThreadCreated: (thread: Record<string, unknown>) => void;
 }
 
 export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onThreadCreated }: CreateThreadDialogProps) {
@@ -40,8 +39,8 @@ export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onTh
       setTitle("");
       setContent("");
       onClose();
-    } catch (err: any) {
-      setError(err.message || "Failed to create thread");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create thread");
     } finally {
       setLoading(false);
     }

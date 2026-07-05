@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Send, User } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { X, Send } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface GroupChatPanelProps {
   isOpen: boolean;
@@ -10,10 +10,17 @@ interface GroupChatPanelProps {
   repositoryId: string;
 }
 
-export function GroupChatPanel({ isOpen, onClose, repositoryId }: GroupChatPanelProps) {
+export function GroupChatPanel({ isOpen, onClose }: GroupChatPanelProps) {
   const [message, setMessage] = useState("");
 
-  const MOCK_MESSAGES: any[] = [];
+  interface ChatMessage {
+    id: string;
+    user: string;
+    time: string;
+    text: string;
+    isMe?: boolean;
+  }
+  const MOCK_MESSAGES: ChatMessage[] = [];
 
   if (!isOpen) return null;
 

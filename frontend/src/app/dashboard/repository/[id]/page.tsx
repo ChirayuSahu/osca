@@ -7,16 +7,35 @@ import { RepositoryService } from "@/services/repository.service";
 import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GroupChatPanel } from "@/components/threads/group-chat-panel";
-import { VisualMap } from "@/components/visual-map";
+import { VisualMap, TreeNode, ManifestNode } from "@/components/visual-map";
 import { RepositoryInsights } from "@/components/repository-insights";
+
+interface Thread {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string | number | Date;
+  [key: string]: unknown;
+}
+
+interface RepositoryDetail {
+  id?: string;
+  name?: string;
+  url?: string;
+  description?: string;
+  techStack?: string[];
+  folderStructure?: TreeNode[];
+  dependencies?: ManifestNode[];
+  [key: string]: unknown;
+}
 
 export default function RepositoryPage() {
   const params = useParams();
   const repositoryId = params.id as string;
   const { token } = useAuth();
   
-  const [repo, setRepo] = useState<any>(null);
-  const [threads, setThreads] = useState<any[]>([]);
+  const [repo, setRepo] = useState<RepositoryDetail | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false);
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
@@ -29,7 +48,10 @@ export default function RepositoryPage() {
         setLoading(true);
         const [repoRes, threadsRes] = await Promise.all([
           RepositoryService.getRepository(repositoryId, token),
-          RepositoryService.getRepositoryThreads(repositoryId, token)
+          RepositoryService.getRepositoryThreads(repositoryId, token).catch(e => {
+            console.error("Failed to load threads", e);
+            return { data: [] };
+          })
         ]);
         setRepo(repoRes.data);
         setThreads(threadsRes.data || []);
@@ -43,8 +65,8 @@ export default function RepositoryPage() {
     loadData();
   }, [repositoryId, token]);
 
-  const handleThreadCreated = (newThread: any) => {
-    setThreads([newThread, ...threads]);
+  const handleThreadCreated = (newThread: Record<string, unknown>) => {
+    setThreads([newThread as unknown as Thread, ...threads]);
   };
 
   if (loading) {
@@ -65,7 +87,7 @@ export default function RepositoryPage() {
           <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
         </div>
         <h2 className="text-2xl font-semibold text-neutral-200 mb-2">Repository Not Found</h2>
-        <p className="text-neutral-400 max-w-md">We couldn't load the details for this repository. It may have been deleted or you don't have access.</p>
+        <p className="text-neutral-400 max-w-md">We couldn&apos;t load the details for this repository. It may have been deleted or you don&apos;t have access.</p>
       </div>
     );
   }
@@ -93,7 +115,7 @@ export default function RepositoryPage() {
             </p>
             
             <div className="flex flex-wrap items-center gap-3 mt-6">
-              {repo.techStack?.length > 0 ? (
+              {repo.techStack && repo.techStack.length > 0 ? (
                 repo.techStack.map((tech: string) => (
                   <span key={tech} className="px-3.5 py-1.5 text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.05)]">
                     {tech}
