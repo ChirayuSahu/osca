@@ -20,6 +20,15 @@ interface ExtendedRepository extends Repository {
   ownerType?: string;
 }
 
+interface APIRepository {
+  id: string;
+  name?: string;
+  fullName?: string;
+  description?: string;
+  languages?: string | Record<string, number>;
+  url?: string;
+}
+
 interface PaginationMeta {
   page: number;
   limit: number;
@@ -55,13 +64,13 @@ function ImportedReposContent() {
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.data)) {
-            const mappedRepos = data.data.map((repo: any) => {
+            const mappedRepos = data.data.map((repo: APIRepository) => {
               // Extract primary language if possible, else default
               let lang = "Unknown";
               if (repo.languages) {
                 const parsed = typeof repo.languages === 'string' ? JSON.parse(repo.languages) : repo.languages;
                 if (parsed && Object.keys(parsed).length > 0) {
-                  const sortedLangs = Object.entries(parsed).sort((a: any, b: any) => b[1] - a[1]);
+                  const sortedLangs = Object.entries(parsed as Record<string, number>).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
                   lang = sortedLangs[0][0];
                 }
               }
@@ -126,6 +135,24 @@ function ImportedReposContent() {
     return pages;
   };
 
+  const handleDelete = async (repo: ExtendedRepository) => {
+    if (!window.confirm(`Are you sure you want to remove ${repo.name}?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/repositories/${repo.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setRepos(repos.filter(r => r.id !== repo.id));
+      } else {
+        alert("Failed to delete repository");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting repository");
+    }
+  };
+
   return (
     <div className="max-w-7xl w-full mx-auto flex flex-col select-none relative space-y-10 pb-16 px-4 sm:px-6">
       {/* Decorative background gradients */}
@@ -153,7 +180,7 @@ function ImportedReposContent() {
         ) : repos.length > 0 ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-4">
             {repos.map((repo) => (
-              <RepositoryCard key={repo.id} repo={repo} mode="view" />
+              <RepositoryCard key={repo.id} repo={repo} mode="view" onDelete={handleDelete} />
             ))}
           </div>
         ) : (

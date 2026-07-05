@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function FeaturesSection() {
+export default function BenefitsSection() {
   const features = [
     {
       title: "Efficiency",
