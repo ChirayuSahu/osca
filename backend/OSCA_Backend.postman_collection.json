@@ -1,530 +1,562 @@
 {
-  "info": {
-    "name": "OSCA Backend API (Full)",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    {
-      "key": "BASE_URL",
-      "value": "http://localhost:8000",
-      "type": "string"
+    "info": {
+        "name": "OSCA Backend API (Full)",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
-    {
-      "key": "JWT_TOKEN",
-      "value": "",
-      "type": "string"
-    }
-  ],
-  "item": [
-    {
-      "name": "Auth",
-      "item": [
+    "variable": [
         {
-          "name": "Redirect to GitHub",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/auth/github",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "github"
-              ]
-            }
-          }
+            "key": "BASE_URL",
+            "value": "http://localhost:8000",
+            "type": "string"
         },
         {
-          "name": "GitHub Callback",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/auth/github/callback?code=YOUR_OAUTH_CODE_HERE",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "github",
-                "callback"
-              ],
-              "query": [
-                {
-                  "key": "code",
-                  "value": "YOUR_OAUTH_CODE_HERE"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get Current User",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/auth/me",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "me"
-              ]
-            }
-          }
+            "key": "JWT_TOKEN",
+            "value": "",
+            "type": "string"
         }
-      ]
-    },
-    {
-      "name": "Users",
-      "item": [
+    ],
+    "item": [
         {
-          "name": "Get User",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/users/USER_ID_HERE",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "USER_ID_HERE"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Update User",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Updated Name\",\n  \"skills\": [\"JavaScript\", \"React\"]\n}"
-            },
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/users/USER_ID_HERE",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "USER_ID_HERE"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Analyze Profile",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/users/USER_ID_HERE/analyze",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "users",
-                "USER_ID_HERE",
-                "analyze"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Issues",
-      "item": [
-        {
-          "name": "List Issues",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/issues/facebook/react?page=1&limit=10",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "issues",
-                "facebook",
-                "react"
-              ],
-              "query": [
+            "name": "Auth",
+            "item": [
                 {
-                  "key": "page",
-                  "value": "1"
+                    "name": "Redirect to GitHub",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/auth/github",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "auth",
+                                "github"
+                            ]
+                        }
+                    }
                 },
                 {
-                  "key": "limit",
-                  "value": "10"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get Issue",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/issues/facebook/react/123",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "issues",
-                "facebook",
-                "react",
-                "123"
-              ]
-            }
-          }
-        },
-        {
-          "name": "List Issue Comments",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments?page=1&limit=10",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "issues",
-                "facebook",
-                "react",
-                "123",
-                "comments"
-              ],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
+                    "name": "GitHub Callback",
+                    "request": {
+                        "method": "GET",
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/auth/github/callback?code=YOUR_OAUTH_CODE_HERE",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "auth",
+                                "github",
+                                "callback"
+                            ],
+                            "query": [
+                                {
+                                    "key": "code",
+                                    "value": "YOUR_OAUTH_CODE_HERE"
+                                }
+                            ]
+                        }
+                    }
                 },
                 {
-                  "key": "limit",
-                  "value": "10"
+                    "name": "Get Current User",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/auth/me",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "auth",
+                                "me"
+                            ]
+                        }
+                    }
                 }
-              ]
-            }
-          }
+            ]
         },
         {
-          "name": "Create Issue",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"New Issue\",\n  \"body\": \"Issue details\"\n}"
-            },
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/issues/facebook/react",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "issues",
-                "facebook",
-                "react"
-              ]
-            }
-          }
+            "name": "Users",
+            "item": [
+                {
+                    "name": "Get User",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/users/USER_ID_HERE",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "users",
+                                "USER_ID_HERE"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Update User",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Updated Name\",\n  \"skills\": [\"JavaScript\", \"React\"]\n}"
+                        },
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/users/USER_ID_HERE",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "users",
+                                "USER_ID_HERE"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Analyze Profile",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/users/USER_ID_HERE/analyze",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "users",
+                                "USER_ID_HERE",
+                                "analyze"
+                            ]
+                        }
+                    }
+                }
+            ]
         },
         {
-          "name": "Create Issue Comment",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"body\": \"New comment\"\n}"
-            },
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "issues",
-                "facebook",
-                "react",
-                "123",
-                "comments"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Repositories",
-      "item": [
-        {
-          "name": "List Repositories",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/repositories",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "repositories"
-              ]
-            }
-          }
+            "name": "Issues",
+            "item": [
+                {
+                    "name": "List Issues",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/issues/facebook/react?page=1&limit=10",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "issues",
+                                "facebook",
+                                "react"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Issue",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/issues/facebook/react/123",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "issues",
+                                "facebook",
+                                "react",
+                                "123"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "List Issue Comments",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments?page=1&limit=10",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "issues",
+                                "facebook",
+                                "react",
+                                "123",
+                                "comments"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1"
+                                },
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create Issue",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"New Issue\",\n  \"body\": \"Issue details\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/issues/facebook/react",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "issues",
+                                "facebook",
+                                "react"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create Issue Comment",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"body\": \"New comment\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/issues/facebook/react/123/comments",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "issues",
+                                "facebook",
+                                "react",
+                                "123",
+                                "comments"
+                            ]
+                        }
+                    }
+                }
+            ]
         },
         {
-          "name": "Queue Analysis",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"url\": \"https://github.com/facebook/react\"\n}"
-            },
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/repositories",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "repositories"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Recommendations",
-      "item": [
+            "name": "Repositories",
+            "item": [
+                {
+                    "name": "List Repositories",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/repositories",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "repositories"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Queue Analysis",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"url\": \"https://github.com/facebook/react\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/repositories",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "repositories"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Hide Repository",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/repositories/:id/hide",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "repositories",
+                                ":id",
+                                "hide"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "id",
+                                    "value": "repo-id-here"
+                                }
+                            ]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
         {
-          "name": "List Recommendations",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/recommendations",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "recommendations"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Jobs",
-      "item": [
+            "name": "Recommendations",
+            "item": [
+                {
+                    "name": "List Recommendations",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/recommendations",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "recommendations"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
         {
-          "name": "Get Job Status",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/jobs/QUEUE_NAME/JOB_ID",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "jobs",
-                "QUEUE_NAME",
-                "JOB_ID"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Feed",
-      "item": [
+            "name": "Jobs",
+            "item": [
+                {
+                    "name": "Get Job Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/jobs/QUEUE_NAME/JOB_ID",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "jobs",
+                                "QUEUE_NAME",
+                                "JOB_ID"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
         {
-          "name": "Get Feed",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              }
-            ],
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/feed",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "feed"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Interactions",
-      "item": [
+            "name": "Feed",
+            "item": [
+                {
+                    "name": "Get Feed",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/feed",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "feed"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
         {
-          "name": "Log Interaction",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{JWT_TOKEN}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"repositoryId\": \"REPO_ID\",\n  \"type\": \"REPOSITORY_VIEW\"\n}"
-            },
-            "url": {
-              "raw": "{{BASE_URL}}/api/v1/interactions",
-              "host": [
-                "{{BASE_URL}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "interactions"
-              ]
-            }
-          }
+            "name": "Interactions",
+            "item": [
+                {
+                    "name": "Log Interaction",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{JWT_TOKEN}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"repositoryId\": \"REPO_ID\",\n  \"type\": \"REPOSITORY_VIEW\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{BASE_URL}}/api/v1/interactions",
+                            "host": [
+                                "{{BASE_URL}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "interactions"
+                            ]
+                        }
+                    }
+                }
+            ]
         }
-      ]
-    }
-  ]
+    ]
 }

@@ -58,6 +58,7 @@ model Repository {
   ciCd            String[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  hidden          Boolean  @default(false)
 
   recommendations Recommendation[]
   likes           RepositoryLike[]

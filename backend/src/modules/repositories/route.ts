@@ -14,6 +14,7 @@ router.get('/discover/easy-contributions', authMiddleware, paginationMiddleware,
 router.get('/', authMiddleware, paginationMiddleware, RepositoryController.listRepositories)
 router.get('/:owner/:repo', authMiddleware, RepositoryController.getRepositoryByFullName)
 router.get('/:id', authMiddleware, RepositoryController.getRepository)
+router.post('/:id/hide', authMiddleware, RepositoryController.hideRepository)
 router.post('/:id/like', authMiddleware, RepositoryController.toggleRepositoryLike)
 router.delete('/:id', authMiddleware, RepositoryController.deleteRepository)
 
