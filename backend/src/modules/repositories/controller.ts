@@ -36,6 +36,20 @@ const getRepository = asyncHandler(async (req: RequestWithUser, res: Response, n
   const id = String(req.params.id)
   const repository = await prisma.repository.findUnique({ where: { id } })
   assertFound(repository, 'Repository not found')
+  
+  if (repository.hidden) {
+    const userId = req.user?.id
+    if (!userId) throw new AppError('Unauthorized', 401)
+    
+    const accounts = await prisma.oAuthAccount.findMany({ where: { userId } })
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
+    
+    if (!validOwners.includes(repository.owner)) {
+      throw new AppError('Repository not found', 404) // hide its existence
+    }
+  }
+
   sendResponse(res, 200, true, 'Repository retrieved successfully', repository)
   } catch (error) {
     next(error)
@@ -57,6 +71,19 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
     })
     
     if (repository) {
+      if (repository.hidden) {
+        const userId = req.user?.id
+        if (!userId) throw new AppError('Unauthorized', 401)
+        
+        const accounts = await prisma.oAuthAccount.findMany({ where: { userId } })
+        const user = await prisma.user.findUnique({ where: { id: userId } })
+        const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
+        
+        if (!validOwners.includes(repository.owner)) {
+          throw new AppError('Repository not found', 404) // hide its existence
+        }
+      }
+
       sendResponse(res, 200, true, 'Repository retrieved successfully', {
         ...repository,
         imported: true
@@ -113,8 +140,8 @@ const listRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, 
   const take = req.pagination?.take
 
   const [total, repos] = await Promise.all([
-    prisma.repository.count(),
-    prisma.repository.findMany({ skip, take })
+    prisma.repository.count({ where: { hidden: false } }),
+    prisma.repository.findMany({ where: { hidden: false }, skip, take })
   ])
 
   sendResponse(res, 200, true, 'Repositories retrieved successfully', repos, {
@@ -262,9 +289,42 @@ const searchEasyContributions = asyncHandler(
   }
 )
 
+const hideRepository = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = requireUserId(req)
+    const id = String(req.params.id)
+
+    const repository = await prisma.repository.findUnique({ where: { id } })
+    assertFound(repository, 'Repository not found')
+
+    const accounts = await prisma.oAuthAccount.findMany({
+      where: { userId }
+    })
+    
+    // allow if the repo owner matches any of the user's oauth account usernames
+    // or if it matches their osca username
+    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
+
+    if (!validOwners.includes(repository.owner)) {
+      throw new AppError('You can only hide your own repositories', 403)
+    }
+
+    const updated = await prisma.repository.update({
+      where: { id },
+      data: { hidden: true }
+    })
+
+    sendResponse(res, 200, true, 'Repository hidden successfully', updated)
+  } catch (error) {
+    next(error)
+  }
+})
+
 export const RepositoryController = {
   queueRepositoryAnalysis,
   getRepository,
+  hideRepository,
   getRepositoryByFullName,
   listRepositories,
   deleteRepository,

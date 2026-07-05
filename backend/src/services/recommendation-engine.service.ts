@@ -42,6 +42,7 @@ export const generateFeed = async (userId: string, limit: number = 20) => {
   // 2. Fetch candidate repositories
   // Fetching all for MVP. In production, we'd limit this to recently active or via a materialized view.
   const repositories = await prisma.repository.findMany({
+    where: { hidden: false },
     select: {
       id: true,
       name: true,
