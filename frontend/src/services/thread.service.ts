@@ -1,21 +1,30 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
 
 export const ThreadService = {
-  async createThread(data: { repositoryId: string; title: string; content: string }, token: string) {
-    const res = await fetch(`${API_URL}/threads`, {
+  async createThread(data: { owner: string; repo: string; title: string; body: string }, token: string) {
+    const res = await fetch(`${API_URL}/issues/${data.owner}/${data.repo}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify({ title: data.title, body: data.body })
     })
     if (!res.ok) throw new Error('Failed to create thread')
     return res.json()
   },
 
-  async getThread(id: string, token: string) {
-    const res = await fetch(`${API_URL}/threads/${id}`, {
+  async listThreads(owner: string, repo: string, token: string, page = 1) {
+    const res = await fetch(`${API_URL}/issues/${owner}/${repo}?page=${page}&_t=${Date.now()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store'
+    })
+    if (!res.ok) throw new Error('Failed to list threads')
+    return res.json()
+  },
+
+  async getThread(owner: string, repo: string, issueNumber: string | number, token: string) {
+    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error('Failed to fetch thread')
