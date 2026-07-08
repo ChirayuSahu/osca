@@ -148,8 +148,40 @@ const getCurrentUser = asyncHandler(async (req: RequestWithUser, res: Response, 
   }
 })
 
+const getDevToken = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (config.nodeEnv === 'production') {
+      throw new AppError('Dev token route is disabled in production', 403)
+    }
+
+    const email = req.query.email as string
+    let user
+
+    if (email) {
+      user = await prisma.user.findUnique({ where: { email } })
+    } else {
+      user = await prisma.user.findFirst()
+    }
+
+    if (!user) {
+      throw new AppError('No user found to generate token for', 404)
+    }
+
+    const token = jwt.sign(
+      { id: user.id, username: user.username, email: user.email },
+      config.jwtSecret,
+      { expiresIn: '1d' }
+    )
+
+    sendResponse(res, 200, true, 'Dev token generated successfully', { token, user })
+  } catch (error) {
+    next(error)
+  }
+})
+
 export const AuthController = {
   redirectToGithub,
   handleGithubCallback,
-  getCurrentUser
+  getCurrentUser,
+  getDevToken
 }
