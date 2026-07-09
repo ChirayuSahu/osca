@@ -51,10 +51,17 @@ backend/src/
 │   ├── auth/                   # GitHub OAuth + JWT issuance
 │   ├── users/                  # Profile CRUD + contributor analysis trigger
 │   ├── repositories/           # Repo CRUD + repository analysis trigger + GitHub repo listing
-│   ├── recommendations/        # Recommendation CRUD (auth required, owner-scoped)
+│   ├── recommendations/        # Recommendation CRUD + AI chat (auth required, owner-scoped)
+│   ├── feed/                   # GET /feed — recommendation engine results (paginated)
+│   ├── interactions/           # POST /interactions — log user/repo interactions (used by engine)
+│   ├── issues/                 # GitHub Issues proxy + comments CRUD (auth required)
+│   ├── pulls/                  # GitHub Pull Requests proxy + comments (auth required)
+│   ├── github/                 # GitHub-specific routes (webhooks placeholder)
 │   ├── jobs/                   # GET /jobs/:queue/:jobId — poll async job status
 │   └── health/
 ├── services/
+│   ├── recommendation-engine.service.ts  # Scores repos against user interests (feed engine)
+│   ├── interaction.service.ts            # Logs interactions + updates UserInterest scores
 │   ├── repository-analysis.service.ts   # Deep repo analysis (worker-only)
 │   ├── contributor-analysis.service.ts  # Profile skill analysis (worker-only)
 │   └── job-enqueue.service.ts           # Centralized BullMQ enqueue helpers
@@ -86,6 +93,13 @@ backend/src/
 4. **User routes** are self-service only (`GET/PUT/POST .../users/:id` requires `req.user.id === :id`).
 5. **Recommendation routes** require auth and are scoped to the authenticated user.
 6. **Job status** is restricted to the user who enqueued the job (`job.data.userId`).
+
+> **Known Issues (see [IMPROVEMENTS.md](backend/IMPROVEMENTS.md) for the full list):**
+> - JWT is currently sent as a URL query param in the OAuth redirect (security risk)
+> - OAuth flow has no `state` CSRF parameter
+> - Dev-token endpoint only guards on `NODE_ENV === 'production'`
+> - GitHub access tokens are stored in plaintext — no encryption at rest
+> - No rate limiting on any endpoint
 
 ### Async Analysis Flow
 
@@ -120,11 +134,26 @@ npm run dev
 
 ---
 
+## Known Issues
+
+A full audit was performed on the backend. **29 prioritised issues** are tracked in [`backend/IMPROVEMENTS.md`](backend/IMPROVEMENTS.md), covering:
+
+- 🔴 **P0 Security:** JWT in URL params, missing OAuth `state`, no rate limiting, any user can delete any repo, hardcoded JWT fallback secret
+- 🟠 **P1 Logic:** Users can self-set `contributionScore`, recommendation `status` not enum-validated, token refresh never happens
+- 🟡 **P2 Performance:** Feed engine loads 1,000 repos into memory, N+1 queries in hidden repo checks, no idempotency on job enqueue, health check never pings DB/Redis
+- 🔵 **P3 Quality:** 444-line fat repository controller, duplicate error-handling pattern, missing Swagger docs for 4 modules
+
+---
+
 ## Agent Guidelines
 
 1. **Do not reintroduce sync deep GitHub analysis** in controllers — enqueue via `JobEnqueueService`.
 2. **Do not expose** `OAuthAccount.accessToken` or `refreshToken` in API responses.
 3. **Use** `lib/github/client.ts` for all GitHub HTTP calls (not ad-hoc fetch/axios in controllers).
-4. **Use** `AppError` + `asyncHandler` for consistent error handling.
+4. **Use** `AppError` + `asyncHandler` for consistent error handling — do **not** add an inner `try/catch` inside `asyncHandler`; the wrapper already calls `next(err)`.
 5. **No GitLab** for MVP unless explicitly requested.
 6. Keep new logic in the **service layer**; controllers should stay thin.
+7. **Always add an ownership check** before any mutation (`DELETE`, `PUT`, `PATCH`) — verify `req.user.id` matches the resource owner before touching the DB.
+8. **Whitelist body fields** in update handlers — never pass `req.body` directly to Prisma; strip computed fields like `contributionScore`.
+9. **Validate enums at the API boundary** — do not rely on Prisma to catch invalid string values for `status`, `provider`, or `action` fields.
+10. **Do not add new shared constants** (e.g., ignored dirs/files, framework maps) inline in controllers — add them to `lib/github/utils/constants.ts`.

@@ -1,4 +1,4 @@
-import { Response, NextFunction } from 'express'
+import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config'
 import { AppError } from '../lib/errors'
@@ -10,8 +10,6 @@ export interface RequestWithUser extends Request {
     email: string
   }
 }
-
-import { Request } from 'express'
 
 export const authMiddleware = (req: RequestWithUser, res: Response, next: NextFunction): void => {
   const authHeader = req.headers.authorization

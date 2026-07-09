@@ -1,4 +1,4 @@
-import { NextFunction,  Response } from 'express'
+import { NextFunction, Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
@@ -13,8 +13,7 @@ const requireSelf = (req: RequestWithUser, userId: string): void => {
   }
 }
 
-const getUser = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const getUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
   requireSelf(req, id)
 
@@ -25,24 +24,21 @@ const getUser = asyncHandler(async (req: RequestWithUser, res: Response, next: N
 
   assertFound(user, 'User not found')
   sendResponse(res, 200, true, 'User retrieved successfully', user)
-  } catch (error) {
-    next(error)
-  }
 })
 
-const updateUser = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const updateUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
   requireSelf(req, id)
 
-  const { name, email, avatarUrl, skills, contributionScore } = req.body
+  // #10: Whitelist only user-editable fields.
+  // contributionScore is a computed metric and must never be user-writable.
+  const { name, email, avatarUrl, skills } = req.body
   const data: Record<string, unknown> = {}
 
   if (typeof name === 'string') data.name = name
   if (typeof email === 'string') data.email = email
   if (typeof avatarUrl === 'string') data.avatarUrl = avatarUrl
   if (Array.isArray(skills)) data.skills = skills.map(String)
-  if (typeof contributionScore === 'number') data.contributionScore = contributionScore
 
   const user = await prisma.user.update({
     where: { id },
@@ -51,13 +47,9 @@ const updateUser = asyncHandler(async (req: RequestWithUser, res: Response, next
   })
 
   sendResponse(res, 200, true, 'User updated successfully', user)
-  } catch (error) {
-    next(error)
-  }
 })
 
-const analyzeProfile = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const analyzeProfile = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
   requireSelf(req, id)
 
@@ -66,9 +58,6 @@ const analyzeProfile = asyncHandler(async (req: RequestWithUser, res: Response, 
 
   const queued = await JobEnqueueService.enqueueContributorAnalysis(id)
   sendResponse(res, 202, true, 'Contributor analysis queued', queued)
-  } catch (error) {
-    next(error)
-  }
 })
 
 export const UserController = {

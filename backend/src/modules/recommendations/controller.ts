@@ -1,10 +1,14 @@
-import { NextFunction,  Response } from 'express'
+import { NextFunction, Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
 import { AppError, assertFound } from '../../lib/errors'
 import { asyncHandler } from '../../utils/async-handler'
+
+// #11: Allowed values for recommendation status
+const VALID_STATUSES = ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED'] as const
+type RecommendationStatus = typeof VALID_STATUSES[number]
 
 const requireUserId = (req: RequestWithUser): string => {
   const userId = req.user?.id
@@ -26,8 +30,7 @@ const assertRecommendationOwner = async (recommendationId: string, userId: strin
   }
 }
 
-const createRecommendation = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const createRecommendation = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const requesterId = requireUserId(req)
   const { userId, repositoryId, fitScore, explanation, roadmap } = req.body
 
@@ -64,13 +67,9 @@ const createRecommendation = asyncHandler(async (req: RequestWithUser, res: Resp
   })
 
   sendResponse(res, 201, true, 'Recommendation created successfully', recommendation)
-  } catch (error) {
-    next(error)
-  }
 })
 
-const getRecommendation = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const getRecommendation = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const requesterId = requireUserId(req)
   const id = String(req.params.id)
 
@@ -82,13 +81,9 @@ const getRecommendation = asyncHandler(async (req: RequestWithUser, res: Respons
   })
 
   sendResponse(res, 200, true, 'Recommendation retrieved successfully', assertFound(recommendation, 'Recommendation not found'))
-  } catch (error) {
-    next(error)
-  }
 })
 
-const listRecommendations = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
+const listRecommendations = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const requesterId = requireUserId(req)
   const skip = req.pagination?.skip
   const take = req.pagination?.take
@@ -111,13 +106,9 @@ const listRecommendations = asyncHandler(async (req: RequestWithPaginationAndUse
     total,
     totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
   })
-  } catch (error) {
-    next(error)
-  }
 })
 
-const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const requesterId = requireUserId(req)
   const id = String(req.params.id)
   const { status } = req.body
@@ -126,21 +117,26 @@ const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res
     throw new AppError('Status must be a string', 400)
   }
 
+  // #11: Validate against the allowed enum before writing to DB
+  const normalised = status.toUpperCase() as RecommendationStatus
+  if (!VALID_STATUSES.includes(normalised)) {
+    throw new AppError(
+      `Invalid status "${status}". Must be one of: ${VALID_STATUSES.join(', ')}`,
+      400
+    )
+  }
+
   await assertRecommendationOwner(id, requesterId)
 
   const recommendation = await prisma.recommendation.update({
     where: { id },
-    data: { status: status.toUpperCase() }
+    data: { status: normalised }
   })
 
   sendResponse(res, 200, true, 'Recommendation status updated successfully', recommendation)
-  } catch (error) {
-    next(error)
-  }
 })
 
-const deleteRecommendation = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const deleteRecommendation = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const requesterId = requireUserId(req)
   const id = String(req.params.id)
 
@@ -148,9 +144,6 @@ const deleteRecommendation = asyncHandler(async (req: RequestWithUser, res: Resp
   await prisma.recommendation.delete({ where: { id } })
 
   sendResponse(res, 200, true, 'Recommendation deleted successfully')
-  } catch (error) {
-    next(error)
-  }
 })
 
 export const RecommendationController = {
