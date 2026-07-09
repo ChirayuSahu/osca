@@ -40,10 +40,12 @@ export const createRepositoryWorker = (): Worker => {
     {
       connection: getRedisConnectionOptions(),
       concurrency: 2,
-      removeOnComplete: { count: 500 },
-      removeOnFail: { count: 200 },
-      stalledInterval: 300000,
-      drainDelay: 300,
+      // #J-2: removeOnComplete / removeOnFail omitted here — controlled by
+      // queue-level defaultJobOptions in config/queue.ts to avoid override conflicts.
+      // #J-3: 30s stall detection (was 5 min) — catches crashed workers faster
+      stalledInterval: 30000,
+      // #J-4: 5s drain delay (was 300ms) — prevents busy-polling when queue is empty
+      drainDelay: 5000,
       metrics: undefined
     }
   )
