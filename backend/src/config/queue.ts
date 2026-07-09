@@ -1,11 +1,14 @@
 import { Queue, type DefaultJobOptions } from 'bullmq'
 import { getRedisConnectionOptions } from './redis'
+import { config } from './index'
 
 // ─── Queue Name Constants ────────────────────────────────────────
 
+const prefix = config.queuePrefix
+
 export const QUEUE_NAMES = {
-  CONTRIBUTOR_ANALYSIS: 'dev-contributor-analysis',
-  REPOSITORY_ANALYSIS: 'dev-repository-analysis'
+  CONTRIBUTOR_ANALYSIS: `${prefix}-contributor-analysis`,
+  REPOSITORY_ANALYSIS: `${prefix}-repository-analysis`
 } as const
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]

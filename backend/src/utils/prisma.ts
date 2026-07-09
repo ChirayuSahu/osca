@@ -10,7 +10,9 @@ const globalForPrisma = global as unknown as {
 
 const pool = globalForPrisma.pool ?? new Pool({
   connectionString: config.databaseUrl,
-  max: 2
+  // #P-9: Configurable pool size. Default 10 for production; use DATABASE_POOL_SIZE env var.
+  // (Was hardcoded to 2, causing contention with concurrent workers + API requests)
+  max: parseInt(process.env.DATABASE_POOL_SIZE ?? '10', 10)
 })
 if (config.nodeEnv !== 'production') {
   globalForPrisma.pool = pool
