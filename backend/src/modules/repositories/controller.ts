@@ -10,6 +10,8 @@ import { RepositoryService } from './service'
 import { InteractionService } from '../../services/interaction.service'
 import { githubGetJson, githubTryGetRaw, githubGraphQL } from '../../lib/github/client'
 import { asyncHandler } from '../../utils/async-handler'
+import { IGNORED_DIRS, IGNORED_FILES } from '../../lib/github/utils/constants'
+import type { Repository } from '@prisma/client'
 
 const requireUserId = (req: RequestWithUser): string => {
   const userId = req.user?.id
@@ -19,230 +21,219 @@ const requireUserId = (req: RequestWithUser): string => {
   return userId
 }
 
-const queueRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+// ─── Shared helper: hidden repo visibility check ────────────────────────────
+// #14: Extracted so getRepository and getRepositoryByFullName don't duplicate
+// the 3-query N+1 pattern. Uses a single oAuthAccount lookup joined to user.
+const assertRepositoryVisible = async (repository: Repository, userId: string): Promise<void> => {
+  if (!repository.hidden) return
+
+  const accounts = await prisma.oAuthAccount.findMany({
+    where: { userId },
+    select: { username: true }
+  })
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { username: true }
+  })
+  const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
+
+  if (!validOwners.includes(repository.owner)) {
+    throw new AppError('Repository not found', 404) // obscure existence of hidden repo
+  }
+}
+
+const queueRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const userId = requireUserId(req)
   const url = resolveRepositoryUrl(req.body)
   const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId)
-
   sendResponse(res, 202, true, 'Repository analysis queued', queued)
-  } catch (error) {
-    next(error)
-  }
 })
 
-const getRepository = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const getRepository = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
   const repository = await prisma.repository.findUnique({ where: { id } })
-  assertFound(repository, 'Repository not found')
-  
+  if (!repository) {
+    throw new AppError('Repository not found', 404)
+  }
+
   if (repository.hidden) {
     const userId = req.user?.id
     if (!userId) throw new AppError('Unauthorized', 401)
-    
-    const accounts = await prisma.oAuthAccount.findMany({ where: { userId } })
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
-    
-    if (!validOwners.includes(repository.owner)) {
-      throw new AppError('Repository not found', 404) // hide its existence
-    }
+    await assertRepositoryVisible(repository, userId)
   }
 
   sendResponse(res, 200, true, 'Repository retrieved successfully', repository)
-  } catch (error) {
-    next(error)
-  }
 })
 
-const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const { owner, repo } = req.params
-    const fullName = `${owner}/${repo}`
-    
-    const repository = await prisma.repository.findUnique({ 
-      where: { 
-        provider_fullName: {
-          provider: 'github',
-          fullName
-        }
-      } 
-    })
-    
-    if (repository) {
-      if (repository.hidden) {
-        const userId = req.user?.id
-        if (!userId) throw new AppError('Unauthorized', 401)
-        
-        const accounts = await prisma.oAuthAccount.findMany({ where: { userId } })
-        const user = await prisma.user.findUnique({ where: { id: userId } })
-        const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
-        
-        if (!validOwners.includes(repository.owner)) {
-          throw new AppError('Repository not found', 404) // hide its existence
-        }
+const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const { owner, repo } = req.params
+  const fullName = `${owner}/${repo}`
+
+  const repository = await prisma.repository.findUnique({
+    where: {
+      provider_fullName: {
+        provider: 'github',
+        fullName
       }
+    }
+  })
 
-      sendResponse(res, 200, true, 'Repository retrieved successfully', {
-        ...repository,
-        imported: true
-      })
-      return
+  if (repository) {
+    if (repository.hidden) {
+      const userId = req.user?.id
+      if (!userId) throw new AppError('Unauthorized', 401)
+      await assertRepositoryVisible(repository, userId)
     }
 
-    // Not found in our DB, try fetching from GitHub
-    const account = await prisma.oAuthAccount.findFirst({
-      where: { userId: req.user!.id, provider: 'github' }
+    sendResponse(res, 200, true, 'Repository retrieved successfully', {
+      ...repository,
+      imported: true
     })
+    return
+  }
 
-    if (!account || !account.accessToken) {
-      throw new AppError('GitHub account not connected', 400)
-    }
+  // Not found in our DB — fetch preview from GitHub
+  const account = await prisma.oAuthAccount.findFirst({
+    where: { userId: req.user!.id, provider: 'github' }
+  })
 
+  if (!account || !account.accessToken) {
+    throw new AppError('GitHub account not connected', 400)
+  }
+
+  try {
+    const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, account.accessToken)
+
+    let dependencies: any[] = []
     try {
-      const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, account.accessToken)
-      
-      let dependencies: any[] = [];
-      try {
-        const query = `
-          query getRepoDependencies($owner: String!, $repo: String!) {
-            repository(owner: $owner, name: $repo) {
-              dependencyGraphManifests {
-                nodes {
-                  blobPath
-                  dependencies {
-                    nodes {
-                      packageName
-                      requirements
-                      hasDependencies
-                      packageManager
-                    }
+      const query = `
+        query getRepoDependencies($owner: String!, $repo: String!) {
+          repository(owner: $owner, name: $repo) {
+            dependencyGraphManifests {
+              nodes {
+                blobPath
+                dependencies {
+                  nodes {
+                    packageName
+                    requirements
+                    hasDependencies
+                    packageManager
                   }
                 }
               }
             }
           }
-        `;
-        const depRes = await githubGraphQL<any>(query, account.accessToken, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json');
-        dependencies = depRes.data?.repository?.dependencyGraphManifests?.nodes || [];
-      } catch (err) {
-        console.error(`[RepoPreview] Dependency graph error:`, err);
-      }
-
-      if (dependencies.length === 0) {
-        try {
-          const rawPkg = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/package.json`, account.accessToken);
-          if (rawPkg) {
-            const pkgJson = typeof rawPkg === 'string' ? JSON.parse(rawPkg) : rawPkg;
-            const nodes = [];
-            const allDeps = { ...(pkgJson.dependencies || {}), ...(pkgJson.devDependencies || {}) };
-            for (const [name, req] of Object.entries(allDeps)) {
-              if (typeof req === 'string') {
-                nodes.push({ packageName: name, requirements: req, packageManager: 'NPM', hasDependencies: false });
-              }
-            }
-            if (nodes.length > 0) {
-              dependencies = [{
-                blobPath: 'package.json',
-                dependencies: { nodes }
-              }];
-            }
-          }
-        } catch (err) {
-          console.error(`[RepoPreview] Dependency fetch error:`, err);
         }
-      }
-
-      let folderStructure: any = null;
-      let isShallow = false;
-      try {
-        const branch = ghRepo.default_branch || 'main';
-        const repoPath = `/repos/${owner}/${repo}`;
-        let treeRes: any;
-        
-        try {
-          treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}?recursive=1`, account.accessToken);
-        } catch (err: any) {
-          console.warn(`[RepoPreview] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow fetch.`);
-          treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}`, account.accessToken);
-          isShallow = true;
-        }
-        
-        const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.github', '.vscode', '.idea', 'target', 'bin', 'obj']);
-        const IGNORED_FILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.DS_Store', 'Thumbs.db']);
-
-        if (treeRes && treeRes.tree) {
-          folderStructure = treeRes.tree.filter((node: any) => {
-            const parts = node.path.split('/');
-            if (parts.some((part: string) => IGNORED_DIRS.has(part))) return false;
-            const filename = parts[parts.length - 1];
-            if (IGNORED_FILES.has(filename)) return false;
-            return true;
-          });
-        }
-      } catch (err) {
-        console.error(`[RepoPreview] Tree fetch error:`, err);
-      }
-
-      if (isShallow && folderStructure && dependencies.length > 0) {
-        const existingPaths = new Set(folderStructure.map((n: any) => n.path));
-        dependencies.forEach((manifest: any) => {
-          let manifestPath = manifest.blobPath;
-          if (manifestPath.startsWith('/')) manifestPath = manifestPath.substring(1);
-          
-          const parts = manifestPath.split('/');
-          let currentPath = '';
-          for (let i = 0; i < parts.length; i++) {
-            currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`;
-            if (!existingPaths.has(currentPath)) {
-              existingPaths.add(currentPath);
-              folderStructure.push({
-                path: currentPath,
-                mode: '100644',
-                type: i === parts.length - 1 ? 'blob' : 'tree',
-                sha: 'dummy-sha-' + currentPath,
-                size: 100,
-                url: ''
-              });
-            }
-          }
-        });
-      }
-      
-      const previewRepo = {
-        id: `gh-${ghRepo.id}`,
-        name: ghRepo.name,
-        owner: ghRepo.owner.login,
-        fullName: ghRepo.full_name,
-        provider: 'github',
-        githubId: ghRepo.id,
-        description: ghRepo.description,
-        url: ghRepo.html_url,
-        languages: ghRepo.language ? { [ghRepo.language]: 100 } : null,
-        frameworks: [],
-        techStack: ghRepo.topics || [],
-        dependencies: dependencies,
-        folderStructure: folderStructure,
-        ciCd: [],
-        createdAt: ghRepo.created_at,
-        updatedAt: ghRepo.updated_at,
-        imported: false,
-        _count: { likes: 0, interactions: 0 }
-      }
-
-      sendResponse(res, 200, true, 'Repository preview retrieved from GitHub', previewRepo)
-    } catch (ghError) {
-      throw new AppError('Repository not found on GitHub or unauthorized', 404)
+      `
+      const depRes = await githubGraphQL<any>(query, account.accessToken, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json')
+      dependencies = depRes.data?.repository?.dependencyGraphManifests?.nodes || []
+    } catch (err) {
+      console.error(`[RepoPreview] Dependency graph error:`, err)
     }
 
-  } catch (error) {
-    next(error)
+    if (dependencies.length === 0) {
+      try {
+        const rawPkg = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/package.json`, account.accessToken)
+        if (rawPkg) {
+          const pkgJson = typeof rawPkg === 'string' ? JSON.parse(rawPkg) : rawPkg
+          const nodes = []
+          const allDeps = { ...(pkgJson.dependencies || {}), ...(pkgJson.devDependencies || {}) }
+          for (const [name, req] of Object.entries(allDeps)) {
+            if (typeof req === 'string') {
+              nodes.push({ packageName: name, requirements: req, packageManager: 'NPM', hasDependencies: false })
+            }
+          }
+          if (nodes.length > 0) {
+            dependencies = [{ blobPath: 'package.json', dependencies: { nodes } }]
+          }
+        }
+      } catch (err) {
+        console.error(`[RepoPreview] Dependency fetch error:`, err)
+      }
+    }
+
+    let folderStructure: any = null
+    let isShallow = false
+    try {
+      const branch = ghRepo.default_branch || 'main'
+      const repoPath = `/repos/${owner}/${repo}`
+      let treeRes: any
+
+      try {
+        treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}?recursive=1`, account.accessToken)
+      } catch {
+        console.warn(`[RepoPreview] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow.`)
+        treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}`, account.accessToken)
+        isShallow = true
+      }
+
+      // #21: Use shared constants imported from lib/github/utils/constants.ts
+      if (treeRes && treeRes.tree) {
+        folderStructure = treeRes.tree.filter((node: any) => {
+          const parts = node.path.split('/')
+          if (parts.some((part: string) => IGNORED_DIRS.has(part))) return false
+          const filename = parts[parts.length - 1]
+          if (IGNORED_FILES.has(filename)) return false
+          return true
+        })
+      }
+    } catch (err) {
+      console.error(`[RepoPreview] Tree fetch error:`, err)
+    }
+
+    if (isShallow && folderStructure && dependencies.length > 0) {
+      const existingPaths = new Set(folderStructure.map((n: any) => n.path))
+      dependencies.forEach((manifest: any) => {
+        let manifestPath = manifest.blobPath
+        if (manifestPath.startsWith('/')) manifestPath = manifestPath.substring(1)
+
+        const parts = manifestPath.split('/')
+        let currentPath = ''
+        for (let i = 0; i < parts.length; i++) {
+          currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`
+          if (!existingPaths.has(currentPath)) {
+            existingPaths.add(currentPath)
+            folderStructure.push({
+              path: currentPath,
+              mode: '100644',
+              type: i === parts.length - 1 ? 'blob' : 'tree',
+              sha: 'dummy-sha-' + currentPath,
+              size: 100,
+              url: ''
+            })
+          }
+        }
+      })
+    }
+
+    const previewRepo = {
+      id: `gh-${ghRepo.id}`,
+      name: ghRepo.name,
+      owner: ghRepo.owner.login,
+      fullName: ghRepo.full_name,
+      provider: 'github',
+      githubId: ghRepo.id,
+      description: ghRepo.description,
+      url: ghRepo.html_url,
+      languages: ghRepo.language ? { [ghRepo.language]: 100 } : null,
+      frameworks: [],
+      techStack: ghRepo.topics || [],
+      dependencies,
+      folderStructure,
+      ciCd: [],
+      createdAt: ghRepo.created_at,
+      updatedAt: ghRepo.updated_at,
+      imported: false,
+      _count: { likes: 0, interactions: 0 }
+    }
+
+    sendResponse(res, 200, true, 'Repository preview retrieved from GitHub', previewRepo)
+  } catch (ghError) {
+    throw new AppError('Repository not found on GitHub or unauthorized', 404)
   }
 })
 
-const listRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
+const listRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const skip = req.pagination?.skip
   const take = req.pagination?.take
 
@@ -257,23 +248,35 @@ const listRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, 
     total,
     totalPages: Math.ceil(total / (req.pagination?.limit ?? 10))
   })
-  } catch (error) {
-    next(error)
-  }
 })
 
-const deleteRepository = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+// #9: Ownership check — only the user who added the repository can delete it
+const deleteRepository = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
   const id = String(req.params.id)
+
+  const repository = await prisma.repository.findUnique({ where: { id } })
+  if (!repository) {
+    throw new AppError('Repository not found', 404)
+  }
+
+  // Verify the requesting user owns this repository
+  const accounts = await prisma.oAuthAccount.findMany({
+    where: { userId },
+    select: { username: true }
+  })
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } })
+  const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
+
+  if (!validOwners.includes(repository.owner)) {
+    throw new AppError('Forbidden: You can only delete your own repositories', 403)
+  }
+
   await prisma.repository.delete({ where: { id } })
   sendResponse(res, 200, true, 'Repository deleted successfully')
-  } catch (error) {
-    next(error)
-  }
 })
 
-const listGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
+const listGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const userId = requireUserId(req)
   const page = req.pagination?.page ?? 1
   const limit = req.pagination?.limit ?? 10
@@ -289,13 +292,9 @@ const listGithubRepositories = asyncHandler(async (req: RequestWithPaginationAnd
     total: result.total,
     totalPages: result.totalPages
   })
-  } catch (error) {
-    next(error)
-  }
 })
 
-const listPersonalGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
+const listPersonalGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const userId = requireUserId(req)
   const page = req.pagination?.page ?? 1
   const limit = req.pagination?.limit ?? 10
@@ -309,13 +308,9 @@ const listPersonalGithubRepositories = asyncHandler(async (req: RequestWithPagin
     total: result.total,
     totalPages: result.totalPages
   })
-  } catch (error) {
-    next(error)
-  }
 })
 
-const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-  try {
+const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const userId = requireUserId(req)
   const page = req.pagination?.page ?? 1
   const limit = req.pagination?.limit ?? 10
@@ -335,14 +330,9 @@ const listOrganizationGithubRepositories = asyncHandler(async (req: RequestWithP
     total: result.total,
     totalPages: result.totalPages
   })
-  } catch (error) {
-    next(error)
-  }
 })
 
-
-const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
+const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const userId = requireUserId(req)
   const repositoryId = String(req.params.id)
 
@@ -369,63 +359,49 @@ const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Resp
   await InteractionService.logInteraction(userId, repositoryId, 'REPOSITORY_LIKE')
 
   sendResponse(res, 201, true, 'Repository liked successfully', like)
-  } catch (error) {
-    next(error)
-  }
 })
 
 const searchEasyContributions = asyncHandler(
-  async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
-    try {
-      const userId = req.user!.id
-      const page = req.pagination?.page ?? 1
-      const limit = req.pagination?.limit ?? 10
-      const language = req.query.language as string | undefined
+  async (req: RequestWithPaginationAndUser, res: Response) => {
+    const userId = req.user!.id
+    const page = req.pagination?.page ?? 1
+    const limit = req.pagination?.limit ?? 10
+    const language = req.query.language as string | undefined
 
-      const result = await RepositoryService.searchEasyContributionRepos(userId, page, limit, language)
-      
-      sendResponse(res, 200, true, 'Easy contribution repositories retrieved successfully', result.repos, {
-        page: result.page,
-        limit: result.limit,
-        total: result.total,
-        totalPages: result.totalPages
-      })
-    } catch (error) {
-      next(error)
-    }
+    const result = await RepositoryService.searchEasyContributionRepos(userId, page, limit, language)
+
+    sendResponse(res, 200, true, 'Easy contribution repositories retrieved successfully', result.repos, {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+      totalPages: result.totalPages
+    })
   }
 )
 
-const hideRepository = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = requireUserId(req)
-    const id = String(req.params.id)
+const hideRepository = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const id = String(req.params.id)
 
-    const repository = await prisma.repository.findUnique({ where: { id } })
-    assertFound(repository, 'Repository not found')
-
-    const accounts = await prisma.oAuthAccount.findMany({
-      where: { userId }
-    })
-    
-    // allow if the repo owner matches any of the user's oauth account usernames
-    // or if it matches their osca username
-    const user = await prisma.user.findUnique({ where: { id: userId } })
-    const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
-
-    if (!validOwners.includes(repository.owner)) {
-      throw new AppError('You can only hide your own repositories', 403)
-    }
-
-    const updated = await prisma.repository.update({
-      where: { id },
-      data: { hidden: true }
-    })
-
-    sendResponse(res, 200, true, 'Repository hidden successfully', updated)
-  } catch (error) {
-    next(error)
+  const repository = await prisma.repository.findUnique({ where: { id } })
+  if (!repository) {
+    throw new AppError('Repository not found', 404)
   }
+
+  const accounts = await prisma.oAuthAccount.findMany({ where: { userId } })
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  const validOwners = [...accounts.map(a => a.username), user?.username].filter(Boolean)
+
+  if (!validOwners.includes(repository.owner)) {
+    throw new AppError('You can only hide your own repositories', 403)
+  }
+
+  const updated = await prisma.repository.update({
+    where: { id },
+    data: { hidden: true }
+  })
+
+  sendResponse(res, 200, true, 'Repository hidden successfully', updated)
 })
 
 export const RepositoryController = {
