@@ -51,6 +51,7 @@ const globalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
+    prefix: 'rl_global:',
     sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
   }),
   message: { success: false, message: 'Too many requests, please try again later.' }
@@ -63,6 +64,7 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
+    prefix: 'rl_auth:',
     sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
   }),
   message: { success: false, message: 'Too many auth requests, please try again later.' }
@@ -75,6 +77,7 @@ const jobLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   store: new RedisStore({
+    prefix: 'rl_job:',
     sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
   }),
   message: { success: false, message: 'Too many analysis requests, please slow down.' }

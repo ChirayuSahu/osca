@@ -1,6 +1,10 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/feed"
+name: Get Feed
+url: "{{BASE_URL}}/api/v1/feed?page=1&limit=10"
 method: GET
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
+queryParams:
+  page: "1"
+  limit: "10"
 order: 1000
