@@ -16,6 +16,7 @@ import {
   type ProgressCallback,
   noopProgress
 } from '../lib/github'
+import { IGNORED_DIRS, IGNORED_FILES } from '../lib/github/utils/constants'
 
 interface RepoAnalysis {
   name: string
@@ -210,8 +211,7 @@ const analyzeGithubRepo = async (
       isShallow = true
     }
     
-    const IGNORED_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', 'out', 'vendor', '.cache', '.vscode', '.idea', 'target', 'bin', 'obj'])
-    const IGNORED_FILES = new Set(['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', '.DS_Store', 'Thumbs.db'])
+    // #21: Use shared constants from lib/github/utils/constants.ts
 
     folderStructure = treeRes.tree.filter(node => {
       const parts = node.path.split('/')

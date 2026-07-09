@@ -190,3 +190,18 @@ export const STACK_FILE_INDICATORS: Array<{ path: string; tech: string; framewor
   { path: '.terraform', tech: 'Terraform' },
   { path: 'serverless.yml', tech: 'Serverless Framework' }
 ]
+
+// ─── Shared File-Tree Filter Constants ───────────────────────────────────────
+// #21: Single source of truth — used by repositories controller AND
+// repository-analysis service to avoid duplication.
+
+export const IGNORED_DIRS = new Set([
+  'node_modules', '.git', 'dist', 'build', '.next', 'coverage',
+  'out', 'vendor', '.cache', '.github', '.vscode', '.idea',
+  'target', 'bin', 'obj'
+])
+
+export const IGNORED_FILES = new Set([
+  'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb',
+  '.DS_Store', 'Thumbs.db'
+])
