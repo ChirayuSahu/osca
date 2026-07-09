@@ -5,6 +5,8 @@ import { asyncHandler } from '../../utils/async-handler'
 import { AppError } from '../../lib/errors'
 import { RecommendationEngineService } from '../../services/recommendation-engine.service'
 
+import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
+
 const requireUserId = (req: RequestWithUser): string => {
   const userId = req.user?.id
   if (!userId) {
@@ -13,14 +15,20 @@ const requireUserId = (req: RequestWithUser): string => {
   return userId
 }
 
-const getFeed = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+const getFeed = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
   try {
   const userId = requireUserId(req)
-  const limit = parseInt(req.query.limit as string, 10) || 20
+  const page = req.pagination?.page || 1
+  const limit = req.pagination?.limit || 20
 
-  const feed = await RecommendationEngineService.generateFeed(userId, limit)
+  const result = await RecommendationEngineService.generateFeed(userId, page, limit)
 
-  sendResponse(res, 200, true, 'Feed retrieved successfully', feed)
+  sendResponse(res, 200, true, 'Feed retrieved successfully', result.feed, {
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalPages: result.totalPages
+  })
   } catch (error) {
     next(error)
   }

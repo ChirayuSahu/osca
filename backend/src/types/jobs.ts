@@ -22,7 +22,10 @@ export interface ContributorAnalysisJobResult {
 }
 
 export interface QueuedJobResponse {
-  jobId: string | undefined
+  /** Always a non-empty string — enqueue throws if BullMQ returns undefined */
+  jobId: string
   queue: string
   statusUrl: string
+  /** True if a job for the same work was already active/waiting — no new job created */
+  alreadyQueued?: boolean
 }

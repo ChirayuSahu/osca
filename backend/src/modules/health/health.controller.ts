@@ -1,15 +1,14 @@
-import { Request, Response, NextFunction } from 'express'
+import { Request, Response } from 'express'
 import { HealthService } from './health.service'
 import { sendResponse } from '../../utils/send-response'
+import { asyncHandler } from '../../utils/async-handler'
 
-const getHealth = (req: Request, res: Response, next: NextFunction): void => {
-  try {
-    const healthInfo = HealthService.getHealthDetails()
-    sendResponse(res, 200, true, 'API health check status retrieved successfully', healthInfo)
-  } catch (error) {
-    next(error)
-  }
-}
+// #27: Updated to async to support DB + Redis health pings
+const getHealth = asyncHandler(async (req: Request, res: Response) => {
+  const healthInfo = await HealthService.checkHealth()
+  const statusCode = healthInfo.status === 'UP' ? 200 : 503
+  sendResponse(res, statusCode, healthInfo.status === 'UP', 'API health check status retrieved', healthInfo)
+})
 
 export const HealthController = {
   getHealth

@@ -99,7 +99,7 @@ const fetchAdvancedStats = async (token: string) => {
     const codeReviewScore = Math.min(5.0, 3.0 + (reviewRatio * 1.5))
 
     return {
-      linesAdded: totalAdditions > 0 ? totalAdditions : 1245, // small mock if 0 for visual
+      linesAdded: totalAdditions > 0 ? totalAdditions : 0,
       avgPrCycleTime: avgPrCycleTimeDays,
       codeReviewScore: codeReviewScore,
       totalCommits: viewer.contributionsCollection.totalCommitContributions
