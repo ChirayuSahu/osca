@@ -15,9 +15,8 @@ export const ThreadService = {
   },
 
   async listThreads(owner: string, repo: string, token: string, page = 1) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}?page=${page}&_t=${Date.now()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store'
+    const res = await fetch(`${API_URL}/issues/${owner}/${repo}?page=${page}`, {
+      headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw new Error('Failed to list threads')
     return res.json()

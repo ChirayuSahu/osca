@@ -20,5 +20,14 @@ export const CommentService = {
     })
     if (!res.ok) throw new Error('Failed to add comment')
     return res.json()
+  },
+
+  async deleteComment(owner: string, repo: string, commentId: string | number, token: string) {
+    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error('Failed to delete comment')
+    return res.json()
   }
 }

@@ -3,9 +3,8 @@ import { getGithubAccessToken, fetchGithub } from '../../lib/github'
 const listIssues = async (userId: string, owner: string, repo: string, page: number, limit: number) => {
   const token = await getGithubAccessToken(userId)
   
-  const response = await fetchGithub(`/search/issues?q=repo:${owner}/${repo}+type:issue&page=${page}&per_page=${limit}`, { token })
-  const searchResult = await response.json()
-  const issues = searchResult.items || []
+  const response = await fetchGithub(`/repos/${owner}/${repo}/issues?page=${page}&per_page=${limit}&state=all`, { token })
+  const issues = await response.json()
   
   // Basic pagination header parsing
   const linkHeader = response.headers.get('Link') ?? response.headers.get('link')
