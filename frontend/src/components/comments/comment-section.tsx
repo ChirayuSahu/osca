@@ -97,6 +97,7 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
               )}
               
               <div className="absolute left-0 top-1 w-6 h-6 rounded-full overflow-hidden border border-white/[0.1] bg-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={comment.user?.avatar_url || "https://github.com/identicons/user.png"} alt={comment.user?.login} className="w-full h-full object-cover" />
               </div>
 
@@ -114,6 +115,7 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
                     remarkPlugins={[remarkGfm]} 
                     rehypePlugins={[rehypeRaw]}
                     components={{
+                      // eslint-disable-next-line @typescript-eslint/no-unused-vars
                       input: ({node, ...props}) => <input {...props} checked={props.checked ?? false} readOnly />
                     }}
                   >
@@ -169,6 +171,7 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
           
           <div className="flex gap-4">
             <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden border border-white/[0.1] bg-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={currentUser?.avatarUrl || "https://github.com/identicons/user.png"} alt="You" className="w-full h-full object-cover" />
             </div>
             

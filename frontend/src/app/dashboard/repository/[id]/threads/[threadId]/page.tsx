@@ -26,6 +26,7 @@ import rehypeRaw from "rehype-raw";
 
 interface ThreadDetail {
   id?: string | number;
+  number?: string | number;
   title?: string;
   body?: string;
   created_at: string | number | Date;
@@ -67,7 +68,7 @@ export default function ThreadPage() {
         // Fetch related threads (using recent threads for now)
         const allThreadsRes = await ThreadService.listThreads(owner, repo, token, 1);
         const otherThreads = (allThreadsRes.data || [])
-          .filter((t: any) => String(t.number) !== String(threadId))
+          .filter((t: { number: string | number }) => String(t.number) !== String(threadId))
           .slice(0, 3); // Take top 3
         setRelatedThreads(otherThreads);
       } catch (err) {
@@ -129,6 +130,7 @@ export default function ThreadPage() {
             </h1>
 
             <div className="flex items-center gap-2 mb-8">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={thread.user?.avatar_url || "https://github.com/identicons/user.png"} alt={thread.user?.login} className="w-5 h-5 rounded-full border border-white/[0.1]" />
               <div className="text-xs font-medium text-neutral-500 flex items-center gap-2">
                 <span>Posted {getRelativeTime(thread.created_at)} by <span className="text-neutral-300 font-semibold">{thread.user?.login}</span></span>
@@ -146,6 +148,7 @@ export default function ThreadPage() {
                 remarkPlugins={[remarkGfm]} 
                 rehypePlugins={[rehypeRaw]}
                 components={{
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
                   input: ({node, ...props}) => <input {...props} checked={props.checked ?? false} readOnly />
                 }}
               >

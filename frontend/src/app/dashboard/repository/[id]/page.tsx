@@ -54,7 +54,7 @@ export default function RepositoryPage() {
         if (repoData && repoData.owner && repoData.name) {
           try {
             const threadsRes = await ThreadService.listThreads(repoData.owner, repoData.name, token);
-            const mappedThreads = (threadsRes.data || []).map((issue: any) => ({
+            const mappedThreads = (threadsRes.data || []).map((issue: { number: string | number; title: string; body: string; created_at?: string; [key: string]: unknown }) => ({
               ...issue,
               id: issue.number,
               title: issue.title,
@@ -77,13 +77,13 @@ export default function RepositoryPage() {
     loadData();
   }, [repositoryId, token]);
 
-  const handleThreadCreated = (newThread: any) => {
+  const handleThreadCreated = (newThread: Record<string, unknown>) => {
     const mapped = {
       ...newThread,
-      id: newThread.number,
-      title: newThread.title,
-      content: newThread.body,
-      createdAt: newThread.created_at || new Date().toISOString()
+      id: newThread.number as string | number,
+      title: newThread.title as string,
+      content: newThread.body as string,
+      createdAt: (newThread.created_at as string) || new Date().toISOString()
     };
     setThreads([mapped as unknown as Thread, ...threads]);
   };
