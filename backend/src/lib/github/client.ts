@@ -132,3 +132,31 @@ export const fetchGithub = async (
 
   return response
 }
+
+/**
+ * Like fetchGithub but with a custom Accept header — used for GitHub preview APIs
+ * such as the Reactions API (squirrel-girl-preview).
+ */
+export const fetchGithubWithAccept = async (
+  path: string,
+  options: { token: string; method?: string; body?: string | object; accept: string }
+): Promise<Response> => {
+  const { token, method = 'GET', body, accept } = options
+  const headers = buildHeaders(token, accept)
+
+  if (body) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    method,
+    headers,
+    body: typeof body === 'object' ? JSON.stringify(body) : body
+  })
+
+  if (!response.ok) {
+    throw parseGithubError(response.status, path)
+  }
+
+  return response
+}
