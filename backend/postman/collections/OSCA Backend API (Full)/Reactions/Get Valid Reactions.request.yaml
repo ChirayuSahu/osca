@@ -1,0 +1,5 @@
+$kind: http-request
+name: Get Valid Reactions
+url: "{{BASE_URL}}/api/v1/reactions"
+method: GET
+order: 1000

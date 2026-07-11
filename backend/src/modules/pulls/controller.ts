@@ -90,40 +90,6 @@ const listPullReactions = asyncHandler(async (req: RequestWithUser, res: Respons
   }
 })
 
-const addPullReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id
-    const owner = String(req.params.owner)
-    const repo = String(req.params.repo)
-    const pullNumber = parseInt(String(req.params.pullNumber), 10)
-    const { content } = req.body
-
-    if (!content || !isValidReaction(content)) {
-      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
-    }
-
-    const reaction = await PullsService.addPullReaction(userId, owner, repo, pullNumber, content)
-    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
-  } catch (error) {
-    next(error)
-  }
-})
-
-const deletePullReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id
-    const owner = String(req.params.owner)
-    const repo = String(req.params.repo)
-    const pullNumber = parseInt(String(req.params.pullNumber), 10)
-    const reactionId = parseInt(String(req.params.reactionId), 10)
-
-    await PullsService.deletePullReaction(userId, owner, repo, pullNumber, reactionId)
-    sendResponse(res, 200, true, 'Reaction removed successfully')
-  } catch (error) {
-    next(error)
-  }
-})
-
 const listPullCommentReactions = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id
@@ -138,7 +104,26 @@ const listPullCommentReactions = asyncHandler(async (req: RequestWithUser, res: 
   }
 })
 
-const addPullCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+const togglePullReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const pullNumber = parseInt(String(req.params.pullNumber), 10)
+    const { content } = req.body
+
+    if (!content || !isValidReaction(content)) {
+      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
+    }
+
+    const result = await PullsService.togglePullReaction(userId, owner, repo, pullNumber, content)
+    sendResponse(res, 200, true, `Reaction ${result.toggled}`, result)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const togglePullCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id
     const owner = String(req.params.owner)
@@ -150,23 +135,8 @@ const addPullCommentReaction = asyncHandler(async (req: RequestWithUser, res: Re
       throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
     }
 
-    const reaction = await PullsService.addPullCommentReaction(userId, owner, repo, commentId, content)
-    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
-  } catch (error) {
-    next(error)
-  }
-})
-
-const deletePullCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id
-    const owner = String(req.params.owner)
-    const repo = String(req.params.repo)
-    const commentId = parseInt(String(req.params.commentId), 10)
-    const reactionId = parseInt(String(req.params.reactionId), 10)
-
-    await PullsService.deletePullCommentReaction(userId, owner, repo, commentId, reactionId)
-    sendResponse(res, 200, true, 'Reaction removed successfully')
+    const result = await PullsService.togglePullCommentReaction(userId, owner, repo, commentId, content)
+    sendResponse(res, 200, true, `Reaction ${result.toggled}`, result)
   } catch (error) {
     next(error)
   }
@@ -178,9 +148,7 @@ export const PullsController = {
   listPullComments,
   createPullComment,
   listPullReactions,
-  addPullReaction,
-  deletePullReaction,
+  togglePullReaction,
   listPullCommentReactions,
-  addPullCommentReaction,
-  deletePullCommentReaction
+  togglePullCommentReaction
 }

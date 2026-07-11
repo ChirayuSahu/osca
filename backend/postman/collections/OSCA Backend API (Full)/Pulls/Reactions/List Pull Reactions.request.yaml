@@ -1,0 +1,7 @@
+$kind: http-request
+name: List Pull Reactions
+url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/reactions"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 1000

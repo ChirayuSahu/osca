@@ -1,0 +1,14 @@
+$kind: http-request
+name: Toggle Pull Reaction
+url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/reactions"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "content": "+1"
+    }
+order: 2000
