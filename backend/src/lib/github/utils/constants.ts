@@ -205,3 +205,11 @@ export const IGNORED_FILES = new Set([
   'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb',
   '.DS_Store', 'Thumbs.db'
 ])
+
+// ─── GitHub Reactions ─────────────────────────────────────────────────────────
+
+export const VALID_REACTIONS = ['+1', '-1', 'laugh', 'hooray', 'confused', 'heart', 'rocket', 'eyes'] as const
+export type ReactionContent = typeof VALID_REACTIONS[number]
+
+export const isValidReaction = (content: string): content is ReactionContent =>
+  (VALID_REACTIONS as readonly string[]).includes(content)

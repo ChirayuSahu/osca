@@ -1,12 +1,9 @@
 import { getGithubAccessToken, fetchGithub, fetchGithubWithAccept } from '../../lib/github'
+import { VALID_REACTIONS, ReactionContent, isValidReaction } from '../../lib/github/utils/constants'
+
+export { isValidReaction }
 
 const REACTIONS_ACCEPT = 'application/vnd.github.squirrel-girl-preview+json'
-
-const VALID_REACTIONS = ['+1', '-1', 'laugh', 'hooray', 'confused', 'heart', 'rocket', 'eyes'] as const
-type ReactionContent = typeof VALID_REACTIONS[number]
-
-export const isValidReaction = (content: string): content is ReactionContent =>
-  (VALID_REACTIONS as readonly string[]).includes(content)
 
 const listPulls = async (userId: string, owner: string, repo: string, page: number, limit: number) => {
   const token = await getGithubAccessToken(userId)
