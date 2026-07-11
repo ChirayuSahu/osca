@@ -1,9 +1,10 @@
 import { Response, NextFunction } from 'express'
 import { asyncHandler } from '../../utils/async-handler'
 import { sendResponse } from '../../utils/send-response'
+import { AppError } from '../../lib/errors'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
-import { PullsService } from './service'
+import { PullsService, isValidReaction } from './service'
 
 const listPulls = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
   try {
@@ -73,9 +74,113 @@ const createPullComment = asyncHandler(async (req: RequestWithUser, res: Respons
   }
 })
 
+// ─── Reactions ───────────────────────────────────────────────────────────────
+
+const listPullReactions = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const pullNumber = parseInt(String(req.params.pullNumber), 10)
+
+    const reactions = await PullsService.listPullReactions(userId, owner, repo, pullNumber)
+    sendResponse(res, 200, true, 'Pull request reactions retrieved successfully', reactions)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const addPullReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const pullNumber = parseInt(String(req.params.pullNumber), 10)
+    const { content } = req.body
+
+    if (!content || !isValidReaction(content)) {
+      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
+    }
+
+    const reaction = await PullsService.addPullReaction(userId, owner, repo, pullNumber, content)
+    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const deletePullReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const pullNumber = parseInt(String(req.params.pullNumber), 10)
+    const reactionId = parseInt(String(req.params.reactionId), 10)
+
+    await PullsService.deletePullReaction(userId, owner, repo, pullNumber, reactionId)
+    sendResponse(res, 200, true, 'Reaction removed successfully')
+  } catch (error) {
+    next(error)
+  }
+})
+
+const listPullCommentReactions = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+
+    const reactions = await PullsService.listPullCommentReactions(userId, owner, repo, commentId)
+    sendResponse(res, 200, true, 'Pull request comment reactions retrieved successfully', reactions)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const addPullCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+    const { content } = req.body
+
+    if (!content || !isValidReaction(content)) {
+      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
+    }
+
+    const reaction = await PullsService.addPullCommentReaction(userId, owner, repo, commentId, content)
+    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const deletePullCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+    const reactionId = parseInt(String(req.params.reactionId), 10)
+
+    await PullsService.deletePullCommentReaction(userId, owner, repo, commentId, reactionId)
+    sendResponse(res, 200, true, 'Reaction removed successfully')
+  } catch (error) {
+    next(error)
+  }
+})
+
 export const PullsController = {
   listPulls,
   getPull,
   listPullComments,
-  createPullComment
+  createPullComment,
+  listPullReactions,
+  addPullReaction,
+  deletePullReaction,
+  listPullCommentReactions,
+  addPullCommentReaction,
+  deletePullCommentReaction
 }
