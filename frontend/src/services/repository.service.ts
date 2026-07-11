@@ -28,5 +28,14 @@ export const RepositoryService = {
     })
     if (!res.ok) throw new Error('Failed to fetch threads')
     return res.json()
+  },
+
+  async toggleLike(id: string, token: string) {
+    const res = await fetch(`${API_URL}/repositories/${id}/like`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error('Failed to toggle repository like')
+    return res.json()
   }
 }
