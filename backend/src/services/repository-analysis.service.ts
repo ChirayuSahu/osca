@@ -81,6 +81,96 @@ interface GithubTreeResponse {
 
 // CI_FILES replaced by CI_CD_FILE_MAP from constants
 
+/**
+ * Fetches the complete recursive file tree for a repository.
+ *
+ * Strategy:
+ *   1. Try GET /git/trees/{branch}?recursive=1  (single request, fast path)
+ *   2. If GitHub truncates it (>100k entries), fall back to:
+ *      a. Fetch the root tree (non-recursive) to enumerate top-level dirs
+ *      b. Fetch each top-level directory's subtree with ?recursive=1 in parallel
+ *      c. Prefix nested entries with the parent dir path and merge
+ *   3. If a subtree is also truncated, keep what we have and warn.
+ */
+const fetchFullTree = async (
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string
+): Promise<GithubTreeResponse['tree']> => {
+  const repoPath = `/repos/${owner}/${repo}`
+
+  // ── Fast path ────────────────────────────────────────────────────────────
+  let fullTree: GithubTreeResponse
+  try {
+    fullTree = await githubGetJson<GithubTreeResponse>(
+      `${repoPath}/git/trees/${branch}?recursive=1`,
+      token
+    )
+  } catch (err) {
+    console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo}, trying root-only.`)
+    return []
+  }
+
+  if (!fullTree.truncated) {
+    console.log(`[RepoService] Full recursive tree fetched (${fullTree.tree.length} entries).`)
+    return fullTree.tree
+  }
+
+  // ── Truncated path ───────────────────────────────────────────────────────
+  console.warn(
+    `[RepoService] Tree truncated for ${owner}/${repo} (>100k entries). ` +
+    `Fetching subtrees per top-level directory...`
+  )
+
+  // Step 1: Get root tree (non-recursive) — always fast
+  const rootTree = await githubGetJson<GithubTreeResponse>(
+    `${repoPath}/git/trees/${branch}`,
+    token
+  )
+
+  const allEntries: GithubTreeResponse['tree'] = [...rootTree.tree]
+
+  // Step 2: For every top-level directory, fetch its full subtree
+  const topLevelDirs = rootTree.tree.filter(
+    (node) => node.type === 'tree' && !IGNORED_DIRS.has(node.path)
+  )
+
+  const subtreeResults = await Promise.allSettled(
+    topLevelDirs.map(async (dir) => {
+      const sub = await githubGetJson<GithubTreeResponse>(
+        `/repos/${owner}/${repo}/git/trees/${dir.sha}?recursive=1`,
+        token
+      )
+
+      if (sub.truncated) {
+        console.warn(
+          `[RepoService] Subtree also truncated: ${dir.path}/ — keeping partial results.`
+        )
+      }
+
+      // Prefix every nested entry with the parent directory path
+      return sub.tree.map((node) => ({
+        ...node,
+        path: `${dir.path}/${node.path}`
+      }))
+    })
+  )
+
+  for (const result of subtreeResults) {
+    if (result.status === 'fulfilled') {
+      allEntries.push(...result.value)
+    } else {
+      console.warn(`[RepoService] Failed to fetch a subtree:`, result.reason)
+    }
+  }
+
+  console.log(
+    `[RepoService] Assembled tree from ${topLevelDirs.length} subtrees: ${allEntries.length} total entries.`
+  )
+  return allEntries
+}
+
 const analyzeRepository = async (
   url: string,
   userId: string,
@@ -198,30 +288,21 @@ const analyzeGithubRepo = async (
 
   await onProgress(25, 'Fetching repository file tree for visual map...')
   let folderStructure: any = null
-  let isShallow = false
   try {
     const branch = repoData.default_branch || 'main'
-    let treeRes: GithubTreeResponse
-    
-    try {
-      treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}?recursive=1`, token)
-    } catch (err: any) {
-      console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow fetch.`)
-      treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}`, token)
-      isShallow = true
-    }
-    
-    // #21: Use shared constants from lib/github/utils/constants.ts
+    const rawTree = await fetchFullTree(owner, repo, branch, token)
 
-    folderStructure = treeRes.tree.filter(node => {
-      const parts = node.path.split('/')
-      if (parts.some(part => IGNORED_DIRS.has(part))) return false
-      const filename = parts[parts.length - 1]
-      if (IGNORED_FILES.has(filename)) return false
-      return true
-    })
+    if (rawTree.length > 0) {
+      folderStructure = rawTree.filter((node) => {
+        const parts = node.path.split('/')
+        if (parts.some((part) => IGNORED_DIRS.has(part))) return false
+        const filename = parts[parts.length - 1]
+        if (IGNORED_FILES.has(filename)) return false
+        return true
+      })
+    }
   } catch (err) {
-    console.error(`[RepoService] Tree fetch error (both recursive and shallow failed):`, err)
+    console.error(`[RepoService] Tree fetch error:`, err)
   }
 
   await onProgress(40, 'Detecting frameworks and tech stack...')
@@ -314,31 +395,6 @@ const analyzeGithubRepo = async (
 
   if (dependenciesData.length === 0) {
     dependenciesData = fallbackDependencies
-  }
-
-  if (isShallow && folderStructure && dependenciesData.length > 0) {
-    const existingPaths = new Set(folderStructure.map((n: any) => n.path));
-    dependenciesData.forEach((manifest: any) => {
-      let manifestPath = manifest.blobPath;
-      if (manifestPath.startsWith('/')) manifestPath = manifestPath.substring(1);
-      
-      const parts = manifestPath.split('/');
-      let currentPath = '';
-      for (let i = 0; i < parts.length; i++) {
-        currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`;
-        if (!existingPaths.has(currentPath)) {
-          existingPaths.add(currentPath);
-          folderStructure.push({
-            path: currentPath,
-            mode: '100644',
-            type: i === parts.length - 1 ? 'blob' : 'tree',
-            sha: 'dummy-sha-' + currentPath,
-            size: 100,
-            url: ''
-          });
-        }
-      }
-    });
   }
 
   await onProgress(75, 'Repository tech stack analysis complete')
