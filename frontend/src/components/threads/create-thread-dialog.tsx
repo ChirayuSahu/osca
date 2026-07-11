@@ -16,11 +16,12 @@ import {
 interface CreateThreadDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  repositoryId: string;
+  owner?: string;
+  repo?: string;
   onThreadCreated: (thread: Record<string, unknown>) => void;
 }
 
-export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onThreadCreated }: CreateThreadDialogProps) {
+export default function CreateThreadDialog({ isOpen, onClose, owner, repo, onThreadCreated }: CreateThreadDialogProps) {
   const { token } = useAuth();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -29,12 +30,12 @@ export default function CreateThreadDialog({ isOpen, onClose, repositoryId, onTh
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!token || !owner || !repo) return;
     
     try {
       setLoading(true);
       setError(null);
-      const res = await ThreadService.createThread({ repositoryId, title, content }, token);
+      const res = await ThreadService.createThread({ owner, repo, title, body: content }, token);
       onThreadCreated(res.data);
       setTitle("");
       setContent("");

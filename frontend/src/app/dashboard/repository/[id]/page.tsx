@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
+import { ThreadService } from "@/services/thread.service";
 import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GroupChatPanel } from "@/components/threads/group-chat-panel";
@@ -46,15 +47,26 @@ export default function RepositoryPage() {
     const loadData = async () => {
       try {
         setLoading(true);
-        const [repoRes, threadsRes] = await Promise.all([
-          RepositoryService.getRepository(repositoryId, token),
-          RepositoryService.getRepositoryThreads(repositoryId, token).catch(e => {
+        const repoRes = await RepositoryService.getRepository(repositoryId, token);
+        const repoData = repoRes.data;
+        setRepo(repoData);
+
+        if (repoData && repoData.owner && repoData.name) {
+          try {
+            const threadsRes = await ThreadService.listThreads(repoData.owner, repoData.name, token);
+            const mappedThreads = (threadsRes.data || []).map((issue: { number: string | number; title: string; body: string; created_at?: string; [key: string]: unknown }) => ({
+              ...issue,
+              id: issue.number,
+              title: issue.title,
+              content: issue.body,
+              createdAt: issue.created_at || new Date().toISOString()
+            }));
+            setThreads(mappedThreads);
+          } catch (e) {
             console.error("Failed to load threads", e);
-            return { data: [] };
-          })
-        ]);
-        setRepo(repoRes.data);
-        setThreads(threadsRes.data || []);
+            setThreads([]);
+          }
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -66,7 +78,14 @@ export default function RepositoryPage() {
   }, [repositoryId, token]);
 
   const handleThreadCreated = (newThread: Record<string, unknown>) => {
-    setThreads([newThread as unknown as Thread, ...threads]);
+    const mapped = {
+      ...newThread,
+      id: newThread.number as string | number,
+      title: newThread.title as string,
+      content: newThread.body as string,
+      createdAt: (newThread.created_at as string) || new Date().toISOString()
+    };
+    setThreads([mapped as unknown as Thread, ...threads]);
   };
 
   if (loading) {
@@ -246,7 +265,8 @@ export default function RepositoryPage() {
       <CreateThreadDialog 
         isOpen={isCreateThreadOpen} 
         onClose={() => setIsCreateThreadOpen(false)} 
-        repositoryId={repositoryId}
+        owner={repo.owner as string}
+        repo={repo.name as string}
         onThreadCreated={handleThreadCreated}
       />
 
