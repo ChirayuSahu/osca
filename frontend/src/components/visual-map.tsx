@@ -43,6 +43,8 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
   const [showFolders, setShowFolders] = useState(true)
   const [showFiles, setShowFiles] = useState(false) // Hide files by default to reduce initial noise
   const [showDependencies, setShowDependencies] = useState(true)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [hoverNode, setHoverNode] = useState<any>(null)
 
   useEffect(() => {
     if (containerRef.current) {
@@ -211,13 +213,42 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
           width={dimensions.width}
           height={dimensions.height}
           graphData={graphData}
-          nodeLabel="name"
+          nodeLabel=""
           nodeColor="color"
           nodeRelSize={4}
           linkColor={() => '#64748b60'}
           linkDirectionalArrowLength={3.5}
           linkDirectionalArrowRelPos={1}
           backgroundColor="rgba(0,0,0,0)" // Ensures canvas background is transparent
+          onNodeHover={setHoverNode}
+          nodeCanvasObjectMode={() => 'after'}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          nodeCanvasObject={(node: any, ctx, globalScale) => {
+            if (hoverNode === node && node.name) {
+              const label = node.name;
+              const fontSize = 12 / globalScale;
+              ctx.font = `${fontSize}px Sans-Serif`;
+              const textWidth = ctx.measureText(label).width;
+              const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.4);
+
+              ctx.fillStyle = 'rgba(23, 23, 23, 0.9)'; // neutral-900 with opacity
+              const x = (node.x ?? 0) - bckgDimensions[0] / 2;
+              const y = (node.y ?? 0) - bckgDimensions[1] / 2 - (15 / globalScale);
+              
+              ctx.beginPath();
+              if (ctx.roundRect) {
+                ctx.roundRect(x, y, bckgDimensions[0], bckgDimensions[1], 4 / globalScale);
+              } else {
+                ctx.rect(x, y, bckgDimensions[0], bckgDimensions[1]);
+              }
+              ctx.fill();
+
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = '#e5e5e5'; // neutral-200
+              ctx.fillText(label, node.x ?? 0, (node.y ?? 0) - (15 / globalScale));
+            }
+          }}
         />
       )}
     </div>

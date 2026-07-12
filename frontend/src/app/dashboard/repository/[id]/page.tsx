@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
 import { ThreadService } from "@/services/thread.service";
-import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network } from "lucide-react";
+import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network, CircleDot, GitPullRequest, ChevronLeft, ChevronRight } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GroupChatPanel } from "@/components/threads/group-chat-panel";
 import { VisualMap, TreeNode, ManifestNode } from "@/components/visual-map";
@@ -37,36 +37,21 @@ export default function RepositoryPage() {
   
   const [repo, setRepo] = useState<RepositoryDetail | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [threadsLoading, setThreadsLoading] = useState(false);
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false);
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
 
   useEffect(() => {
     if (!token || !repositoryId) return;
 
-    const loadData = async () => {
+    const loadRepo = async () => {
       try {
         setLoading(true);
         const repoRes = await RepositoryService.getRepository(repositoryId, token);
-        const repoData = repoRes.data;
-        setRepo(repoData);
-
-        if (repoData && repoData.owner && repoData.name) {
-          try {
-            const threadsRes = await ThreadService.listThreads(repoData.owner, repoData.name, token);
-            const mappedThreads = (threadsRes.data || []).map((issue: { number: string | number; title: string; body: string; created_at?: string; [key: string]: unknown }) => ({
-              ...issue,
-              id: issue.number,
-              title: issue.title,
-              content: issue.body,
-              createdAt: issue.created_at || new Date().toISOString()
-            }));
-            setThreads(mappedThreads);
-          } catch (e) {
-            console.error("Failed to load threads", e);
-            setThreads([]);
-          }
-        }
+        setRepo(repoRes.data);
       } catch (err) {
         console.error(err);
       } finally {
@@ -74,8 +59,36 @@ export default function RepositoryPage() {
       }
     };
 
-    loadData();
+    loadRepo();
   }, [repositoryId, token]);
+
+  useEffect(() => {
+    if (!token || !repo || !repo.owner || !repo.name) return;
+    
+    const loadThreads = async () => {
+      try {
+        setThreadsLoading(true);
+        const threadsRes = await ThreadService.listThreads(repo.owner as string, repo.name as string, token, page);
+        const mappedThreads = (threadsRes.data || []).map((issue: { number: string | number; title: string; body: string; created_at?: string; pull_request?: object; [key: string]: unknown }) => ({
+          ...issue,
+          id: issue.number,
+          title: issue.title,
+          content: issue.body,
+          createdAt: issue.created_at || new Date().toISOString(),
+          isPR: !!issue.pull_request
+        }));
+        setThreads(mappedThreads);
+        setTotalPages(threadsRes.meta?.totalPages || 1);
+      } catch (e) {
+        console.error("Failed to load threads", e);
+        setThreads([]);
+      } finally {
+        setThreadsLoading(false);
+      }
+    };
+
+    loadThreads();
+  }, [repo, token, page]);
 
   const handleThreadCreated = (newThread: Record<string, unknown>) => {
     const mapped = {
@@ -231,7 +244,8 @@ export default function RepositoryPage() {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-neutral-800/50">
+            <>
+              <div className={`divide-y divide-neutral-800/50 transition-opacity duration-200 ${threadsLoading ? 'opacity-50' : 'opacity-100'}`}>
               {threads.map(thread => (
                 <a 
                   key={thread.id} 
@@ -241,8 +255,19 @@ export default function RepositoryPage() {
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 transform scale-y-0 group-hover:scale-y-100 transition-transform origin-center duration-300" />
                   
                   <div className="flex-1 min-w-0 pr-6 pl-2">
-                    <h3 className="text-lg font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1.5">
+                    <h3 className="text-lg font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1.5 flex items-center gap-2">
                       {thread.title}
+                      {thread.isPR ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
+                          <GitPullRequest className="w-3 h-3" />
+                          PR
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-neutral-500/10 text-neutral-400 border border-neutral-500/20 flex-shrink-0">
+                          <CircleDot className="w-3 h-3" />
+                          Issue
+                        </span>
+                      )}
                     </h3>
                     <p className="text-neutral-500 text-sm font-light truncate">
                       {thread.content}
@@ -258,6 +283,28 @@ export default function RepositoryPage() {
                 </a>
               ))}
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-neutral-800/50 bg-neutral-900/20">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-400 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+                <span className="text-xs text-neutral-500 font-medium">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-400 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>
