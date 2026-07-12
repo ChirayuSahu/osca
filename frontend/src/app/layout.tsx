@@ -1,7 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, JetBrains_Mono, Playfair_Display } from "next/font/google";
+import { 
+  Geist, 
+  Geist_Mono, 
+  JetBrains_Mono, 
+  Playfair_Display, 
+  Libre_Baskerville 
+} from "next/font/google";
 import './globals.css'
 import { cn } from "@/lib/utils";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/context/auth-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,13 +32,17 @@ const playfairDisplay = Playfair_Display({
   style: ["normal", "italic"],
 });
 
+const libreBaskerville = Libre_Baskerville({
+  variable: "--font-libre-baskerville",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+});
+
 export const metadata: Metadata = {
   title: "OSCA",
   description: "Open Source Contributor Analytics",
 };
-
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/context/auth-context";
 
 export default function RootLayout({
   children,
@@ -38,9 +50,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-mono bg-black text-white", jetbrainsMono.variable)} suppressHydrationWarning>
+    <html 
+      lang="en" 
+      className={cn("font-mono bg-black text-white", jetbrainsMono.variable)} 
+      suppressHydrationWarning
+    >
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} font-sans antialiased bg-black text-white`}
+        className={cn(
+          geistSans.variable, 
+          geistMono.variable, 
+          playfairDisplay.variable, 
+          libreBaskerville.variable, 
+          "font-sans antialiased bg-black text-white"
+        )}
         suppressHydrationWarning
       >
         <AuthProvider>
