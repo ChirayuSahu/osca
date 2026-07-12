@@ -4,3 +4,7 @@ values:
     value: 'Error:getaddrinfo ENOTFOUND {{base_url}}'
   - key: BASE_URL
     value: ''
+  - key: owner
+    value: ''
+  - key: repo
+    value: ''

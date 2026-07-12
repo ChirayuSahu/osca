@@ -1,9 +1,10 @@
 import { Response, NextFunction } from 'express'
 import { asyncHandler } from '../../utils/async-handler'
 import { sendResponse } from '../../utils/send-response'
+import { AppError } from '../../lib/errors'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
-import { IssuesService } from './service'
+import { IssuesService, isValidReaction } from './service'
 
 const listIssues = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
   try {
@@ -101,11 +102,115 @@ const deleteIssueComment = asyncHandler(async (req: RequestWithUser, res: Respon
   }
 })
 
+// ─── Reactions ───────────────────────────────────────────────────────────────
+
+const listIssueReactions = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const issueNumber = parseInt(String(req.params.issueNumber), 10)
+
+    const reactions = await IssuesService.listIssueReactions(userId, owner, repo, issueNumber)
+    sendResponse(res, 200, true, 'Issue reactions retrieved successfully', reactions)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const addIssueReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const issueNumber = parseInt(String(req.params.issueNumber), 10)
+    const { content } = req.body
+
+    if (!content || !isValidReaction(content)) {
+      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
+    }
+
+    const reaction = await IssuesService.addIssueReaction(userId, owner, repo, issueNumber, content)
+    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const deleteIssueReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const issueNumber = parseInt(String(req.params.issueNumber), 10)
+    const reactionId = parseInt(String(req.params.reactionId), 10)
+
+    await IssuesService.deleteIssueReaction(userId, owner, repo, issueNumber, reactionId)
+    sendResponse(res, 200, true, 'Reaction removed successfully')
+  } catch (error) {
+    next(error)
+  }
+})
+
+const listIssueCommentReactions = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+
+    const reactions = await IssuesService.listIssueCommentReactions(userId, owner, repo, commentId)
+    sendResponse(res, 200, true, 'Issue comment reactions retrieved successfully', reactions)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const addIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+    const { content } = req.body
+
+    if (!content || !isValidReaction(content)) {
+      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
+    }
+
+    const reaction = await IssuesService.addIssueCommentReaction(userId, owner, repo, commentId, content)
+    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const deleteIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const commentId = parseInt(String(req.params.commentId), 10)
+    const reactionId = parseInt(String(req.params.reactionId), 10)
+
+    await IssuesService.deleteIssueCommentReaction(userId, owner, repo, commentId, reactionId)
+    sendResponse(res, 200, true, 'Reaction removed successfully')
+  } catch (error) {
+    next(error)
+  }
+})
+
 export const IssuesController = {
   listIssues,
   getIssue,
   listIssueComments,
   createIssue,
   createIssueComment,
-  deleteIssueComment
+  deleteIssueComment,
+  listIssueReactions,
+  addIssueReaction,
+  deleteIssueReaction,
+  listIssueCommentReactions,
+  addIssueCommentReaction,
+  deleteIssueCommentReaction
 }

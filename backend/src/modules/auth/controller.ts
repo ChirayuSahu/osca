@@ -80,34 +80,34 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
   const avatarUrl = githubUser.avatar_url
   const email = githubUser.email ?? `${username}@github.com`
 
-  const user = await prisma.$transaction(async (tx) => {
-    const existingOauth = await tx.oAuthAccount.findUnique({
-      where: {
-        provider_providerId: {
-          provider: 'github',
-          providerId
-        }
-      },
-      include: { user: true }
+  let userRecord = null
+
+  const existingOauth = await prisma.oAuthAccount.findUnique({
+    where: {
+      provider_providerId: {
+        provider: 'github',
+        providerId
+      }
+    },
+    include: { user: true }
+  })
+
+  if (existingOauth !== null) {
+    await prisma.oAuthAccount.update({
+      where: { id: existingOauth.id },
+      data: { accessToken }
     })
-
-    if (existingOauth !== null) {
-      await tx.oAuthAccount.update({
-        where: { id: existingOauth.id },
-        data: { accessToken }
-      })
-      return existingOauth.user
-    }
-
-    let userRecord = await tx.user.findUnique({ where: { email } })
+    userRecord = existingOauth.user
+  } else {
+    userRecord = await prisma.user.findUnique({ where: { email } })
 
     if (userRecord === null) {
-      userRecord = await tx.user.create({
+      userRecord = await prisma.user.create({
         data: { name, username, email, avatarUrl }
       })
     }
 
-    await tx.oAuthAccount.create({
+    await prisma.oAuthAccount.create({
       data: {
         userId: userRecord.id,
         provider: 'github',
@@ -116,9 +116,9 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
         accessToken
       }
     })
+  }
 
-    return userRecord
-  })
+  const user = userRecord
 
   const token = jwt.sign(
     { id: user.id, username: user.username, email: user.email },
