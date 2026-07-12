@@ -28,5 +28,13 @@ export const ThreadService = {
     })
     if (!res.ok) throw new Error('Failed to fetch thread')
     return res.json()
+  },
+
+  async getPull(owner: string, repo: string, pullNumber: string | number, token: string) {
+    const res = await fetch(`${API_URL}/pulls/${owner}/${repo}/${pullNumber}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw new Error('Failed to fetch pull request')
+    return res.json()
   }
 }
