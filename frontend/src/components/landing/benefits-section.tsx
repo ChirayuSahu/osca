@@ -85,14 +85,14 @@ export default function BenefitsSection() {
   ];
 
   return (
-    <section id="features" className="w-full h-full bg-[#030905] text-white flex items-center select-none py-24 relative">
+    <section id="benefits" className="w-full h-full bg-[#0E1B0E] text-[#F0FFF2] flex items-center select-none py-24 relative">
       <div className="w-full max-w-7xl mx-auto px-6 md:px-12">
         
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-8 mb-24">
-          <h2 className="font-serif italic font-medium text-4xl md:text-5xl lg:text-[54px] text-white leading-tight">
+          <h2 className="font-serif italic font-medium text-4xl md:text-5xl lg:text-[54px] text-[#F0FFF2] leading-tight">
             Our Features
           </h2>
-          <p className="w-full max-w-[440px] text-neutral-300 font-normal text-lg md:text-xl lg:text-[22px] leading-relaxed pt-2">
+          <p className="w-full max-w-[440px] text-[#F0FFF2] font-normal text-[25px] md:text-[25px] lg:text-[25px] leading-relaxed pt-2">
             From profile to perfect match in minutes, with a personalized contribution roadmap
           </p>
         </div>
@@ -101,18 +101,18 @@ export default function BenefitsSection() {
           {features.map((item, index) => (
             <div 
               key={index} 
-              className="border-3 border-emerald-500/30 bg-transparent rounded-[24px] p-7 flex flex-col justify-between min-h-[220px] transition-all duration-300 hover:border-emerald-500/60"
+              className="border-3 border-[#808F81] bg-transparent rounded-[24px] p-7 flex flex-col justify-between min-h-[220px] transition-all duration-300 hover:border-emerald-500/60"
             >
               <div>
                 <div className={`w-8 h-8 ${item.iconBg} rounded-[10px] flex items-center justify-center mb-5`}>
                   {item.icon}
                 </div>
                 
-                <h3 className="font-semibold text-white text-lg mb-2.5 tracking-tight">
+                <h3 className="font-semibold text-[#F0FFF2] text-lg mb-2.5 tracking-tight">
                   {item.title}
                 </h3>
                 
-                <p className="text-neutral-400 text-[14px] font-normal leading-relaxed">
+                <p className="text-[#F0FFF2] text-[14px] font-normal leading-relaxed">
                   {item.description}
                 </p>
               </div>
