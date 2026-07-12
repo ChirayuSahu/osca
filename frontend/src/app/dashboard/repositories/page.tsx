@@ -6,8 +6,6 @@ import { SlidersHorizontal, Globe, BookMarked } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { SearchHeader } from "@/components/repositories/search-header";
 import { RepositoryCard, Repository } from "@/components/repositories/repository-card";
-import { RepositoryFilters } from "@/components/repositories/repository-filters";
-import { RepositoryDetailsPopover } from "@/components/repositories/repository-details-popover";
 import {
   Pagination,
   PaginationContent,
@@ -27,10 +25,27 @@ import {
   DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 
 interface ExtendedRepository extends Repository {
   ownerType?: string;
+}
+
+interface GitHubRepo {
+  id: string | number;
+  full_name: string;
+  name?: string;
+  description: string | null;
+  language: string | null;
+  stargazers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  html_url: string;
+  owner?: { type: string };
+}
+
+interface ImportedRepo {
+  id: string;
+  url?: string;
 }
 
 interface PaginationMeta {
@@ -101,7 +116,7 @@ function GitHubReposContent() {
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.data)) {
-            const mappedRepos = data.data.map((repo: any, index: number) => {
+            const mappedRepos = data.data.map((repo: GitHubRepo, index: number) => {
               const lang = repo.language || "TypeScript";
               let langColor = "bg-neutral-500";
               if (lang === "TypeScript") langColor = "bg-blue-500";
@@ -142,13 +157,13 @@ function GitHubReposContent() {
             const importedData = await importedRes.json();
             if (importedData.success && Array.isArray(importedData.data)) {
               const urlMap: Record<string, string> = {};
-              importedData.data.forEach((r: any) => {
+              importedData.data.forEach((r: ImportedRepo) => {
                 if (r.url) urlMap[r.url.toLowerCase()] = r.id;
               });
               setImportedUrls(urlMap);
             }
           }
-        } catch (e) {
+        } catch {
           // Silent fail for imported repos fetch
         }
       } catch (err) {
@@ -197,11 +212,11 @@ function GitHubReposContent() {
       });
       const data = await res.json();
       if (!data.success) {
-        setDialogState({ isOpen: true, type: "error", message: "Failed to queue repository for import." });
+        setDialogState({ isOpen: true, type: "error", message: data.message || "Failed to queue repository for import." });
       } else {
         setDialogState({ isOpen: true, type: "success", message: "Repository successfully queued for import! It will appear in your Imported Repositories soon." });
       }
-    } catch (e) {
+    } catch {
       setDialogState({ isOpen: true, type: "error", message: "Error importing repository." });
     }
   };

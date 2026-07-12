@@ -9,6 +9,16 @@ export type InteractionAction =
   | 'ISSUE_COMMENT' 
   | 'CONTRIBUTION'
 
+// #25: Exported so controllers can do runtime validation without duplicating this list
+export const VALID_INTERACTION_ACTIONS: InteractionAction[] = [
+  'REPOSITORY_VIEW',
+  'ISSUE_VIEW',
+  'REPOSITORY_LIKE',
+  'REPOSITORY_SAVE',
+  'ISSUE_COMMENT',
+  'CONTRIBUTION'
+]
+
 const INTERACTION_WEIGHTS: Record<InteractionAction, number> = {
   REPOSITORY_VIEW: 1,
   ISSUE_VIEW: 2,
@@ -67,27 +77,14 @@ export const logInteraction = async (
 
   const tagsArray = Array.from(tagsToUpdate)
 
-  // Prisma doesn't natively support upsertMany/increment natively easily across multiple rows without a loop or raw query.
-  // Using sequential upserts or Promise.all.
-  await Promise.all(
+  // #15: Replace N parallel upserts with a single $transaction to avoid
+  // firing one DB round-trip per tag (could be 20+ for a well-tagged repo).
+  await prisma.$transaction(
     tagsArray.map(tag =>
       prisma.userInterest.upsert({
-        where: {
-          userId_tag: {
-            userId,
-            tag
-          }
-        },
-        update: {
-          score: {
-            increment: weight
-          }
-        },
-        create: {
-          userId,
-          tag,
-          score: weight
-        }
+        where: { userId_tag: { userId, tag } },
+        update: { score: { increment: weight } },
+        create: { userId, tag, score: weight }
       })
     )
   )

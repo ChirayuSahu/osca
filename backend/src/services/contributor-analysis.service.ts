@@ -1,17 +1,20 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../utils/prisma'
 import { assertFound } from '../lib/errors'
-import { buildSkillList } from '../lib/github/build-skills'
 import {
+  buildSkillList,
   detectNpmFrameworks,
   detectPythonFrameworks,
   parsePackageJson,
-  parseRawContent
-} from '../lib/github/detect-frameworks'
-import { getGithubAccessToken } from '../lib/github/get-access-token'
-import { githubGetJson, githubTryGetRaw, githubGraphQL } from '../lib/github/client'
-import type { ProgressCallback, Skill } from '../lib/github/types'
-import { noopProgress } from '../lib/github/types'
+  parseRawContent,
+  getGithubAccessToken,
+  githubGetJson,
+  githubTryGetRaw,
+  githubGraphQL,
+  type ProgressCallback,
+  type Skill,
+  noopProgress
+} from '../lib/github'
 
 interface GitHubRepo {
   name: string
@@ -96,7 +99,7 @@ const fetchAdvancedStats = async (token: string) => {
     const codeReviewScore = Math.min(5.0, 3.0 + (reviewRatio * 1.5))
 
     return {
-      linesAdded: totalAdditions > 0 ? totalAdditions : 1245, // small mock if 0 for visual
+      linesAdded: totalAdditions > 0 ? totalAdditions : 0,
       avgPrCycleTime: avgPrCycleTimeDays,
       codeReviewScore: codeReviewScore,
       totalCommits: viewer.contributionsCollection.totalCommitContributions
@@ -127,9 +130,49 @@ const analyzeProfile = async (
   await onProgress(90, 'Saving extracted skills to database...')
 
   const skillNames = skills.map((skill) => skill.name)
-  const avgSkillScore = skills.length > 0
-    ? skills.reduce((sum, skill) => sum + skill.proficiencyScore, 0) / skills.length
+  
+  // 1. Skill Depth (Average of Top 5 skills)
+  const sortedSkills = [...skills].sort((a, b) => b.proficiencyScore - a.proficiencyScore)
+  const topSkills = sortedSkills.slice(0, 5)
+  const avgSkillScore = topSkills.length > 0
+    ? topSkills.reduce((sum, skill) => sum + skill.proficiencyScore, 0) / topSkills.length
     : 0
+
+  // 2. Activity Rate (Logarithmic scale + PR cycle modifier)
+  let activityScore = 0
+  if (advancedStats) {
+    const commits = advancedStats.totalCommits || 0
+    const lines = advancedStats.linesAdded || 0
+    const baseActivity = 25 * Math.log10(commits + 1) + 10 * Math.log10(lines + 1)
+    
+    let cycleModifier = 1.0
+    if (advancedStats.avgPrCycleTime > 0) {
+      if (advancedStats.avgPrCycleTime < 1) cycleModifier = 1.05
+      else if (advancedStats.avgPrCycleTime > 7) cycleModifier = 0.95
+    }
+    activityScore = Math.min(100, baseActivity * cycleModifier)
+  }
+
+  // 3. Code Quality (PR size chunking modifier)
+  let qualityScore = 0
+  if (advancedStats) {
+    const baseQuality = (advancedStats.codeReviewScore / 5.0) * 100
+    // Heuristic for PR size
+    const estimatedPrs = Math.max(1, (advancedStats.totalCommits || 1) / 5)
+    const linesPerPr = (advancedStats.linesAdded || 0) / estimatedPrs
+
+    let sizeModifier = 1.0
+    if (linesPerPr > 1000) sizeModifier = 0.90 // penalty for massive PRs
+    else if (linesPerPr < 300 && linesPerPr > 10) sizeModifier = 1.05 // bonus for focused PRs
+
+    qualityScore = Math.min(100, baseQuality * sizeModifier)
+  }
+
+  // 4. Diversity Scope (8 pts per skill)
+  const diversityScore = Math.min(100, skills.length * 8)
+
+  // 5. Overall Score (Weighted Average: Skill 40%, Quality 30%, Activity 20%, Diversity 10%)
+  const overallScore = (avgSkillScore * 0.40) + (qualityScore * 0.30) + (activityScore * 0.20) + (diversityScore * 0.10)
 
   const repositoryExperience = toContributorExperience(skills)
   
@@ -152,11 +195,19 @@ const analyzeProfile = async (
       create: {
         userId,
         skillScore: avgSkillScore,
+        activityScore,
+        qualityScore,
+        diversityScore,
+        overallScore,
         repositoryExperience,
         contributionHistory: contributionHistory || Prisma.JsonNull
       },
       update: {
         skillScore: avgSkillScore,
+        activityScore,
+        qualityScore,
+        diversityScore,
+        overallScore,
         repositoryExperience,
         contributionHistory: contributionHistory || Prisma.JsonNull
       }

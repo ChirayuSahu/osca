@@ -1,5 +1,10 @@
 import express, { Application, Request, Response, NextFunction } from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
+import rateLimit from 'express-rate-limit'
+import { RedisStore } from 'rate-limit-redis'
+import Redis from 'ioredis'
+import { config } from './config'
 import { mountSwaggerDocs } from './config/swagger'
 import { healthRouter } from './modules/health/health.route'
 import { usersRouter } from './modules/users/route'
@@ -7,30 +12,108 @@ import { authRouter } from './modules/auth/route'
 import { repositoriesRouter } from './modules/repositories/route'
 import { recommendationsRouter } from './modules/recommendations/route'
 import { jobsRouter } from './modules/jobs/jobs.route'
-import { threadsRouter } from './modules/threads/route'
-import { commentsRouter } from './modules/comments/route'
 import { feedRouter } from './modules/feed/route'
 import { interactionsRouter } from './modules/interactions/route'
+import { issuesRouter } from './modules/issues/route'
+import { pullsRouter } from './modules/pulls/route'
 import { errorMiddleware, CustomError } from './middlewares/error.middleware'
 
 const app: Application = express()
 
-app.use(cors())
-app.use(express.json())
+// ─── Redis client for rate limiting ──────────────────────────────
+const redisClient = new Redis({
+  host: config.redis.host,
+  port: config.redis.port,
+  username: config.redis.username || 'default',
+  password: config.redis.password,
+  ...(config.redis.tls ? { tls: {} } : {})
+})
+
+// ─── CORS ─────────────────────────────────────────────────────────
+// #7: Restrict to known frontend origin
+app.use(cors({
+  origin: config.frontendUrl,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+}))
+
+// ─── Body parsing ─────────────────────────────────────────────────
+// #8: 64kb body size limit prevents oversized payload attacks
+app.use(express.json({ limit: '64kb' }))
+app.use(express.urlencoded({ extended: true, limit: '64kb' }))
+app.use(cookieParser())
+
+// ─── Rate Limiting ────────────────────────────────────────────────
+// #6: Global limiter — 100 req / 1 min per IP
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({
+    prefix: 'rl_global:',
+    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
+  }),
+  message: { success: false, message: 'Too many requests, please try again later.' }
+})
+
+// Tighter limiter for auth endpoints — 20 req / 15 min
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({
+    prefix: 'rl_auth:',
+    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
+  }),
+  message: { success: false, message: 'Too many auth requests, please try again later.' }
+})
+
+// Tight limiter for expensive job-enqueue endpoints — 10 req / 5 min
+const jobLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: new RedisStore({
+    prefix: 'rl_job:',
+    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
+  }),
+  message: { success: false, message: 'Too many analysis requests, please slow down.' }
+})
+
+app.use(globalLimiter)
+
+// ─── Request Logger ───────────────────────────────────────────────
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`)
+  })
+  next()
+})
 
 mountSwaggerDocs(app)
 
+// ─── Routes ───────────────────────────────────────────────────────
 app.use('/api/v1/health', healthRouter)
+app.use('/api/v1/auth', authLimiter, authRouter)
 app.use('/api/v1/users', usersRouter)
-app.use('/api/v1/auth', authRouter)
 app.use('/api/v1/repositories', repositoriesRouter)
 app.use('/api/v1/recommendations', recommendationsRouter)
 app.use('/api/v1/jobs', jobsRouter)
-app.use('/api/v1/threads', threadsRouter)
-app.use('/api/v1/comments', commentsRouter)
 app.use('/api/v1/feed', feedRouter)
 app.use('/api/v1/interactions', interactionsRouter)
+app.use('/api/v1/issues', issuesRouter)
+app.use('/api/v1/pulls', pullsRouter)
 
+// Apply tight limit on job-enqueue routes
+app.use('/api/v1/repositories', jobLimiter)
+app.use('/api/v1/users', jobLimiter)
+
+// ─── 404 Handler ─────────────────────────────────────────────────
 app.use((req: Request, res: Response, next: NextFunction) => {
   const error: CustomError = new Error(`Cannot ${req.method} ${req.originalUrl}`)
   error.statusCode = 404
@@ -39,4 +122,5 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
 app.use(errorMiddleware)
 
+export { redisClient }
 export default app

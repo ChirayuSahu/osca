@@ -1,0 +1,6 @@
+$kind: http-request
+url: "{{BASE_URL}}/api/v1/users/{{user_id}}/analyze"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 3000

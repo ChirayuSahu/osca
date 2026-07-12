@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 interface RepositoryFiltersProps {
   isOpen: boolean;
   onClose: () => void;
-  onApply: (filters: any) => void;
+  onApply: (filters: { language: string; minStars: string }) => void;
 }
 
 export function RepositoryFilters({ isOpen, onClose, onApply }: RepositoryFiltersProps) {

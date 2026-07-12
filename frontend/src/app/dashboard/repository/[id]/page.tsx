@@ -4,33 +4,54 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
-import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock } from "lucide-react";
+import { ThreadService } from "@/services/thread.service";
+import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network, CircleDot, GitPullRequest, ChevronLeft, ChevronRight } from "lucide-react";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GroupChatPanel } from "@/components/threads/group-chat-panel";
+import { VisualMap, TreeNode, ManifestNode } from "@/components/visual-map";
+import { RepositoryInsights } from "@/components/repository-insights";
+
+interface Thread {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string | number | Date;
+  [key: string]: unknown;
+}
+
+interface RepositoryDetail {
+  id?: string;
+  name?: string;
+  url?: string;
+  description?: string;
+  techStack?: string[];
+  folderStructure?: TreeNode[];
+  dependencies?: ManifestNode[];
+  [key: string]: unknown;
+}
 
 export default function RepositoryPage() {
   const params = useParams();
   const repositoryId = params.id as string;
   const { token } = useAuth();
   
-  const [repo, setRepo] = useState<any>(null);
-  const [threads, setThreads] = useState<any[]>([]);
+  const [repo, setRepo] = useState<RepositoryDetail | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [threadsLoading, setThreadsLoading] = useState(false);
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false);
   const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
 
   useEffect(() => {
     if (!token || !repositoryId) return;
 
-    const loadData = async () => {
+    const loadRepo = async () => {
       try {
         setLoading(true);
-        const [repoRes, threadsRes] = await Promise.all([
-          RepositoryService.getRepository(repositoryId, token),
-          RepositoryService.getRepositoryThreads(repositoryId, token)
-        ]);
+        const repoRes = await RepositoryService.getRepository(repositoryId, token);
         setRepo(repoRes.data);
-        setThreads(threadsRes.data || []);
       } catch (err) {
         console.error(err);
       } finally {
@@ -38,11 +59,46 @@ export default function RepositoryPage() {
       }
     };
 
-    loadData();
+    loadRepo();
   }, [repositoryId, token]);
 
-  const handleThreadCreated = (newThread: any) => {
-    setThreads([newThread, ...threads]);
+  useEffect(() => {
+    if (!token || !repo || !repo.owner || !repo.name) return;
+    
+    const loadThreads = async () => {
+      try {
+        setThreadsLoading(true);
+        const threadsRes = await ThreadService.listThreads(repo.owner as string, repo.name as string, token, page);
+        const mappedThreads = (threadsRes.data || []).map((issue: { number: string | number; title: string; body: string; created_at?: string; pull_request?: object; [key: string]: unknown }) => ({
+          ...issue,
+          id: issue.number,
+          title: issue.title,
+          content: issue.body,
+          createdAt: issue.created_at || new Date().toISOString(),
+          isPR: !!issue.pull_request
+        }));
+        setThreads(mappedThreads);
+        setTotalPages(threadsRes.meta?.totalPages || 1);
+      } catch (e) {
+        console.error("Failed to load threads", e);
+        setThreads([]);
+      } finally {
+        setThreadsLoading(false);
+      }
+    };
+
+    loadThreads();
+  }, [repo, token, page]);
+
+  const handleThreadCreated = (newThread: Record<string, unknown>) => {
+    const mapped = {
+      ...newThread,
+      id: newThread.number as string | number,
+      title: newThread.title as string,
+      content: newThread.body as string,
+      createdAt: (newThread.created_at as string) || new Date().toISOString()
+    };
+    setThreads([mapped as unknown as Thread, ...threads]);
   };
 
   if (loading) {
@@ -63,7 +119,7 @@ export default function RepositoryPage() {
           <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
         </div>
         <h2 className="text-2xl font-semibold text-neutral-200 mb-2">Repository Not Found</h2>
-        <p className="text-neutral-400 max-w-md">We couldn't load the details for this repository. It may have been deleted or you don't have access.</p>
+        <p className="text-neutral-400 max-w-md">We couldn&apos;t load the details for this repository. It may have been deleted or you don&apos;t have access.</p>
       </div>
     );
   }
@@ -91,7 +147,7 @@ export default function RepositoryPage() {
             </p>
             
             <div className="flex flex-wrap items-center gap-3 mt-6">
-              {repo.techStack?.length > 0 ? (
+              {repo.techStack && repo.techStack.length > 0 ? (
                 repo.techStack.map((tech: string) => (
                   <span key={tech} className="px-3.5 py-1.5 text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.05)]">
                     {tech}
@@ -121,6 +177,35 @@ export default function RepositoryPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Two Column Layout: Map & Insights */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left Column: Visual Map (takes up 2/3 on xl screens) */}
+        <div className="xl:col-span-2 flex flex-col space-y-4">
+          {(repo.folderStructure || (repo.dependencies && repo.dependencies.length > 0)) && (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-neutral-200 flex items-center gap-2">
+                  <Network className="w-5 h-5 text-emerald-500" />
+                  Codebase Architecture Map
+                </h2>
+              </div>
+              <VisualMap folderStructure={repo.folderStructure} dependencies={repo.dependencies} />
+            </>
+          )}
+        </div>
+
+        {/* Right Column: Insights (takes up 1/3 on xl screens) */}
+        <div className="xl:col-span-1 flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-neutral-200 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-emerald-500" />
+              Repository Insights
+            </h2>
+          </div>
+          <RepositoryInsights repo={repo} />
         </div>
       </div>
 
@@ -159,7 +244,8 @@ export default function RepositoryPage() {
               </button>
             </div>
           ) : (
-            <div className="divide-y divide-neutral-800/50">
+            <>
+              <div className={`divide-y divide-neutral-800/50 transition-opacity duration-200 ${threadsLoading ? 'opacity-50' : 'opacity-100'}`}>
               {threads.map(thread => (
                 <a 
                   key={thread.id} 
@@ -169,8 +255,19 @@ export default function RepositoryPage() {
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 transform scale-y-0 group-hover:scale-y-100 transition-transform origin-center duration-300" />
                   
                   <div className="flex-1 min-w-0 pr-6 pl-2">
-                    <h3 className="text-lg font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1.5">
+                    <h3 className="text-lg font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1.5 flex items-center gap-2">
                       {thread.title}
+                      {thread.isPR ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
+                          <GitPullRequest className="w-3 h-3" />
+                          PR
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-neutral-500/10 text-neutral-400 border border-neutral-500/20 flex-shrink-0">
+                          <CircleDot className="w-3 h-3" />
+                          Issue
+                        </span>
+                      )}
                     </h3>
                     <p className="text-neutral-500 text-sm font-light truncate">
                       {thread.content}
@@ -186,6 +283,28 @@ export default function RepositoryPage() {
                 </a>
               ))}
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-neutral-800/50 bg-neutral-900/20">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-400 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+                <span className="text-xs text-neutral-500 font-medium">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-400 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>
@@ -193,7 +312,8 @@ export default function RepositoryPage() {
       <CreateThreadDialog 
         isOpen={isCreateThreadOpen} 
         onClose={() => setIsCreateThreadOpen(false)} 
-        repositoryId={repositoryId}
+        owner={repo.owner as string}
+        repo={repo.name as string}
         onThreadCreated={handleThreadCreated}
       />
 

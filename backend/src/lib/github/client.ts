@@ -90,10 +90,15 @@ export const githubPostJson = async <T>(url: string, body: unknown): Promise<T> 
   return response.json() as Promise<T>
 }
 
-export const githubGraphQL = async <T>(query: string, token: string, variables: Record<string, unknown> = {}): Promise<T> => {
+export const githubGraphQL = async <T>(
+  query: string, 
+  token: string, 
+  variables: Record<string, unknown> = {},
+  accept = 'application/vnd.github.v3+json'
+): Promise<T> => {
   const response = await fetch('https://api.github.com/graphql', {
     method: 'POST',
-    headers: buildHeaders(token),
+    headers: buildHeaders(token, accept),
     body: JSON.stringify({ query, variables })
   })
 
@@ -104,3 +109,54 @@ export const githubGraphQL = async <T>(query: string, token: string, variables: 
   return response.json() as Promise<T>
 }
 
+export const fetchGithub = async (
+  path: string,
+  options: { token: string; method?: string; body?: string | object }
+): Promise<Response> => {
+  const { token, method = 'GET', body } = options
+  const headers = buildHeaders(token)
+
+  if (body) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    method,
+    headers,
+    body: typeof body === 'object' ? JSON.stringify(body) : body
+  })
+
+  if (!response.ok) {
+    throw parseGithubError(response.status, path)
+  }
+
+  return response
+}
+
+/**
+ * Like fetchGithub but with a custom Accept header — used for GitHub preview APIs
+ * such as the Reactions API (squirrel-girl-preview).
+ */
+export const fetchGithubWithAccept = async (
+  path: string,
+  options: { token: string; method?: string; body?: string | object; accept: string }
+): Promise<Response> => {
+  const { token, method = 'GET', body, accept } = options
+  const headers = buildHeaders(token, accept)
+
+  if (body) {
+    headers['Content-Type'] = 'application/json'
+  }
+
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    method,
+    headers,
+    body: typeof body === 'object' ? JSON.stringify(body) : body
+  })
+
+  if (!response.ok) {
+    throw parseGithubError(response.status, path)
+  }
+
+  return response
+}

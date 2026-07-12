@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Repository } from "./repository-card";
-import { Lightbulb, CheckCircle2, XCircle, ArrowRight, GitFork, Star } from "lucide-react";
+import { Lightbulb, ArrowRight, GitFork, Star } from "lucide-react";
 
 interface RepositoryDetailsPopoverProps {
   repo: Repository | null;
@@ -53,10 +53,10 @@ export function RepositoryDetailsPopover({ repo, isOpen, onClose }: RepositoryDe
           <div className="space-y-6 pt-2">
             <div className="bg-emerald-500/[0.02] border border-emerald-500/10 rounded-2xl p-5 space-y-3">
               <h3 className="text-emerald-400 font-medium flex items-center gap-2 text-sm">
-                <Lightbulb className="w-4 h-4" /> Why It's a Good Fit
+                <Lightbulb className="w-4 h-4" /> Why It&apos;s a Good Fit
               </h3>
               <p className="text-neutral-300 text-sm font-light leading-relaxed">
-                This repository relies heavily on {repo.language}, matching your primary skill set. They have {repo.issuesCount} open issues specifically tagged for "good first issue" which aligns perfectly with your recent contribution patterns.
+                This repository relies heavily on {repo.language}, matching your primary skill set. They have {repo.issuesCount} open issues specifically tagged for &quot;good first issue&quot; which aligns perfectly with your recent contribution patterns.
               </p>
             </div>
 
@@ -72,7 +72,7 @@ export function RepositoryDetailsPopover({ repo, isOpen, onClose }: RepositoryDe
               <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-5">
                 <h4 className="text-neutral-200 text-sm font-medium mb-2">Contributor Comments</h4>
                 <p className="text-xs text-neutral-400 italic font-light">
-                  "The maintainers here are incredibly responsive and helpful for first-time contributors!" - @devUser
+                  &quot;The maintainers here are incredibly responsive and helpful for first-time contributors!&quot; - @devUser
                 </p>
               </div>
             </div>

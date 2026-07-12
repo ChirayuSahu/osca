@@ -1,10 +1,14 @@
-import { Response } from 'express'
+import { NextFunction, Response } from 'express'
 import { prisma } from '../../utils/prisma'
 import { sendResponse } from '../../utils/send-response'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
 import { AppError, assertFound } from '../../lib/errors'
 import { asyncHandler } from '../../utils/async-handler'
+
+// #11: Allowed values for recommendation status
+const VALID_STATUSES = ['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED'] as const
+type RecommendationStatus = typeof VALID_STATUSES[number]
 
 const requireUserId = (req: RequestWithUser): string => {
   const userId = req.user?.id
@@ -113,11 +117,20 @@ const updateRecommendationStatus = asyncHandler(async (req: RequestWithUser, res
     throw new AppError('Status must be a string', 400)
   }
 
+  // #11: Validate against the allowed enum before writing to DB
+  const normalised = status.toUpperCase() as RecommendationStatus
+  if (!VALID_STATUSES.includes(normalised)) {
+    throw new AppError(
+      `Invalid status "${status}". Must be one of: ${VALID_STATUSES.join(', ')}`,
+      400
+    )
+  }
+
   await assertRecommendationOwner(id, requesterId)
 
   const recommendation = await prisma.recommendation.update({
     where: { id },
-    data: { status: status.toUpperCase() }
+    data: { status: normalised }
   })
 
   sendResponse(res, 200, true, 'Recommendation status updated successfully', recommendation)

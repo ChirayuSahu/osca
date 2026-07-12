@@ -2,6 +2,7 @@ import React from "react";
 
 export default function HeroSection() {
   return (
+<<<<<<< HEAD
     <section id="home" className="relative w-full h-full bg-[#020503] flex flex-col select-none">
       <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
         <div
@@ -11,6 +12,63 @@ export default function HeroSection() {
       </div>
 
       <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-12 flex-1 grid grid-cols-1 lg:grid-cols-2 items-center gap-12 pb-16 pt-28 md:pt-25">
+=======
+    <section id="home" className="relative w-full h-full bg-[#020503] flex flex-col overflow-hidden select-none">
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <div
+          className="absolute inset-0 bg-[radial-gradient(160%_140%_at_85%_25%,#104025_0%,#041e10_35%,#020503_70%)]"
+        />
+        <div
+          className="absolute inset-x-0 bottom-0 h-[20%] bg-gradient-to-t from-[#020503] to-transparent z-10"
+        />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `radial-gradient(circle at center, rgba(255,255,255,0.6) 1px, transparent 1px)`,
+            backgroundSize: '24px 24px'
+          }}
+        />
+        <div
+          className="absolute left-0 top-0 bottom-0 w-32 border-r border-dashed border-white/[0.04]"
+          style={{
+            backgroundImage: `radial-gradient(circle at center, rgba(255,255,255,0.2) 1px, transparent 1px)`,
+            backgroundSize: '16px 16px',
+            backgroundPosition: 'center'
+          }}
+        />
+        <div
+          className="absolute right-0 top-0 bottom-0 w-32 border-l border-dashed border-white/[0.04]"
+          style={{
+            backgroundImage: `radial-gradient(circle at center, rgba(255,255,255,0.2) 1px, transparent 1px)`,
+            backgroundSize: '16px 16px',
+            backgroundPosition: 'center'
+          }}
+        />
+      </div>
+
+      <div className="w-full border-b border-white/[0.04] backdrop-blur-md relative z-20">
+        <nav className="w-full max-w-7xl mx-auto px-6 md:px-12 py-5 flex items-center justify-between">
+          <div className="text-xl font-semibold tracking-tight italic text-white font-serif">
+            osca
+          </div>
+
+          <div className="hidden lg:flex items-center gap-12 text-sm font-medium text-neutral-400">
+            <a href="#home" className="text-white transition-colors duration-200">Home</a>
+            <a href="#how-it-works" className="hover:text-white transition-colors duration-200 whitespace-nowrap">How it works</a>
+            <a href="#about" className="hover:text-white transition-colors duration-200">About</a>
+            <a href="#benefits" className="hover:text-white transition-colors duration-200">Benefits</a>
+          </div>
+
+          <div>
+            <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
+              Sign up
+            </a>
+          </div>
+        </nav>
+      </div>
+
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-12 flex-1 grid grid-cols-1 lg:grid-cols-2 items-center gap-12 pb-16 pt-4">
+>>>>>>> 26426561661c931a17a3b81497fd6d10417485f3
         <div className="flex flex-col justify-center w-full max-w-[620px] space-y-6">
           <h1 className="text-4xl md:text-5xl lg:text-[56px] font-normal tracking-tight text-[#F0FFF2] leading-[1.15]">
             Lorem Ipsum Dolor sit{" "}
@@ -29,6 +87,7 @@ export default function HeroSection() {
         </div>
 
         <div className="flex justify-center lg:justify-end w-full">
+<<<<<<< HEAD
           <div className="w-full max-w-[640px] bg-[#020d06] border-10 border-emerald-500/30 rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] grid grid-cols-[160px_1fr] font-sans overflow-hidden">
             <div className="border-r border border-neutral-800/80 px-3 py-4 flex flex-col gap-4 bg-[#010804]">
               <div className="text-lg font-bold italic text-[#F0FFF2] font-serif pl-2">
@@ -38,6 +97,18 @@ export default function HeroSection() {
               <div className="flex flex-col gap-1 w-full">
                 <button className="flex items-center gap-2 w-full px-2.5 py-1.5 text-[11px] font-medium text-[#031303] bg-white rounded-lg transition-colors">
                   <svg className="w-3 h-3 stroke-current fill-none" viewBox="0 0 24 24" strokeWidth="2">
+=======
+          <div className="w-full max-w-[640px] bg-[#020d06] border-10 border-emerald-500/30 rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] grid grid-cols-[180px_1fr] font-sans overflow-hidden">
+
+            <div className="border-r border border-neutral-800/80 px-4 py-6 flex flex-col gap-6 bg-[#010804]">
+              <div className="text-xl font-bold italic text-white font-serif pl-2">
+                osca
+              </div>
+
+              <div className="flex flex-col gap-1.5 w-full">
+                <button className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-neutral-900 bg-white rounded-lg transition-colors">
+                  <svg className="w-3.5 h-3.5 stroke-current fill-none" viewBox="0 0 24 24" strokeWidth="2">
+>>>>>>> 26426561661c931a17a3b81497fd6d10417485f3
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                   </svg>
                   Home
@@ -59,17 +130,30 @@ export default function HeroSection() {
                 <h2 className="text-base font-semibold text-[#F0FFF2] tracking-wide mb-2">
                   Welcome, Varada
                 </h2>
+<<<<<<< HEAD
                 
                 <div className="w-full h-5 bg-neutral-950/40 border border-white/[0.06] rounded-full mb-3" />
+=======
+
+                <div className="w-full h-6 bg-neutral-950/40 border border-white/[0.06] rounded-full mb-6" />
+>>>>>>> 26426561661c931a17a3b81497fd6d10417485f3
 
                 <p className="text-[11px] font-semibold text-[#F0FFF2] tracking-wide mb-2">
                   Your repositories
                 </p>
+<<<<<<< HEAD
                 
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   <div className="bg-[#020503]/40 border border-white/[0.08] rounded-lg p-2.5 flex flex-col gap-1.5">
                     <div className="w-5 h-5 bg-orange-500/20 text-orange-400 rounded-md flex items-center justify-center">
                       <svg className="w-3 h-3 fill-none stroke-current" viewBox="0 0 24 24" strokeWidth="2">
+=======
+
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="bg-[#020503]/40 border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-2">
+                    <div className="w-6 h-6 bg-orange-500/20 text-orange-400 rounded-md flex items-center justify-center">
+                      <svg className="w-3.5 h-3.5 fill-none stroke-current" viewBox="0 0 24 24" strokeWidth="2">
+>>>>>>> 26426561661c931a17a3b81497fd6d10417485f3
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>

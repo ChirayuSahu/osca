@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Repository
+url: "{{BASE_URL}}/api/v1/repositories/{{owner}}/{{repo}}"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 1500

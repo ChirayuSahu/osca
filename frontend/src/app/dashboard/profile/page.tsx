@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
-import { Sparkles, BookOpen, RefreshCw, UserCheck, Shield, ArrowUpRight, ArrowDownRight, FileCode, GitMerge } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback, Badge, Progress } from "@/components/ui";
+import { Sparkles, BookOpen, RefreshCw, UserCheck, Shield, ArrowUpRight, ArrowDownRight, FileCode, GitMerge, Code2 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback, Badge } from "@/components/ui";
 import { GitHubCalendar } from 'react-github-calendar';
 
 interface ContributorProfile {
@@ -220,45 +220,65 @@ export default function ProfilePage() {
             </p>
           </div>
         ) : analytics ? (
-          <div className="space-y-8">
-            
-            {/* Overall Index Score Banner */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 rounded-2xl border border-white/[0.04] bg-neutral-950/30">
-              <div className="space-y-1.5 max-w-xl">
-                <span className="text-xs text-neutral-500 font-light tracking-wide uppercase">Overall Code Index Rating</span>
-                <p className="text-xs text-neutral-400 font-light leading-relaxed">
-                  Weighted index scored from your contributions, language diversity, commit volume, and code structural patterns.
+          <div className="space-y-8 relative">
+
+            {/* Overall Index Score Banner - Minimalist Premium */}
+            <div className="relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 p-8 rounded-3xl border border-white/[0.08] bg-neutral-950/40 hover:bg-neutral-950/60 transition-all duration-500">
+              
+              <div className="space-y-3 max-w-xl relative z-10 text-center md:text-left">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.08] text-neutral-300 text-[10px] font-medium tracking-widest uppercase">
+                  <Sparkles className="w-3 h-3" />
+                  Primary Metric
+                </div>
+                <h3 className="text-xl text-white font-light tracking-wide">Overall Code Index Rating</h3>
+                <p className="text-sm text-neutral-400 font-light leading-relaxed">
+                  A comprehensive, weighted index derived from your algorithmic contributions, language diversity, commit velocity, and structural code quality.
                 </p>
               </div>
-              <div className="flex items-baseline gap-1 text-center md:text-right min-w-[120px]">
-                <span className="text-5xl font-extralight text-white tracking-tight">
-                  {analytics.overallScore.toFixed(1)}
-                </span>
-                <span className="text-xs text-neutral-600 font-light">/100</span>
+              
+              <div className="relative z-10 flex flex-col items-center justify-center shrink-0">
+                <div className="relative flex items-center justify-center w-36 h-36 rounded-full border border-white/[0.08] bg-neutral-950/50 shadow-inner">
+                  <div className="absolute inset-2 rounded-full border border-dashed border-white/20 animate-[spin_60s_linear_infinite]" />
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-5xl font-extralight text-white tracking-tight">
+                      {analytics.overallScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="absolute bottom-4 text-[10px] text-neutral-500 font-medium tracking-widest">/ 100</div>
+                </div>
               </div>
             </div>
 
-            {/* Sub-Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 pt-2">
+            {/* Sub-Metrics Grid - Premium Redesign */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
               {[
-                { label: "Skill Depth", score: analytics.skillScore, desc: "Technical complexity & code variety", icon: BookOpen },
-                { label: "Activity Rate", score: analytics.activityScore, desc: "Commit frequency & PR velocity", icon: RefreshCw },
-                { label: "Code Quality", score: analytics.qualityScore, desc: "Best practices & documentation patterns", icon: UserCheck },
-                { label: "Diversity Scope", score: analytics.diversityScore, desc: "Cross-repo contributions & org involvement", icon: Shield }
+                { label: "Skill Depth", score: analytics.skillScore, desc: "Technical complexity & code variety", icon: BookOpen, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
+                { label: "Activity Rate", score: analytics.activityScore, desc: "Commit frequency & PR velocity", icon: RefreshCw, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
+                { label: "Code Quality", score: analytics.qualityScore, desc: "Best practices & documentation patterns", icon: UserCheck, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
+                { label: "Diversity Scope", score: analytics.diversityScore, desc: "Cross-repo contributions & org involvement", icon: Shield, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" }
               ].map((metric) => {
                 const Icon = metric.icon;
                 return (
-                  <div key={metric.label} className="space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-neutral-400 font-light flex items-center gap-1.5">
-                        <Icon className="w-3.5 h-3.5 text-neutral-600" />
-                        {metric.label}
-                      </span>
-                      <span className="text-white font-normal">{metric.score.toFixed(1)}%</span>
+                  <div key={metric.label} className="group flex flex-col gap-4 p-6 rounded-3xl border border-white/[0.04] bg-neutral-950/40 hover:bg-neutral-950/60 hover:border-white/[0.08] transition-all duration-300">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${metric.bg} border border-white/[0.05] shadow-inner`}>
+                          <Icon className="w-5 h-5 text-white opacity-80" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm text-neutral-200 font-medium">{metric.label}</h4>
+                          <p className="text-[11px] text-neutral-500 font-light mt-0.5">{metric.desc}</p>
+                        </div>
+                      </div>
+                      <span className="text-lg font-light text-white">{metric.score.toFixed(1)}<span className="text-neutral-600 text-xs ml-0.5">%</span></span>
                     </div>
                     
-                    <Progress value={metric.score} className="h-1 bg-white/[0.03]" />
-                    <p className="text-[10px] text-neutral-500 font-light leading-snug">{metric.desc}</p>
+                    <div className="w-full h-1.5 bg-neutral-900 rounded-full overflow-hidden mt-2 relative">
+                      <div 
+                        className={`absolute top-0 left-0 h-full bg-gradient-to-r ${metric.color} rounded-full`}
+                        style={{ width: `${metric.score}%` }}
+                      />
+                    </div>
                   </div>
                 );
               })}
@@ -332,9 +352,12 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             
             {/* Skill Overview */}
-            <div className="md:col-span-2 p-6 rounded-2xl border border-white/[0.04] bg-neutral-950/40 space-y-6">
-              <h3 className="text-sm font-normal text-white text-center">Skill overview</h3>
-              <div className="space-y-4 pt-2">
+            <div className="md:col-span-2 p-6 rounded-3xl border border-white/[0.04] bg-neutral-950/40 hover:bg-neutral-950/60 transition-all duration-300 space-y-6">
+              <h3 className="text-sm font-medium text-neutral-200 flex items-center gap-2">
+                <Code2 className="w-4 h-4 text-emerald-400" />
+                Skill Overview
+              </h3>
+              <div className="space-y-5 pt-2">
                 {(() => {
                   const repExp = analytics?.repositoryExperience as { skills?: { name: string, proficiencyScore: number }[] } | undefined;
                   const dbSkills = repExp?.skills && repExp.skills.length > 0 
@@ -348,12 +371,17 @@ export default function ProfilePage() {
                       ];
                   
                   return dbSkills.map((s, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-neutral-300 font-light">{s.name}</span>
-                        <span className="text-neutral-400">{s.val}%</span>
+                    <div key={i} className="space-y-1.5 group cursor-default">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-neutral-400 group-hover:text-neutral-200 transition-colors">{s.name}</span>
+                        <span className="text-neutral-500 group-hover:text-emerald-400 transition-colors font-light">{s.val}%</span>
                       </div>
-                      <Progress value={s.val} className="h-1 bg-white/[0.03]" />
+                      <div className="w-full h-1 bg-neutral-900 rounded-full overflow-hidden relative">
+                        <div 
+                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-1000 ease-out"
+                          style={{ width: `${s.val}%` }}
+                        />
+                      </div>
                     </div>
                   ));
                 })()}

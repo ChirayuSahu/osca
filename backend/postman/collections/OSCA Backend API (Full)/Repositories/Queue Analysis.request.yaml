@@ -1,0 +1,14 @@
+$kind: http-request
+name: Queue Analysis
+url: "{{BASE_URL}}/api/v1/repositories"
+method: POST
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "url": "https://github.com/ChirayuSahu/delivery-app-fe"
+    }
+order: 2000

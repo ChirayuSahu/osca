@@ -11,14 +11,21 @@ const processContributorAnalysis = async (
 
   console.log(`[ContributorWorker] Starting analysis for user ${userId} (job ${job.id})`)
 
-  const skills = await ContributorAnalysisService.analyzeProfile(userId, async (percent, message) => {
-    await job.updateProgress({ percent, message })
-  })
+  // #E-6: Explicit try/catch so we can log context before rethrowing to BullMQ
+  try {
+    const skills = await ContributorAnalysisService.analyzeProfile(userId, async (percent, message) => {
+      await job.updateProgress({ percent, message })
+    })
 
-  return {
-    userId,
-    skillCount: skills.length,
-    skills
+    console.log(`[ContributorWorker] Job ${job.id} complete — ${skills.length} skills extracted`)
+    return {
+      userId,
+      skillCount: skills.length,
+      skills
+    }
+  } catch (error) {
+    console.error(`[ContributorWorker] Job ${job.id} failed for user ${userId}:`, error)
+    throw error
   }
 }
 
@@ -29,10 +36,11 @@ export const createContributorWorker = (): Worker => {
     {
       connection: getRedisConnectionOptions(),
       concurrency: 3,
-      removeOnComplete: { count: 500 },
-      removeOnFail: { count: 200 },
-      stalledInterval: 300000,
-      drainDelay: 300,
+      // #J-2: removeOnComplete / removeOnFail omitted — controlled by queue defaultJobOptions
+      // #J-3: 30s stall detection (was 5 min)
+      stalledInterval: 30000,
+      // #J-4: 5s drain delay (was 300ms)
+      drainDelay: 5000,
       metrics: undefined
     }
   )

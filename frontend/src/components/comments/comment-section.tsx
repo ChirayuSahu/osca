@@ -3,21 +3,35 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/auth-context";
 import { CommentService } from "@/services/comment.service";
-import { Loader2, MessageSquare } from "lucide-react";
+import { Loader2, MessageSquare, ChevronDown, Trash } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
-export default function CommentSection({ threadId }: { threadId: string }) {
-  const { token, user } = useAuth();
-  const [comments, setComments] = useState<any[]>([]);
+interface Comment {
+  id: string | number;
+  body: string;
+  created_at: string | number | Date;
+  user?: { login: string; avatar_url: string };
+  reactions?: { '+1': number };
+}
+
+export default function CommentSection({ owner, repo, threadId }: { owner: string; repo: string; threadId: string }) {
+  const { token, user: currentUser } = useAuth();
+  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [upvotedComments, setUpvotedComments] = useState<Set<string | number>>(new Set());
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !owner || !repo || !threadId) return;
     
     const loadComments = async () => {
       try {
-        const res = await CommentService.getComments(threadId, token);
+        const res = await CommentService.getComments(owner, repo, threadId, token);
         setComments(res.data || []);
       } catch (err) {
         console.error(err);
@@ -27,7 +41,7 @@ export default function CommentSection({ threadId }: { threadId: string }) {
     };
 
     loadComments();
-  }, [threadId, token]);
+  }, [owner, repo, threadId, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +49,7 @@ export default function CommentSection({ threadId }: { threadId: string }) {
 
     try {
       setSubmitting(true);
-      const res = await CommentService.createComment({ threadId, content: newComment }, token);
+      const res = await CommentService.createComment(owner, repo, threadId, { body: newComment }, token);
       setComments([...comments, res.data]);
       setNewComment("");
     } catch (err) {
@@ -45,67 +59,157 @@ export default function CommentSection({ threadId }: { threadId: string }) {
     }
   };
 
+  const handleDeleteComment = async (commentId: string | number) => {
+    if (!token) return;
+    try {
+      await CommentService.deleteComment(owner, repo, commentId, token);
+      setComments(comments.filter(c => c.id !== commentId));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
-    <div className="space-y-10 pt-4">
-      <div className="flex items-center gap-3 border-b border-white/[0.06] pb-5">
-        <MessageSquare className="w-5 h-5 text-emerald-500" />
-        <h2 className="text-xl font-medium text-white">Comments <span className="text-neutral-500 font-light">({comments.length})</span></h2>
+    <div className="space-y-6 pt-4">
+      <div className="flex items-center justify-between border-b border-white/[0.06] pb-4">
+        <button 
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity group"
+        >
+          <MessageSquare className="w-5 h-5 text-emerald-500" />
+          <h2 className="text-lg font-medium text-white">{comments.length} Replies</h2>
+          <ChevronDown className={`w-4 h-4 ml-1 text-neutral-500 transition-transform ${isCollapsed ? "-rotate-90" : "group-hover:translate-y-0.5"}`} />
+        </button>
       </div>
 
-      <div className="space-y-8">
+      {!isCollapsed && (
+        <div className="space-y-0">
         {loading ? (
           <div className="text-center text-neutral-500 text-sm animate-pulse py-8">Loading comments...</div>
         ) : comments.length === 0 ? (
-          <div className="text-neutral-500 text-base font-light italic text-center py-12 bg-white/[0.01] rounded-2xl border border-white/[0.03]">No comments yet. Start the conversation!</div>
+          <div className="text-neutral-500 text-sm font-light italic text-center py-12">No replies yet. Start the conversation!</div>
         ) : (
-          comments.map(comment => (
-            <div key={comment.id} className="flex gap-5 group">
-              <div className="w-12 h-12 rounded-full shrink-0 bg-neutral-900 border border-white/[0.06] flex items-center justify-center text-neutral-300 text-base font-medium shadow-sm">
-                {comment.author?.name?.charAt(0) || "U"}
+          comments.map((comment, index) => (
+            <div key={comment.id} className="relative pl-6 pb-8 group">
+              {/* Vertical Thread Line */}
+              {index !== comments.length - 1 && (
+                <div className="absolute left-[11px] top-10 bottom-0 w-px bg-white/[0.06] group-hover:bg-white/[0.1] transition-colors" />
+              )}
+              
+              <div className="absolute left-0 top-1 w-6 h-6 rounded-full overflow-hidden border border-white/[0.1] bg-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={comment.user?.avatar_url || "https://github.com/identicons/user.png"} alt={comment.user?.login} className="w-full h-full object-cover" />
               </div>
-              <div className="flex-1">
-                <div className="bg-neutral-950/40 border border-white/[0.04] group-hover:border-white/[0.08] transition-all rounded-2xl rounded-tl-sm p-6 shadow-xl shadow-black/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-base font-medium text-neutral-200">{comment.author?.name || "User"}</span>
-                    <span className="text-xs font-medium text-neutral-500 bg-white/[0.03] px-2.5 py-1 rounded-full border border-white/[0.05]">
-                      {new Date(comment.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} at {new Date(comment.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <p className="text-base text-neutral-300 font-light leading-relaxed whitespace-pre-wrap">{comment.content}</p>
+
+              <div className="ml-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm font-medium text-neutral-200">{comment.user?.login || "User"}</span>
+                  <span className="text-xs text-neutral-500">•</span>
+                  <span className="text-xs font-medium text-neutral-500">
+                    {new Date(comment.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+                
+                <div className="prose prose-invert prose-emerald max-w-none text-neutral-300 font-light text-[14px] leading-relaxed mb-3">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]} 
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                      input: ({node, ...props}) => <input {...props} checked={props.checked ?? false} readOnly />
+                    }}
+                  >
+                    {comment.body}
+                  </ReactMarkdown>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={() => {
+                      setUpvotedComments(prev => {
+                        const next = new Set(prev);
+                        if (next.has(comment.id)) next.delete(comment.id);
+                        else next.add(comment.id);
+                        return next;
+                      });
+                    }}
+                    className={`flex items-center gap-1.5 text-xs font-medium transition-colors ${upvotedComments.has(comment.id) ? 'text-emerald-400' : 'text-neutral-400 hover:text-emerald-400'}`}
+                  >
+                    ↑ {(comment.reactions?.['+1'] || 0) + (upvotedComments.has(comment.id) ? 1 : 0)}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setNewComment(`@${comment.user?.login || 'User'} `);
+                      textareaRef.current?.focus();
+                    }}
+                    className="text-xs font-medium text-neutral-500 hover:text-neutral-300 transition-colors"
+                  >
+                    Reply
+                  </button>
+                  {currentUser?.username === comment.user?.login && (
+                    <button 
+                      onClick={() => handleDeleteComment(comment.id)}
+                      className="text-neutral-500 hover:text-red-400 transition-colors ml-auto"
+                      title="Delete reply"
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           ))
         )}
       </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="mt-12 pt-8 border-t border-white/[0.06]">
-        <div className="flex gap-5">
-          <div className="w-12 h-12 rounded-full shrink-0 bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-base font-bold shadow-inner">
-            {user?.name?.charAt(0) || "Y"}
+      <div className="mt-8 bg-[#0A0A0A] border border-white/[0.06] rounded-xl p-4">
+        <form onSubmit={handleSubmit}>
+          <div className="flex items-center gap-2 text-sm text-emerald-400 mb-4 ml-1">
+            <span className="font-medium text-white">Add a reply</span>
           </div>
-          <div className="flex-1 space-y-4">
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Write a meaningful comment..."
-              rows={4}
-              className="w-full bg-neutral-950 border border-white/[0.06] rounded-2xl rounded-tl-sm px-5 py-4 text-white placeholder-neutral-500 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/40 transition-all resize-none text-base font-light shadow-inner"
-              required
-            />
-            <div className="flex justify-end">
-              <button 
-                type="submit" 
-                disabled={submitting || !newComment.trim()}
-                className="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-neutral-200 text-black font-semibold rounded-full text-sm transition-all disabled:opacity-50 active:scale-95 shadow-lg shadow-white/10"
-              >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin text-black" />}
-                Post Comment
-              </button>
+          
+          <div className="flex gap-4">
+            <div className="w-8 h-8 rounded-full shrink-0 overflow-hidden border border-white/[0.1] bg-neutral-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={currentUser?.avatarUrl || "https://github.com/identicons/user.png"} alt="You" className="w-full h-full object-cover" />
+            </div>
+            
+            <div className="flex-1 space-y-3">
+              <textarea
+                ref={textareaRef}
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add your reply"
+                rows={4}
+                className="w-full bg-[#141414] border border-white/[0.06] rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-emerald-500/40 focus:ring-1 focus:ring-emerald-500/40 transition-all resize-none shadow-inner"
+                required
+              />
+              
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-neutral-500 tracking-wide">Markdown supported</span>
+                <div className="flex gap-3">
+                  <button 
+                    type="button" 
+                    className="px-4 py-1.5 text-xs font-medium text-[#8A8F98] hover:text-white transition-colors"
+                    onClick={() => setNewComment("")}
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={submitting || !newComment.trim()}
+                    className="flex items-center gap-2 px-5 py-1.5 bg-[#10B981] hover:bg-emerald-400 text-[#04140D] font-semibold rounded-full text-xs transition-all disabled:opacity-50"
+                  >
+                    {submitting && <Loader2 className="w-3 h-3 animate-spin text-[#04140D]" />}
+                    Post Reply
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }

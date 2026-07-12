@@ -1,0 +1,7 @@
+$kind: http-request
+name: Get Dev Token
+url: "{{BASE_URL}}/api/v1/auth/dev-token?email=chirayusahu@github.com"
+method: GET
+queryParams:
+  email: chirayusahu@github.com
+order: 4000
