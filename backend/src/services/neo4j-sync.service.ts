@@ -55,7 +55,7 @@ export const Neo4jSyncService = {
       // Basic interaction mapping (example)
       let relType = 'INTERACTED_WITH'
       if (action === 'STARRED') relType = 'STARRED'
-      else if (action === 'CONTRIBUTED_TO') relType = 'CONTRIBUTED_TO'
+      else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
       else if (action === 'OWNS') relType = 'OWNS'
 
       await session.run(
@@ -64,6 +64,28 @@ export const Neo4jSyncService = {
         MATCH (r:Repository {id: $repoId})
         MERGE (u)-[rel:${relType}]->(r)
         SET rel.updatedAt = datetime()
+        `,
+        { userGithubId, repoId }
+      )
+    } finally {
+      await session.close()
+    }
+  },
+
+  // Mirrors syncInteraction's action->relType mapping so callers can undo a
+  // toggle (e.g. unliking a repo) without needing to know the Cypher rel type.
+  async removeInteraction(userGithubId: number, repoId: string, action: string) {
+    const session = neo4jDriver.session({ database: config.neo4j.database })
+    try {
+      let relType = 'INTERACTED_WITH'
+      if (action === 'STARRED') relType = 'STARRED'
+      else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
+      else if (action === 'OWNS') relType = 'OWNS'
+
+      await session.run(
+        `
+        MATCH (u:User {githubId: $userGithubId})-[rel:${relType}]->(r:Repository {id: $repoId})
+        DELETE rel
         `,
         { userGithubId, repoId }
       )
