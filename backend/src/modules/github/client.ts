@@ -63,7 +63,8 @@ export const githubGetResponse = async (path: string, token: string): Promise<Re
 export const githubTryGetRaw = async (path: string, token: string): Promise<string | null> => {
   try {
     return await githubGetRaw(path, token)
-  } catch {
+  } catch (err: any) {
+    console.error(`[GithubClient] githubTryGetRaw miss for ${path}:`, err?.message || err)
     return null
   }
 }
@@ -72,7 +73,8 @@ export const githubPathExists = async (path: string, token: string): Promise<boo
   try {
     await fetchGithub(path, { token, method: 'HEAD' })
     return true
-  } catch {
+  } catch (err: any) {
+    console.error(`[GithubClient] githubPathExists miss for ${path}:`, err?.message || err)
     return false
   }
 }

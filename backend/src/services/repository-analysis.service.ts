@@ -286,7 +286,8 @@ const analyzeGithubRepo = async (
   let languagesData: Record<string, number> = {}
   try {
     languagesData = await githubGetJson<Record<string, number>>(`${repoPath}/languages`, token)
-  } catch {
+  } catch (err) {
+    console.error(`[RepoService] Failed to fetch languages for ${owner}/${repo}:`, err)
     languagesData = {}
   }
 
@@ -294,7 +295,8 @@ const analyzeGithubRepo = async (
   try {
     const topicsRes = await githubGetJson<{ names: string[] }>(`${repoPath}/topics`, token)
     topics = topicsRes.names || []
-  } catch {
+  } catch (err) {
+    console.error(`[RepoService] Failed to fetch topics for ${owner}/${repo}:`, err)
     topics = []
   }
 

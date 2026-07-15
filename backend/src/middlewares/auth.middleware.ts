@@ -25,7 +25,8 @@ export const authMiddleware = (req: RequestWithUser, res: Response, next: NextFu
     const decoded = jwt.verify(token, config.jwtSecret) as { id: string, username: string, email: string }
     req.user = decoded
     next()
-  } catch {
+  } catch (err: any) {
+    console.error('[Auth] Token verification failed:', err?.message || err)
     next(new AppError('Access token is invalid or expired', 401))
   }
 }

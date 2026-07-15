@@ -289,8 +289,8 @@ const analyzeGithubProfile = async (
         for (const [lang, bytes] of Object.entries(languages)) {
           languageTotals[lang] = (languageTotals[lang] ?? 0) + bytes
         }
-      } catch {
-        // Skip repos we can't access
+      } catch (err) {
+        console.error(`[ContributorAnalysis] Failed to fetch languages for ${repo.full_name}:`, err)
       }
 
       const packageJson = await githubTryGetRaw(`/repos/${repo.full_name}/contents/package.json`, accessToken)

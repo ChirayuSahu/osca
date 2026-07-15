@@ -32,8 +32,9 @@ const redisClient = new Redis({
 })
 
 redisClient.on('error', (err) => {
-  // Catch Redis connection errors silently to prevent unhandled exception crashes
-  // console.error('[Redis] Connection Error:', err.message)
+  // Registering this handler (rather than leaving it unset) is what prevents
+  // ioredis's unhandled 'error' event from crashing the process — still log it.
+  console.error('[Redis] Connection error:', err.message)
 })
 
 // ─── CORS ─────────────────────────────────────────────────────────
