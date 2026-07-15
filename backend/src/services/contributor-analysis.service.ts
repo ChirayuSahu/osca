@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../utils/prisma'
 import { assertFound } from '../lib/errors'
+import { Neo4jSyncService } from './neo4j-sync.service'
 import {
   buildSkillList,
   detectNpmFrameworks,
@@ -22,6 +23,47 @@ interface GitHubRepo {
   language: string | null
   fork: boolean
   size: number
+}
+
+interface GitHubStarredRepo {
+  id: number
+  full_name: string
+}
+
+// Caps how many pages of /user/starred we walk (100 per page) so a user with
+// thousands of stars can't blow the GitHub rate limit or stall the job queue.
+const MAX_STARRED_PAGES = 5
+
+// Syncs STARRED edges into Neo4j for the subset of the user's GitHub stars
+// that we already track as Repository rows in Postgres. We deliberately don't
+// ingest brand-new repos here — that's the job of the repository-analysis
+// pipeline; this only wires up the edge for repos already known to us.
+const syncStarredRepositories = async (userId: string, githubId: number, username: string): Promise<number> => {
+  const accessToken = await getGithubAccessToken(userId)
+
+  const starredGithubIds: number[] = []
+  for (let page = 1; page <= MAX_STARRED_PAGES; page++) {
+    const repos = await githubGetJson<GitHubStarredRepo[]>(`/user/starred?per_page=100&page=${page}`, accessToken)
+    if (!Array.isArray(repos) || repos.length === 0) break
+    starredGithubIds.push(...repos.map((repo) => repo.id))
+    if (repos.length < 100) break
+  }
+
+  if (starredGithubIds.length === 0) return 0
+
+  const trackedRepos = await prisma.repository.findMany({
+    where: { githubId: { in: starredGithubIds } },
+    select: { id: true }
+  })
+
+  if (trackedRepos.length === 0) return 0
+
+  await Neo4jSyncService.syncUser({ githubId, username })
+  for (const repo of trackedRepos) {
+    await Neo4jSyncService.syncInteraction(githubId, repo.id, 'STARRED')
+  }
+
+  return trackedRepos.length
 }
 
 const toContributorExperience = (skills: Skill[]): Prisma.InputJsonValue => ({
@@ -310,5 +352,6 @@ const analyzeGithubProfile = async (
 }
 
 export const ContributorAnalysisService = {
-  analyzeProfile
+  analyzeProfile,
+  syncStarredRepositories
 }

@@ -42,8 +42,14 @@ const redirectToGithub = (req: Request, res: Response): void => {
 
 // #4: Callback verifies `state` against cookie before exchanging code
 const handleGithubCallback = asyncHandler(async (req: Request, res: Response) => {
-  const { code, state } = req.query
+  const { code, state, error, error_description } = req.query
   const cookieState = req.cookies?.oauth_state as string | undefined
+
+  if (error) {
+    const errorMsg = error_description ? String(error_description) : 'Authentication failed'
+    res.redirect(`${config.frontendUrl}/login?error=${String(error)}&error_description=${encodeURIComponent(errorMsg)}`)
+    return
+  }
 
   // Verify state to prevent CSRF / OAuth hijacking
   if (typeof state !== 'string' || !cookieState || state !== cookieState) {

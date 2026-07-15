@@ -29,6 +29,7 @@ function LoginContent() {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
+  const errorDescription = searchParams.get("error_description");
 
   const handleLogin = () => {
     setIsRedirecting(true);
@@ -38,12 +39,14 @@ function LoginContent() {
   const isLoading = authLoading || isRedirecting;
 
   let errorMessage = "";
-  if (error === "session_error") {
+  if (error === "access_denied") {
+    errorMessage = errorDescription ? decodeURIComponent(errorDescription).replace(/\+/g, ' ') : "You denied the authorization request.";
+  } else if (error === "session_error") {
     errorMessage = "Failed to establish a secure session. Please try again.";
   } else if (error === "invalid_params") {
     errorMessage = "Authentication request is missing required parameters.";
   } else if (error) {
-    errorMessage = "An unexpected authentication error occurred. Please try again.";
+    errorMessage = errorDescription ? decodeURIComponent(errorDescription).replace(/\+/g, ' ') : "An unexpected authentication error occurred. Please try again.";
   }
 
   return (
@@ -67,15 +70,16 @@ function LoginContent() {
           </p>
         </div>
 
-        {/* Error Notification Banner */}
-        {errorMessage && (
-          <div className="w-full flex items-start gap-3 p-3 text-left bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs animate-in fade-in slide-in-from-top-2 duration-300">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <p className="leading-normal">{errorMessage}</p>
-          </div>
-        )}
+        <div className="w-full flex flex-col gap-4">
+          {/* Error Notification Banner */}
+          {errorMessage && (
+            <div className="w-full flex items-start gap-3 p-3 text-left bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs animate-in fade-in slide-in-from-top-2 duration-300">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p className="leading-normal">{errorMessage}</p>
+            </div>
+          )}
 
-        <div className="w-full pt-4">
+          <div className="w-full">
           <Button
             onClick={handleLogin}
             disabled={isLoading}
@@ -95,6 +99,7 @@ function LoginContent() {
                 : "Continue with GitHub"}
             </span>
           </Button>
+        </div>
         </div>
 
         <div className="text-[10px] text-neutral-500 font-light leading-normal">

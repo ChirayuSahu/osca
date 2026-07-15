@@ -1,5 +1,7 @@
 import { prisma } from '../utils/prisma'
 import { AppError, assertFound } from '../lib/errors'
+import { getGithubIdForUser } from '../lib/github'
+import { Neo4jSyncService } from './neo4j-sync.service'
 
 export type InteractionAction = 
   | 'REPOSITORY_VIEW' 
@@ -70,6 +72,18 @@ export const logInteraction = async (
       // Assuming languages is a Record<string, number>
       Object.keys(repository.languages).forEach(lang => tagsToUpdate.add(lang.toLowerCase()))
     }
+  }
+
+  // Best-effort: feed this interaction into the Neo4j graph so it strengthens
+  // the collaborative-filtering signal in the recommendation engine. Never
+  // block the caller on this — Neo4j being down shouldn't fail the interaction.
+  // Done before the tag-update early-return below so it still fires for
+  // repos with no known languages/techStack.
+  const githubId = await getGithubIdForUser(userId)
+  if (githubId !== null) {
+    Neo4jSyncService.syncInteraction(githubId, repositoryId, action).catch((error) => {
+      console.error(`[Neo4jSync] Failed to sync interaction for user ${userId}, repo ${repositoryId}:`, error)
+    })
   }
 
   // 3. Update UserInterests

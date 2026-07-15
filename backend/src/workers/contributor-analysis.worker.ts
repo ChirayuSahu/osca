@@ -30,6 +30,13 @@ const processContributorAnalysis = async (
       if (!isNaN(githubId)) {
         await Neo4jSyncService.syncUser({ githubId, username: user.username })
         await Neo4jSyncService.syncUserSkills(githubId, skills)
+
+        try {
+          const starredCount = await ContributorAnalysisService.syncStarredRepositories(userId, githubId, user.username)
+          console.log(`[ContributorWorker] Synced ${starredCount} STARRED edges for user ${userId}`)
+        } catch (error) {
+          console.error(`[ContributorWorker] Failed to sync starred repos for user ${userId}:`, error)
+        }
       }
     }
 
