@@ -1,34 +1,29 @@
-import { neo4jDriver } from '../utils/neo4j'
-import { config } from '../config'
+import { withSession } from '../utils/neo4j'
 
 export const Neo4jSyncService = {
   async syncUser(user: { githubId?: number; username: string }) {
     if (!user.githubId) return
 
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
-      await session.run(
+    await withSession(session =>
+      session.run(
         `
         MERGE (u:User {githubId: $githubId})
         SET u.username = $username
         `,
         { githubId: user.githubId, username: user.username }
       )
-    } finally {
-      await session.close()
-    }
+    )
   },
 
-  async syncRepository(repo: { 
-    id: string; 
-    name: string; 
+  async syncRepository(repo: {
+    id: string;
+    name: string;
     owner: string;
     description?: string | null;
     stars?: number;
   }) {
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
-      await session.run(
+    await withSession(session =>
+      session.run(
         `
         MERGE (r:Repository {id: $id})
         SET r.name = $name,
@@ -36,29 +31,26 @@ export const Neo4jSyncService = {
             r.description = $description,
             r.stars = $stars
         `,
-        { 
-          id: repo.id, 
-          name: repo.name, 
+        {
+          id: repo.id,
+          name: repo.name,
           owner: repo.owner,
           description: repo.description ?? '',
           stars: repo.stars ?? 0
         }
       )
-    } finally {
-      await session.close()
-    }
+    )
   },
 
   async syncInteraction(userGithubId: number, repoId: string, action: string) {
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
-      // Basic interaction mapping (example)
-      let relType = 'INTERACTED_WITH'
-      if (action === 'STARRED') relType = 'STARRED'
-      else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
-      else if (action === 'OWNS') relType = 'OWNS'
+    // Basic interaction mapping (example)
+    let relType = 'INTERACTED_WITH'
+    if (action === 'STARRED') relType = 'STARRED'
+    else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
+    else if (action === 'OWNS') relType = 'OWNS'
 
-      await session.run(
+    await withSession(session =>
+      session.run(
         `
         MATCH (u:User {githubId: $userGithubId})
         MATCH (r:Repository {id: $repoId})
@@ -67,36 +59,30 @@ export const Neo4jSyncService = {
         `,
         { userGithubId, repoId }
       )
-    } finally {
-      await session.close()
-    }
+    )
   },
 
   // Mirrors syncInteraction's action->relType mapping so callers can undo a
   // toggle (e.g. unliking a repo) without needing to know the Cypher rel type.
   async removeInteraction(userGithubId: number, repoId: string, action: string) {
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
-      let relType = 'INTERACTED_WITH'
-      if (action === 'STARRED') relType = 'STARRED'
-      else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
-      else if (action === 'OWNS') relType = 'OWNS'
+    let relType = 'INTERACTED_WITH'
+    if (action === 'STARRED') relType = 'STARRED'
+    else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
+    else if (action === 'OWNS') relType = 'OWNS'
 
-      await session.run(
+    await withSession(session =>
+      session.run(
         `
         MATCH (u:User {githubId: $userGithubId})-[rel:${relType}]->(r:Repository {id: $repoId})
         DELETE rel
         `,
         { userGithubId, repoId }
       )
-    } finally {
-      await session.close()
-    }
+    )
   },
 
   async syncUserSkills(userGithubId: number, skills: { name: string; proficiencyScore: number }[]) {
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
+    await withSession(async session => {
       for (const skill of skills) {
         await session.run(
           `
@@ -108,14 +94,11 @@ export const Neo4jSyncService = {
           { userGithubId, skillName: skill.name, score: skill.proficiencyScore }
         )
       }
-    } finally {
-      await session.close()
-    }
+    })
   },
 
   async syncRepositoryTechStack(repoId: string, data: { languages: Record<string, number>, frameworks: string[], techStack: string[], ciCd: string[] }) {
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
+    await withSession(async session => {
       // 1. Sync Languages
       for (const [lang, bytes] of Object.entries(data.languages)) {
         await session.run(
@@ -165,16 +148,13 @@ export const Neo4jSyncService = {
           { repoId, ci }
         )
       }
-    } finally {
-      await session.close()
-    }
+    })
   },
 
   async syncRepositoryTopics(repoId: string, topics: string[]) {
     if (!topics.length) return
 
-    const session = neo4jDriver.session({ database: config.neo4j.database })
-    try {
+    await withSession(async session => {
       for (const topic of topics) {
         await session.run(
           `
@@ -185,8 +165,6 @@ export const Neo4jSyncService = {
           { repoId, topic }
         )
       }
-    } finally {
-      await session.close()
-    }
+    })
   }
 }

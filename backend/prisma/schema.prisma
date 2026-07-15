@@ -17,7 +17,6 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   oauthAccounts      OAuthAccount[]
-  recommendations    Recommendation[]
   contributorProfile ContributorProfile?
   repositoryLikes    RepositoryLike[]
   interactions       UserInteraction[]
@@ -64,7 +63,6 @@ model Repository {
   updatedAt       DateTime @updatedAt
   hidden          Boolean  @default(false)
 
-  recommendations Recommendation[]
   likes           RepositoryLike[]
   interactions    UserInteraction[]
 
@@ -84,22 +82,6 @@ model ContributorProfile {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Recommendation {
-  id           String     @id @default(uuid())
-  userId       String
-  repositoryId String
-  fitScore     Float      @default(0.0)
-  explanation  String
-  roadmap      Json? // Step-by-step roadmap
-  status       String     @default("PENDING") // e.g. PENDING, ACCEPTED, REJECTED, COMPLETED
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, repositoryId])
 }
 
 model RepositoryLike {
