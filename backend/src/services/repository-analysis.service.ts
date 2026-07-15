@@ -177,7 +177,8 @@ const fetchFullTree = async (
 const analyzeRepository = async (
   url: string,
   userId: string,
-  onProgress: ProgressCallback = noopProgress
+  onProgress: ProgressCallback = noopProgress,
+  force: boolean = false
 ) => {
   console.log(`[RepoService] Starting analysis for ${url}`)
   await onProgress(5, 'Validating repository URL...')
@@ -195,7 +196,12 @@ const analyzeRepository = async (
     }
   })
 
-  // User requested to re-analyze even if the repository exists, so we proceed without early exit.
+  // If we already have the folderStructure and force isn't true, skip analysis
+  if (existingRepo && existingRepo.folderStructure && !force) {
+    console.log(`[RepoService] Repository ${fullName} is already analyzed. Skipping.`)
+    await onProgress(100, 'Repository already analyzed.')
+    return existingRepo
+  }
 
   await onProgress(8, 'Fetching user credentials...')
   const accessToken = await getGithubAccessToken(userId)

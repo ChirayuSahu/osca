@@ -54,9 +54,11 @@ const enqueue = async (
 }
 
 export const JobEnqueueService = {
-  enqueueRepositoryAnalysis: (url: string, userId: string) => {
-    const jobId = deterministicJobId('repo-analysis', `${userId}:${url}`)
-    return enqueue(QUEUE_NAMES.REPOSITORY_ANALYSIS, 'analyze-repository', { url, userId }, jobId)
+  enqueueRepositoryAnalysis: (url: string, userId: string, force: boolean = false) => {
+    let jobKey = `${userId}:${url}`
+    if (force) jobKey += ':force'
+    const jobId = deterministicJobId('repo-analysis', jobKey)
+    return enqueue(QUEUE_NAMES.REPOSITORY_ANALYSIS, 'analyze-repository', { url, userId, force }, jobId)
   },
 
   enqueueContributorAnalysis: (userId: string) => {

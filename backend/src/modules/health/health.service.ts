@@ -1,5 +1,6 @@
 import { prisma } from '../../utils/prisma'
-import { redisClient } from '../../app'
+import { redisClient } from '../../utils/redis-client'
+import { neo4jDriver } from '../../utils/neo4j'
 
 interface DependencyStatus {
   status: 'UP' | 'DOWN'
