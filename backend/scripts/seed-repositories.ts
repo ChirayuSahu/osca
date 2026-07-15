@@ -31,6 +31,10 @@ const SEED_REPOS: string[] = [
   'tailwindlabs/tailwindcss',
   'denoland/deno',
   'nodejs/node',
+  'reduxjs/redux',
+  'mui/material-ui',
+  'ant-design/ant-design',
+  'socketio/socket.io',
 
   // Python
   'django/django',
@@ -41,11 +45,14 @@ const SEED_REPOS: string[] = [
   'scikit-learn/scikit-learn',
   'pytorch/pytorch',
   'keras-team/keras',
+  'celery/celery',
+  'home-assistant/core',
 
   // Go
   'golang/go',
   'gin-gonic/gin',
   'gofiber/fiber',
+  'gohugoio/hugo',
 
   // Rust
   'rust-lang/rust',
@@ -63,13 +70,33 @@ const SEED_REPOS: string[] = [
   'quarkusio/quarkus',
   'JetBrains/kotlin',
   'square/retrofit',
+  'elastic/elasticsearch',
+  'apache/kafka',
+
+  // C / C++ / Systems
+  'torvalds/linux',
+  'microsoft/vscode',
+  'apple/swift',
+  'bitcoin/bitcoin',
+  'opencv/opencv',
+  'obsproject/obs-studio',
+  'godotengine/godot',
+  'electron/electron',
+
+  // Graphics / Data Viz
+  'mrdoob/three.js',
+  'd3/d3',
+
+  // AI / ML
+  'huggingface/transformers',
+  'langchain-ai/langchain',
 
   // Mobile
   'flutter/flutter',
   'facebook/react-native',
   'ionic-team/ionic-framework',
 
-  // Infra / DevOps
+  // Infra / DevOps / DB
   'kubernetes/kubernetes',
   'helm/helm',
   'hashicorp/terraform',
@@ -79,7 +106,9 @@ const SEED_REPOS: string[] = [
   'grafana/grafana',
   'redis/redis',
   'meilisearch/meilisearch',
-  'mongodb/node-mongodb-native'
+  'mongodb/node-mongodb-native',
+  'supabase/supabase',
+  'RocketChat/Rocket.Chat'
 ]
 
 const main = async () => {
