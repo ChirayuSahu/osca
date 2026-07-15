@@ -47,41 +47,76 @@ const SEED_REPOS: string[] = [
   'keras-team/keras',
   'celery/celery',
   'home-assistant/core',
+  'ansible/ansible',
+  'jupyter/notebook',
+  'matplotlib/matplotlib',
 
   // Go
   'golang/go',
   'gin-gonic/gin',
   'gofiber/fiber',
   'gohugoio/hugo',
+  'moby/moby',
+  'etcd-io/etcd',
+  'grpc/grpc-go',
 
   // Rust
   'rust-lang/rust',
   'tokio-rs/tokio',
   'actix/actix-web',
+  'bevyengine/bevy',
+  'tauri-apps/tauri',
+  'clap-rs/clap',
 
-  // Ruby / PHP
+  // Ruby
   'rails/rails',
   'sinatra/sinatra',
+  'discourse/discourse',
+  'mastodon/mastodon',
+  'jekyll/jekyll',
+
+  // PHP
   'laravel/laravel',
   'symfony/symfony',
+  'woocommerce/woocommerce',
+  'wordpress/wordpress',
+  'guzzle/guzzle',
 
-  // JVM
+  // JVM (Java / Kotlin)
   'spring-projects/spring-boot',
   'quarkusio/quarkus',
   'JetBrains/kotlin',
   'square/retrofit',
   'elastic/elasticsearch',
   'apache/kafka',
+  'apache/spark',
+  'ReactiveX/RxJava',
+
+  // C# / .NET
+  'dotnet/aspnetcore',
+  'dotnet/efcore',
+  'AutoMapper/AutoMapper',
+  'SignalR/SignalR',
 
   // C / C++ / Systems
   'torvalds/linux',
   'microsoft/vscode',
-  'apple/swift',
   'bitcoin/bitcoin',
   'opencv/opencv',
   'obsproject/obs-studio',
   'godotengine/godot',
   'electron/electron',
+  'protocolbuffers/protobuf',
+  'nlohmann/json',
+  'tesseract-ocr/tesseract',
+
+  // Mobile / Swift / Objective-C
+  'apple/swift',
+  'flutter/flutter',
+  'facebook/react-native',
+  'ionic-team/ionic-framework',
+  'Alamofire/Alamofire',
+  'ReactiveX/RxSwift',
 
   // Graphics / Data Viz
   'mrdoob/three.js',
@@ -91,16 +126,10 @@ const SEED_REPOS: string[] = [
   'huggingface/transformers',
   'langchain-ai/langchain',
 
-  // Mobile
-  'flutter/flutter',
-  'facebook/react-native',
-  'ionic-team/ionic-framework',
-
   // Infra / DevOps / DB
   'kubernetes/kubernetes',
   'helm/helm',
   'hashicorp/terraform',
-  'ansible/ansible',
   'docker/compose',
   'prometheus/prometheus',
   'grafana/grafana',
