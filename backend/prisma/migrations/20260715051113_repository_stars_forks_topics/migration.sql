@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Repository" ADD COLUMN     "forks" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "openIssuesCount" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "stars" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "topics" TEXT[];

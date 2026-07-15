@@ -1,12 +1,9 @@
 import { getGithubAccessToken, fetchGithub, fetchGithubWithAccept } from '../../lib/github'
+import { VALID_REACTIONS, ReactionContent, isValidReaction } from '../../lib/github/utils/constants'
+
+export { isValidReaction }
 
 const REACTIONS_ACCEPT = 'application/vnd.github.squirrel-girl-preview+json'
-
-const VALID_REACTIONS = ['+1', '-1', 'laugh', 'hooray', 'confused', 'heart', 'rocket', 'eyes'] as const
-type ReactionContent = typeof VALID_REACTIONS[number]
-
-export const isValidReaction = (content: string): content is ReactionContent =>
-  (VALID_REACTIONS as readonly string[]).includes(content)
 
 const listPulls = async (userId: string, owner: string, repo: string, page: number, limit: number) => {
   const token = await getGithubAccessToken(userId)
@@ -70,27 +67,6 @@ const listPullReactions = async (userId: string, owner: string, repo: string, pu
   return response.json()
 }
 
-const addPullReaction = async (userId: string, owner: string, repo: string, pullNumber: number, content: ReactionContent) => {
-  const token = await getGithubAccessToken(userId)
-  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${pullNumber}/reactions`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ content }),
-    accept: REACTIONS_ACCEPT
-  })
-  return response.json()
-}
-
-const deletePullReaction = async (userId: string, owner: string, repo: string, pullNumber: number, reactionId: number) => {
-  const token = await getGithubAccessToken(userId)
-  await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${pullNumber}/reactions/${reactionId}`, {
-    method: 'DELETE',
-    token,
-    accept: REACTIONS_ACCEPT
-  })
-  return { success: true }
-}
-
 const listPullCommentReactions = async (userId: string, owner: string, repo: string, commentId: number) => {
   const token = await getGithubAccessToken(userId)
   const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
@@ -100,25 +76,68 @@ const listPullCommentReactions = async (userId: string, owner: string, repo: str
   return response.json()
 }
 
-const addPullCommentReaction = async (userId: string, owner: string, repo: string, commentId: number, content: ReactionContent) => {
+const togglePullReaction = async (userId: string, owner: string, repo: string, pullNumber: number, content: ReactionContent) => {
   const token = await getGithubAccessToken(userId)
-  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
+
+  const listRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${pullNumber}/reactions`, {
+    token,
+    accept: REACTIONS_ACCEPT
+  })
+  const reactions: any[] = await listRes.json()
+
+  const meRes = await fetchGithubWithAccept('/user', { token, accept: REACTIONS_ACCEPT })
+  const me: any = await meRes.json()
+  const existing = reactions.find((r) => r.content === content && r.user?.login === me.login)
+
+  if (existing) {
+    await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${pullNumber}/reactions/${existing.id}`, {
+      method: 'DELETE',
+      token,
+      accept: REACTIONS_ACCEPT
+    })
+    return { toggled: 'removed' as const, reactionId: existing.id }
+  }
+
+  const addRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${pullNumber}/reactions`, {
     method: 'POST',
     token,
     body: JSON.stringify({ content }),
     accept: REACTIONS_ACCEPT
   })
-  return response.json()
+  const reaction = await addRes.json()
+  return { toggled: 'added' as const, reaction }
 }
 
-const deletePullCommentReaction = async (userId: string, owner: string, repo: string, commentId: number, reactionId: number) => {
+const togglePullCommentReaction = async (userId: string, owner: string, repo: string, commentId: number, content: ReactionContent) => {
   const token = await getGithubAccessToken(userId)
-  await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions/${reactionId}`, {
-    method: 'DELETE',
+
+  const listRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
     token,
     accept: REACTIONS_ACCEPT
   })
-  return { success: true }
+  const reactions: any[] = await listRes.json()
+
+  const meRes = await fetchGithubWithAccept('/user', { token, accept: REACTIONS_ACCEPT })
+  const me: any = await meRes.json()
+  const existing = reactions.find((r) => r.content === content && r.user?.login === me.login)
+
+  if (existing) {
+    await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions/${existing.id}`, {
+      method: 'DELETE',
+      token,
+      accept: REACTIONS_ACCEPT
+    })
+    return { toggled: 'removed' as const, reactionId: existing.id }
+  }
+
+  const addRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ content }),
+    accept: REACTIONS_ACCEPT
+  })
+  const reaction = await addRes.json()
+  return { toggled: 'added' as const, reaction }
 }
 
 export const PullsService = {
@@ -127,9 +146,7 @@ export const PullsService = {
   listPullComments,
   createPullComment,
   listPullReactions,
-  addPullReaction,
-  deletePullReaction,
+  togglePullReaction,
   listPullCommentReactions,
-  addPullCommentReaction,
-  deletePullCommentReaction
+  togglePullCommentReaction
 }

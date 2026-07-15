@@ -11,5 +11,6 @@ export const getRedisConnectionOptions = (): ConnectionOptions => ({
   username: config.redis.username || 'default',
   password: config.redis.password,
   maxRetriesPerRequest: null,
+  enableOfflineQueue: false,
   ...(config.redis.tls ? { tls: {} } : {})
 })

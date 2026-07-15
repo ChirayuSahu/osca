@@ -15,12 +15,10 @@ router.delete('/:owner/:repo/comments/:commentId', authMiddleware, IssuesControl
 // ─── Reactions ───────────────────────────────────────────────────────────────
 // Issue reactions
 router.get('/:owner/:repo/:issueNumber/reactions', authMiddleware, IssuesController.listIssueReactions)
-router.post('/:owner/:repo/:issueNumber/reactions', authMiddleware, IssuesController.addIssueReaction)
-router.delete('/:owner/:repo/:issueNumber/reactions/:reactionId', authMiddleware, IssuesController.deleteIssueReaction)
+router.post('/:owner/:repo/:issueNumber/reactions', authMiddleware, IssuesController.toggleIssueReaction)
 
 // Issue comment reactions
 router.get('/:owner/:repo/comments/:commentId/reactions', authMiddleware, IssuesController.listIssueCommentReactions)
-router.post('/:owner/:repo/comments/:commentId/reactions', authMiddleware, IssuesController.addIssueCommentReaction)
-router.delete('/:owner/:repo/comments/:commentId/reactions/:reactionId', authMiddleware, IssuesController.deleteIssueCommentReaction)
+router.post('/:owner/:repo/comments/:commentId/reactions', authMiddleware, IssuesController.toggleIssueCommentReaction)
 
 export const issuesRouter = router

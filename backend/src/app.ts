@@ -16,6 +16,7 @@ import { feedRouter } from './modules/feed/route'
 import { interactionsRouter } from './modules/interactions/route'
 import { issuesRouter } from './modules/issues/route'
 import { pullsRouter } from './modules/pulls/route'
+import { reactionsRouter } from './modules/reactions/route'
 import { errorMiddleware, CustomError } from './middlewares/error.middleware'
 
 const app: Application = express()
@@ -26,7 +27,14 @@ const redisClient = new Redis({
   port: config.redis.port,
   username: config.redis.username || 'default',
   password: config.redis.password,
+  enableOfflineQueue: false,
   ...(config.redis.tls ? { tls: {} } : {})
+})
+
+redisClient.on('error', (err) => {
+  // Registering this handler (rather than leaving it unset) is what prevents
+  // ioredis's unhandled 'error' event from crashing the process — still log it.
+  console.error('[Redis] Connection error:', err.message)
 })
 
 // ─── CORS ─────────────────────────────────────────────────────────
@@ -50,10 +58,6 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    prefix: 'rl_global:',
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-  }),
   message: { success: false, message: 'Too many requests, please try again later.' }
 })
 
@@ -63,10 +67,6 @@ const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    prefix: 'rl_auth:',
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-  }),
   message: { success: false, message: 'Too many auth requests, please try again later.' }
 })
 
@@ -76,10 +76,6 @@ const jobLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    prefix: 'rl_job:',
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-  }),
   message: { success: false, message: 'Too many analysis requests, please slow down.' }
 })
 
@@ -108,6 +104,7 @@ app.use('/api/v1/feed', feedRouter)
 app.use('/api/v1/interactions', interactionsRouter)
 app.use('/api/v1/issues', issuesRouter)
 app.use('/api/v1/pulls', pullsRouter)
+app.use('/api/v1/reactions', reactionsRouter)
 
 // Apply tight limit on job-enqueue routes
 app.use('/api/v1/repositories', jobLimiter)

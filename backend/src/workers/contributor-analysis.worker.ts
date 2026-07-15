@@ -2,6 +2,8 @@ import { Worker, Job } from 'bullmq'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { ContributorAnalysisService } from '../services/contributor-analysis.service'
+import { Neo4jSyncService } from '../services/neo4j-sync.service'
+import { prisma } from '../utils/prisma'
 import type { ContributorAnalysisJobData, ContributorAnalysisJobResult } from '../types/jobs'
 
 const processContributorAnalysis = async (
@@ -16,6 +18,20 @@ const processContributorAnalysis = async (
     const skills = await ContributorAnalysisService.analyzeProfile(userId, async (percent, message) => {
       await job.updateProgress({ percent, message })
     })
+
+    // Sync to Neo4j
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, oauthAccounts: { where: { provider: 'github' } } }
+    })
+    
+    if (user && user.oauthAccounts[0]?.providerId) {
+      const githubId = parseInt(user.oauthAccounts[0].providerId, 10)
+      if (!isNaN(githubId)) {
+        await Neo4jSyncService.syncUser({ githubId, username: user.username })
+        await Neo4jSyncService.syncUserSkills(githubId, skills)
+      }
+    }
 
     console.log(`[ContributorWorker] Job ${job.id} complete — ${skills.length} skills extracted`)
     return {

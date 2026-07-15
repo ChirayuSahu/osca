@@ -53,9 +53,13 @@ model Repository {
   languages       Json?
   frameworks      String[]
   techStack       String[]
+  topics          String[]
   dependencies    Json?
   folderStructure Json?
   ciCd            String[]
+  stars           Int      @default(0)
+  forks           Int      @default(0)
+  openIssuesCount Int      @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   hidden          Boolean  @default(false)

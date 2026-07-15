@@ -1,6 +1,10 @@
 $kind: http-request
+name: List Pull Comments
 url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/comments?page=1&limit=10"
 method: GET
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
+queryParams:
+  page: "1"
+  limit: "10"
 order: 3000

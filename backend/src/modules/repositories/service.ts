@@ -45,8 +45,8 @@ const parseGithubLinkPagination = (
       try {
         const lastPage = parseInt(new URL(urlMatch[1]).searchParams.get('page') ?? '1', 10)
         return { total: lastPage * limit, totalPages: lastPage }
-      } catch {
-        // fall through
+      } catch (err) {
+        console.error('[RepositoryService] Failed to parse "last" Link header page:', err)
       }
     }
   }
@@ -58,8 +58,8 @@ const parseGithubLinkPagination = (
       try {
         const prevPage = parseInt(new URL(urlMatch[1]).searchParams.get('page') ?? '0', 10)
         return { total: prevPage * limit + currentCount, totalPages: prevPage + 1 }
-      } catch {
-        // fall through
+      } catch (err) {
+        console.error('[RepositoryService] Failed to parse "prev" Link header page:', err)
       }
     }
   }

@@ -1,0 +1,7 @@
+$kind: http-request
+name: List Pull Comment Reactions
+url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/comments/{{comment_id}}/reactions"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 4000

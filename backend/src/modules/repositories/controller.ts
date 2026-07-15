@@ -161,8 +161,8 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
 
       try {
         treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}?recursive=1`, account.accessToken)
-      } catch {
-        console.warn(`[RepoPreview] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow.`)
+      } catch (err) {
+        console.warn(`[RepoPreview] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow.`, err)
         treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}`, account.accessToken)
         isShallow = true
       }
@@ -239,7 +239,16 @@ const listRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, 
 
   const [total, repos] = await Promise.all([
     prisma.repository.count({ where: { hidden: false } }),
-    prisma.repository.findMany({ where: { hidden: false }, skip, take })
+    prisma.repository.findMany({
+      where: { hidden: false },
+      skip,
+      take,
+      omit: {
+        folderStructure: true,
+        dependencies: true,
+        ciCd: false
+      }
+    })
   ])
 
   sendResponse(res, 200, true, 'Repositories retrieved successfully', repos, {

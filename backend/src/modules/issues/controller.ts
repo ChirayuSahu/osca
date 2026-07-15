@@ -118,40 +118,6 @@ const listIssueReactions = asyncHandler(async (req: RequestWithUser, res: Respon
   }
 })
 
-const addIssueReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id
-    const owner = String(req.params.owner)
-    const repo = String(req.params.repo)
-    const issueNumber = parseInt(String(req.params.issueNumber), 10)
-    const { content } = req.body
-
-    if (!content || !isValidReaction(content)) {
-      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
-    }
-
-    const reaction = await IssuesService.addIssueReaction(userId, owner, repo, issueNumber, content)
-    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
-  } catch (error) {
-    next(error)
-  }
-})
-
-const deleteIssueReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id
-    const owner = String(req.params.owner)
-    const repo = String(req.params.repo)
-    const issueNumber = parseInt(String(req.params.issueNumber), 10)
-    const reactionId = parseInt(String(req.params.reactionId), 10)
-
-    await IssuesService.deleteIssueReaction(userId, owner, repo, issueNumber, reactionId)
-    sendResponse(res, 200, true, 'Reaction removed successfully')
-  } catch (error) {
-    next(error)
-  }
-})
-
 const listIssueCommentReactions = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id
@@ -166,7 +132,26 @@ const listIssueCommentReactions = asyncHandler(async (req: RequestWithUser, res:
   }
 })
 
-const addIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+const toggleIssueReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const issueNumber = parseInt(String(req.params.issueNumber), 10)
+    const { content } = req.body
+
+    if (!content || !isValidReaction(content)) {
+      throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
+    }
+
+    const result = await IssuesService.toggleIssueReaction(userId, owner, repo, issueNumber, content)
+    sendResponse(res, 200, true, `Reaction ${result.toggled}`, result)
+  } catch (error) {
+    next(error)
+  }
+})
+
+const toggleIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
   try {
     const userId = req.user!.id
     const owner = String(req.params.owner)
@@ -178,23 +163,8 @@ const addIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res: R
       throw new AppError('Invalid reaction. Must be one of: +1, -1, laugh, hooray, confused, heart, rocket, eyes', 400)
     }
 
-    const reaction = await IssuesService.addIssueCommentReaction(userId, owner, repo, commentId, content)
-    sendResponse(res, 201, true, 'Reaction added successfully', reaction)
-  } catch (error) {
-    next(error)
-  }
-})
-
-const deleteIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.user!.id
-    const owner = String(req.params.owner)
-    const repo = String(req.params.repo)
-    const commentId = parseInt(String(req.params.commentId), 10)
-    const reactionId = parseInt(String(req.params.reactionId), 10)
-
-    await IssuesService.deleteIssueCommentReaction(userId, owner, repo, commentId, reactionId)
-    sendResponse(res, 200, true, 'Reaction removed successfully')
+    const result = await IssuesService.toggleIssueCommentReaction(userId, owner, repo, commentId, content)
+    sendResponse(res, 200, true, `Reaction ${result.toggled}`, result)
   } catch (error) {
     next(error)
   }
@@ -208,9 +178,7 @@ export const IssuesController = {
   createIssueComment,
   deleteIssueComment,
   listIssueReactions,
-  addIssueReaction,
-  deleteIssueReaction,
+  toggleIssueReaction,
   listIssueCommentReactions,
-  addIssueCommentReaction,
-  deleteIssueCommentReaction
+  toggleIssueCommentReaction
 }

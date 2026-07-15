@@ -29,5 +29,19 @@ export const config = {
     username: process.env.REDIS_USERNAME || 'default',
     password: process.env.REDIS_PASSWORD || undefined,
     tls: process.env.REDIS_TLS === 'true'
+  },
+  neo4j: {
+    uri: process.env.NEO4J_URI ?? 'bolt://localhost:7687',
+    user: process.env.NEO4J_USER ?? 'neo4j',
+    password: process.env.NEO4J_PASSWORD ?? 'password',
+    database: process.env.NEO4J_DATABASE || 'neo4j'
+  },
+  recommendation: {
+    // Weights for the feed's combined score: content (skill match) +
+    // collaborative (co-interaction) + topic similarity + normalized stars.
+    contentWeight: parseFloat(process.env.RECOMMENDATION_CONTENT_WEIGHT ?? '0.45'),
+    collabWeight: parseFloat(process.env.RECOMMENDATION_COLLAB_WEIGHT ?? '0.3'),
+    topicWeight: parseFloat(process.env.RECOMMENDATION_TOPIC_WEIGHT ?? '0.2'),
+    starsWeight: parseFloat(process.env.RECOMMENDATION_STARS_WEIGHT ?? '0.05')
   }
 }

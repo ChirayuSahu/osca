@@ -1,6 +1,6 @@
 $kind: http-request
-name: Queue Analysis
-url: "{{BASE_URL}}/api/v1/repositories/analyze"
+name: Toggle Pull Comment Reaction
+url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/comments/{{comment_id}}/reactions"
 method: POST
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
@@ -9,6 +9,6 @@ body:
   type: json
   content: |-
     {
-      "url": "https://github.com/docker/cli"
+      "content": "+1"
     }
-order: 2000
+order: 4000

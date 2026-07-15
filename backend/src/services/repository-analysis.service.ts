@@ -28,9 +28,13 @@ interface RepoAnalysis {
   languages: Record<string, number>
   frameworks: string[]
   techStack: string[]
+  topics: string[]
   ciCd: string[]
   folderStructure: any
   dependencies: any
+  stars: number
+  forks: number
+  openIssuesCount: number
 }
 
 interface GithubRepoResponse {
@@ -81,6 +85,95 @@ interface GithubTreeResponse {
 
 // CI_FILES replaced by CI_CD_FILE_MAP from constants
 
+/**
+ * Fetches the complete recursive file tree for a repository.
+ *
+ * Strategy:
+ *   1. Try GET /git/trees/{branch}?recursive=1  (single request, fast path)
+ *   2. If GitHub truncates it (>100k entries), fall back to:
+ *      a. Fetch the root tree (non-recursive) to enumerate top-level dirs
+ *      b. Fetch each top-level directory's subtree with ?recursive=1 in parallel
+ *      c. Prefix nested entries with the parent dir path and merge
+ *   3. If a subtree is also truncated, keep what we have and warn.
+ */
+const fetchFullTree = async (
+  owner: string,
+  repo: string,
+  branch: string,
+  token: string
+): Promise<GithubTreeResponse['tree']> => {
+  const repoPath = `/repos/${owner}/${repo}`
+
+  // ── Fast path ────────────────────────────────────────────────────────────
+  let fullTree: GithubTreeResponse | null = null
+  try {
+    fullTree = await githubGetJson<GithubTreeResponse>(
+      `${repoPath}/git/trees/${branch}?recursive=1`,
+      token
+    )
+  } catch (err: any) {
+    console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo} (${err?.message}), falling back to subtree fetching.`)
+  }
+
+  if (fullTree && !fullTree.truncated) {
+    console.log(`[RepoService] Full recursive tree fetched (${fullTree.tree.length} entries).`)
+    return fullTree.tree
+  }
+
+  // ── Truncated path ───────────────────────────────────────────────────────
+  console.warn(
+    `[RepoService] Tree truncated or fetch failed for ${owner}/${repo}. ` +
+    `Fetching subtrees per top-level directory...`
+  )
+
+  // Step 1: Get root tree (non-recursive) — always fast
+  const rootTree = await githubGetJson<GithubTreeResponse>(
+    `${repoPath}/git/trees/${branch}`,
+    token
+  )
+
+  const allEntries: GithubTreeResponse['tree'] = [...rootTree.tree]
+
+  // Step 2: For every top-level directory, fetch its full subtree
+  const topLevelDirs = rootTree.tree.filter(
+    (node) => node.type === 'tree' && !IGNORED_DIRS.has(node.path)
+  )
+
+  const subtreeResults = await Promise.allSettled(
+    topLevelDirs.map(async (dir) => {
+      const sub = await githubGetJson<GithubTreeResponse>(
+        `/repos/${owner}/${repo}/git/trees/${dir.sha}?recursive=1`,
+        token
+      )
+
+      if (sub.truncated) {
+        console.warn(
+          `[RepoService] Subtree also truncated: ${dir.path}/ — keeping partial results.`
+        )
+      }
+
+      // Prefix every nested entry with the parent directory path
+      return sub.tree.map((node) => ({
+        ...node,
+        path: `${dir.path}/${node.path}`
+      }))
+    })
+  )
+
+  for (const result of subtreeResults) {
+    if (result.status === 'fulfilled') {
+      allEntries.push(...result.value)
+    } else {
+      console.warn(`[RepoService] Failed to fetch a subtree:`, result.reason)
+    }
+  }
+
+  console.log(
+    `[RepoService] Assembled tree from ${topLevelDirs.length} subtrees: ${allEntries.length} total entries.`
+  )
+  return allEntries
+}
+
 const analyzeRepository = async (
   url: string,
   userId: string,
@@ -102,17 +195,7 @@ const analyzeRepository = async (
     }
   })
 
-  // Only skip if the repo has been fully analyzed (has folder structure AND frameworks/ciCd populated)
-  const fs = existingRepo?.folderStructure
-  const hasFullAnalysis = existingRepo &&
-    Array.isArray(fs) && fs.length > 0 &&
-    (existingRepo.frameworks.length > 0 || existingRepo.ciCd.length > 0)
-
-  if (hasFullAnalysis) {
-    console.log(`[RepoService] Repository ${fullName} already fully analyzed. Skipping.`)
-    await onProgress(100, 'Repository already analyzed.')
-    return existingRepo
-  }
+  // User requested to re-analyze even if the repository exists, so we proceed without early exit.
 
   await onProgress(8, 'Fetching user credentials...')
   const accessToken = await getGithubAccessToken(userId)
@@ -134,43 +217,54 @@ const analyzeRepository = async (
     ? analysis.dependencies
     : undefined
 
-  const saved = await prisma.repository.upsert({
-    where: { 
-      provider_fullName: {
-        provider: 'github',
-        fullName: analysis.fullName
-      }
-    },
-    update: {
-      name: analysis.name,
-      owner: analysis.owner,
-      description: analysis.description,
-      url: analysis.url,
-      provider: 'github',
-      githubId: analysis.githubId,
-      languages: analysis.languages,
-      frameworks: analysis.frameworks,
-      techStack: analysis.techStack,
-      ciCd: analysis.ciCd,
-      ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
-      ...(persistDependencies !== undefined && { dependencies: persistDependencies })
-    },
-    create: {
-      name: analysis.name,
-      owner: analysis.owner,
-      fullName: analysis.fullName,
-      description: analysis.description,
-      url: analysis.url,
-      provider: 'github',
-      githubId: analysis.githubId,
-      languages: analysis.languages,
-      frameworks: analysis.frameworks,
-      techStack: analysis.techStack,
-      ciCd: analysis.ciCd,
-      ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
-      ...(persistDependencies !== undefined && { dependencies: persistDependencies })
-    }
+  const repoData = {
+    name: analysis.name,
+    owner: analysis.owner,
+    fullName: analysis.fullName,
+    description: analysis.description,
+    url: analysis.url,
+    provider: 'github',
+    githubId: analysis.githubId,
+    languages: analysis.languages,
+    frameworks: analysis.frameworks,
+    techStack: analysis.techStack,
+    topics: analysis.topics,
+    ciCd: analysis.ciCd,
+    stars: analysis.stars,
+    forks: analysis.forks,
+    openIssuesCount: analysis.openIssuesCount,
+    ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
+    ...(persistDependencies !== undefined && { dependencies: persistDependencies })
+  }
+
+  // 1. Try to find by githubId (best identifier, handles repo renames)
+  let targetRepo = await prisma.repository.findUnique({
+    where: { githubId: analysis.githubId }
   })
+
+  // 2. Fallback to provider_fullName in case githubId is missing
+  if (!targetRepo) {
+    targetRepo = await prisma.repository.findUnique({
+      where: { 
+        provider_fullName: {
+          provider: 'github',
+          fullName: analysis.fullName
+        }
+      }
+    })
+  }
+
+  let saved
+  if (targetRepo) {
+    saved = await prisma.repository.update({
+      where: { id: targetRepo.id },
+      data: repoData
+    })
+  } else {
+    saved = await prisma.repository.create({
+      data: repoData
+    })
+  }
 
   await onProgress(100, 'Repository analysis complete!')
   console.log(`[RepoService] Repository ${saved.fullName} successfully saved to database.`)
@@ -192,36 +286,37 @@ const analyzeGithubRepo = async (
   let languagesData: Record<string, number> = {}
   try {
     languagesData = await githubGetJson<Record<string, number>>(`${repoPath}/languages`, token)
-  } catch {
+  } catch (err) {
+    console.error(`[RepoService] Failed to fetch languages for ${owner}/${repo}:`, err)
     languagesData = {}
+  }
+
+  let topics: string[] = []
+  try {
+    const topicsRes = await githubGetJson<{ names: string[] }>(`${repoPath}/topics`, token)
+    topics = topicsRes.names || []
+  } catch (err) {
+    console.error(`[RepoService] Failed to fetch topics for ${owner}/${repo}:`, err)
+    topics = []
   }
 
   await onProgress(25, 'Fetching repository file tree for visual map...')
   let folderStructure: any = null
-  let isShallow = false
   try {
     const branch = repoData.default_branch || 'main'
-    let treeRes: GithubTreeResponse
-    
-    try {
-      treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}?recursive=1`, token)
-    } catch (err: any) {
-      console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow fetch.`)
-      treeRes = await githubGetJson<GithubTreeResponse>(`${repoPath}/git/trees/${branch}`, token)
-      isShallow = true
-    }
-    
-    // #21: Use shared constants from lib/github/utils/constants.ts
+    const rawTree = await fetchFullTree(owner, repo, branch, token)
 
-    folderStructure = treeRes.tree.filter(node => {
-      const parts = node.path.split('/')
-      if (parts.some(part => IGNORED_DIRS.has(part))) return false
-      const filename = parts[parts.length - 1]
-      if (IGNORED_FILES.has(filename)) return false
-      return true
-    })
+    if (rawTree.length > 0) {
+      folderStructure = rawTree.filter((node) => {
+        const parts = node.path.split('/')
+        if (parts.some((part) => IGNORED_DIRS.has(part))) return false
+        const filename = parts[parts.length - 1]
+        if (IGNORED_FILES.has(filename)) return false
+        return true
+      })
+    }
   } catch (err) {
-    console.error(`[RepoService] Tree fetch error (both recursive and shallow failed):`, err)
+    console.error(`[RepoService] Tree fetch error:`, err)
   }
 
   await onProgress(40, 'Detecting frameworks and tech stack...')
@@ -295,7 +390,7 @@ const analyzeGithubRepo = async (
         }
       }
     `
-    const depRes = await githubGraphQL<GithubDependencyGraphResponse>(query, token, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json')
+    const depRes = await githubGraphQL<GithubDependencyGraphResponse>(query, token, { owner, repo })
     dependenciesData = depRes.data?.repository?.dependencyGraphManifests?.nodes || []
     
     // Auto-detect frameworks from deep dependencies if missed by root scan
@@ -316,31 +411,6 @@ const analyzeGithubRepo = async (
     dependenciesData = fallbackDependencies
   }
 
-  if (isShallow && folderStructure && dependenciesData.length > 0) {
-    const existingPaths = new Set(folderStructure.map((n: any) => n.path));
-    dependenciesData.forEach((manifest: any) => {
-      let manifestPath = manifest.blobPath;
-      if (manifestPath.startsWith('/')) manifestPath = manifestPath.substring(1);
-      
-      const parts = manifestPath.split('/');
-      let currentPath = '';
-      for (let i = 0; i < parts.length; i++) {
-        currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`;
-        if (!existingPaths.has(currentPath)) {
-          existingPaths.add(currentPath);
-          folderStructure.push({
-            path: currentPath,
-            mode: '100644',
-            type: i === parts.length - 1 ? 'blob' : 'tree',
-            sha: 'dummy-sha-' + currentPath,
-            size: 100,
-            url: ''
-          });
-        }
-      }
-    });
-  }
-
   await onProgress(75, 'Repository tech stack analysis complete')
 
   return {
@@ -353,9 +423,13 @@ const analyzeGithubRepo = async (
     languages: languagesData,
     frameworks: Array.from(frameworks),
     techStack: Array.from(techStack),
+    topics,
     ciCd,
     folderStructure,
-    dependencies: dependenciesData
+    dependencies: dependenciesData,
+    stars: Number(repoData.stargazers_count) || 0,
+    forks: Number(repoData.forks_count) || 0,
+    openIssuesCount: Number(repoData.open_issues_count) || 0
   }
 }
 
