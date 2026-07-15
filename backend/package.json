@@ -10,8 +10,9 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
-    "backfill:neo4j": "ts-node --transpile-only scripts/backfill-neo4j-graph.ts",
-    "reanalyze": "ts-node --transpile-only scripts/reanalyze.ts",
+    "backfill:neo4j": "node dist/scripts/backfill-neo4j-graph.js",
+    "reanalyze": "node dist/scripts/reanalyze.js",
+    "cancel-jobs": "node dist/scripts/cancel-jobs.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

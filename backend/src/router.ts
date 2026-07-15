@@ -15,8 +15,8 @@ const router = Router()
 
 import { userRateLimiter, ipRateLimiter, authLimiter, jobLimiter } from './middlewares/rate-limit.middleware'
 
-router.use(userRateLimiter)
-router.use(ipRateLimiter)
+// router.use(userRateLimiter)
+// router.use(ipRateLimiter)
 
 router.use('/health', healthRouter)
 router.use('/auth', authLimiter, authRouter)

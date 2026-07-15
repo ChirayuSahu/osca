@@ -2,7 +2,6 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "Node16",
-    "rootDir": "./src",
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
@@ -10,5 +9,5 @@
     "moduleResolution": "node16",
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "scripts/**/*"]
 }
