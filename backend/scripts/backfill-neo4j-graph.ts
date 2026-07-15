@@ -8,16 +8,20 @@
  * signal is empty for them until this runs once. Safe to re-run — every
  * write here is a Neo4j MERGE.
  *
- * Does NOT reanalyze repositories or re-run full contributor analysis (skills,
- * tech stack, etc.) — it only backfills the STARRED / INTERACTED_WITH /
- * CONTRIBUTED_TO edges those flows would otherwise leave missing.
+ * Tech stack and skills re-analysis can now be triggered via the --repos flag.
  *
- * Usage: npm run backfill:neo4j
+ * Usage: 
+ *   npm run backfill:neo4j                   # Runs all backfills
+ *   npm run backfill:neo4j -- --interactions # Only backfill interactions
+ *   npm run backfill:neo4j -- --stars        # Only backfill starred repos
+ *   npm run backfill:neo4j -- --repos        # Only re-enqueue repo analysis
+ *   npm run backfill:neo4j -- --users        # Only re-enqueue user contributor analysis
  */
 import { prisma } from '../src/utils/prisma'
 import { neo4jDriver } from '../src/utils/neo4j'
 import { Neo4jSyncService } from '../src/services/neo4j-sync.service'
 import { ContributorAnalysisService } from '../src/services/contributor-analysis.service'
+import { JobEnqueueService } from '../src/services/job-enqueue.service'
 
 const backfillInteractions = async () => {
   const interactions = await prisma.userInteraction.findMany({
@@ -98,9 +102,59 @@ const backfillStarredRepos = async () => {
   console.log(`[Backfill] Starred repos: processed ${processed} users, skipped ${skipped} (no linked GitHub account)`)
 }
 
+const backfillRepositoryAnalysis = async () => {
+  const user = await prisma.user.findFirst()
+  if (!user) {
+    console.error('[Backfill] Cannot re-analyze repos: No user found in database to attach to jobs')
+    return
+  }
+
+  const repos = await prisma.repository.findMany({ select: { url: true, fullName: true } })
+  console.log(`[Backfill] Found ${repos.length} repositories to re-analyze`)
+
+  let enqueued = 0
+  for (const repo of repos) {
+    if (!repo.url) continue
+    try {
+      const job = await JobEnqueueService.enqueueRepositoryAnalysis(repo.url, user.id)
+      console.log(`[Backfill] Enqueued repo ${repo.fullName || repo.url} -> Queue: ${job.queue}, Job ID: ${job.jobId}${job.alreadyQueued ? ' (already queued)' : ''}`)
+      enqueued++
+    } catch (err) {
+      console.error(`[Backfill] Failed to enqueue repo ${repo.url}:`, err)
+    }
+  }
+  console.log(`[Backfill] Re-analyzed repos: enqueued ${enqueued} jobs`)
+}
+
+const backfillUserAnalysis = async () => {
+  const users = await prisma.user.findMany({ select: { id: true, username: true } })
+  console.log(`[Backfill] Found ${users.length} users to re-analyze`)
+
+  let enqueued = 0
+  for (const user of users) {
+    try {
+      const job = await JobEnqueueService.enqueueContributorAnalysis(user.id)
+      console.log(`[Backfill] Enqueued user ${user.username} -> Queue: ${job.queue}, Job ID: ${job.jobId}${job.alreadyQueued ? ' (already queued)' : ''}`)
+      enqueued++
+    } catch (err) {
+      console.error(`[Backfill] Failed to enqueue user ${user.username}:`, err)
+    }
+  }
+  console.log(`[Backfill] Re-analyzed users: enqueued ${enqueued} jobs`)
+}
+
 const main = async () => {
-  await backfillInteractions()
-  await backfillStarredRepos()
+  const args = process.argv.slice(2)
+  const runAll = args.length === 0 || args.includes('--all')
+  const runInteractions = runAll || args.includes('--interactions')
+  const runStars = runAll || args.includes('--stars')
+  const runRepos = runAll || args.includes('--repos')
+  const runUsers = runAll || args.includes('--users')
+
+  if (runInteractions) await backfillInteractions()
+  if (runStars) await backfillStarredRepos()
+  if (runRepos) await backfillRepositoryAnalysis()
+  if (runUsers) await backfillUserAnalysis()
 
   console.log('[Backfill] Done.')
 
@@ -108,7 +162,11 @@ const main = async () => {
   await prisma.$disconnect()
 }
 
-main().catch((err) => {
-  console.error('[Backfill] Fatal error:', err)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    process.exit(0)
+  })
+  .catch((err) => {
+    console.error('[Backfill] Fatal error:', err)
+    process.exit(1)
+  })
