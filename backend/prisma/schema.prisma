@@ -78,6 +78,7 @@ model ContributorProfile {
   activityScore        Float    @default(0.0)
   diversityScore       Float    @default(0.0)
   qualityScore         Float    @default(0.0)
+  networkScore         Float    @default(0.0)
   overallScore         Float    @default(0.0)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

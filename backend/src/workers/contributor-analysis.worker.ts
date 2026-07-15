@@ -15,21 +15,24 @@ const processContributorAnalysis = async (
 
   // #E-6: Explicit try/catch so we can log context before rethrowing to BullMQ
   try {
-    const skills = await ContributorAnalysisService.analyzeProfile(userId, async (percent, message) => {
+    const analyzed = await ContributorAnalysisService.analyzeProfile(userId, async (percent, message) => {
       await job.updateProgress({ percent, message })
     })
 
-    // Sync to Neo4j
+    // Sync to Neo4j before scoring, so finalizeContributorProfile can read
+    // this user's up-to-date graph footprint.
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { username: true, oauthAccounts: { where: { provider: 'github' } } }
     })
-    
+
+    let githubId: number | null = null
     if (user && user.oauthAccounts[0]?.providerId) {
-      const githubId = parseInt(user.oauthAccounts[0].providerId, 10)
-      if (!isNaN(githubId)) {
+      const parsedId = parseInt(user.oauthAccounts[0].providerId, 10)
+      if (!isNaN(parsedId)) {
+        githubId = parsedId
         await Neo4jSyncService.syncUser({ githubId, username: user.username })
-        await Neo4jSyncService.syncUserSkills(githubId, skills)
+        await Neo4jSyncService.syncUserSkills(githubId, analyzed.skills)
 
         try {
           const starredCount = await ContributorAnalysisService.syncStarredRepositories(userId, githubId, user.username)
@@ -40,11 +43,15 @@ const processContributorAnalysis = async (
       }
     }
 
-    console.log(`[ContributorWorker] Job ${job.id} complete — ${skills.length} skills extracted`)
+    await job.updateProgress({ percent: 98, message: 'Scoring profile from graph data...' })
+    const overallScore = await ContributorAnalysisService.finalizeContributorProfile(userId, githubId, analyzed)
+    await job.updateProgress({ percent: 100, message: 'Profile analysis complete!' })
+
+    console.log(`[ContributorWorker] Job ${job.id} complete — ${analyzed.skills.length} skills extracted, overall score ${overallScore.toFixed(1)}`)
     return {
       userId,
-      skillCount: skills.length,
-      skills
+      skillCount: analyzed.skills.length,
+      skills: analyzed.skills
     }
   } catch (error) {
     console.error(`[ContributorWorker] Job ${job.id} failed for user ${userId}:`, error)

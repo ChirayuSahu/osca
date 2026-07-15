@@ -180,10 +180,26 @@ const fetchAdvancedStats = async (token: string) => {
   }
 }
 
+export interface AnalyzedProfile {
+  skills: Skill[]
+  baseScores: {
+    avgSkillScore: number
+    activityScore: number
+    qualityScore: number
+    diversityScore: number
+  }
+  contributionHistory: Prisma.InputJsonValue | null
+  repositoryExperience: Prisma.InputJsonValue
+}
+
+// Extracts skills and computes GitHub-API-only scores. Deliberately stops short
+// of persisting the contributor profile: scoring is finished (and the graph
+// stats folded in) by finalizeContributorProfile, which needs to run *after*
+// this user's edges have been synced into Neo4j.
 const analyzeProfile = async (
   userId: string,
   onProgress: ProgressCallback = noopProgress
-): Promise<Skill[]> => {
+): Promise<AnalyzedProfile> => {
   await onProgress(5, 'Fetching user profile from database...')
 
   const user = await prisma.user.findUnique({ where: { id: userId } })
@@ -238,14 +254,12 @@ const analyzeProfile = async (
     qualityScore = Math.min(100, baseQuality * sizeModifier)
   }
 
-  // 4. Diversity Scope (8 pts per skill)
+  // 4. Diversity Scope (8 pts per skill) — later blended with graph-derived
+  // language/framework/topic spread in finalizeContributorProfile.
   const diversityScore = Math.min(100, skills.length * 8)
 
-  // 5. Overall Score (Weighted Average: Skill 40%, Quality 30%, Activity 20%, Diversity 10%)
-  const overallScore = (avgSkillScore * 0.40) + (qualityScore * 0.30) + (activityScore * 0.20) + (diversityScore * 0.10)
-
   const repositoryExperience = toContributorExperience(skills)
-  
+
   // Construct contribution history object
   const contributionHistory = advancedStats ? {
     linesAdded: advancedStats.linesAdded,
@@ -254,38 +268,81 @@ const analyzeProfile = async (
     totalCommits: advancedStats.totalCommits
   } : null
 
-  await prisma.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: userId },
-      data: { skills: skillNames }
-    })
-
-    await tx.contributorProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        skillScore: avgSkillScore,
-        activityScore,
-        qualityScore,
-        diversityScore,
-        overallScore,
-        repositoryExperience,
-        contributionHistory: contributionHistory || Prisma.JsonNull
-      },
-      update: {
-        skillScore: avgSkillScore,
-        activityScore,
-        qualityScore,
-        diversityScore,
-        overallScore,
-        repositoryExperience,
-        contributionHistory: contributionHistory || Prisma.JsonNull
-      }
-    })
+  await prisma.user.update({
+    where: { id: userId },
+    data: { skills: skillNames }
   })
 
-  await onProgress(100, 'Profile analysis complete!')
-  return skills
+  await onProgress(95, 'Base profile computed, syncing to graph...')
+
+  return {
+    skills,
+    baseScores: { avgSkillScore, activityScore, qualityScore, diversityScore },
+    contributionHistory,
+    repositoryExperience
+  }
+}
+
+// Runs after this user's skills/stars have been synced into Neo4j (by the
+// worker), so the graph reflects their current state. Blends graph-derived
+// signals into the GitHub-API-only base scores and persists the final profile.
+const finalizeContributorProfile = async (
+  userId: string,
+  githubId: number | null,
+  analyzed: AnalyzedProfile
+): Promise<number> => {
+  const graphStats = githubId != null
+    ? await Neo4jSyncService.getContributorGraphStats(githubId)
+    : { repoCount: 0, languageCount: 0, frameworkCount: 0, topicCount: 0, avgStars: 0, maxStars: 0, collaboratorCount: 0 }
+
+  const { avgSkillScore } = analyzed.baseScores
+
+  // Diversity: blend the flat skill-count score with the distinct
+  // Language/Framework/Topic spread across every repo the user is connected
+  // to in the graph (owned, starred, or contributed to) — a footprint wider
+  // than the subset of repos analyzed in this run.
+  const graphDiversityScore = Math.min(100, (graphStats.languageCount + graphStats.frameworkCount + graphStats.topicCount) * 5)
+  const diversityScore = Math.min(100, (analyzed.baseScores.diversityScore * 0.5) + (graphDiversityScore * 0.5))
+
+  // Quality: small bonus for contributing to repos the graph shows as
+  // well-regarded (highly starred), on top of the review-ratio/PR-size heuristic.
+  const starsBonus = Math.min(10, Math.log10(graphStats.avgStars + 1) * 4)
+  const qualityScore = Math.min(100, analyzed.baseScores.qualityScore + starsBonus)
+
+  // Activity: bonus for breadth of distinct repos touched, per the graph.
+  const repoBreadthBonus = Math.min(10, Math.log10(graphStats.repoCount + 1) * 8)
+  const activityScore = Math.min(100, analyzed.baseScores.activityScore + repoBreadthBonus)
+
+  // Network: log-scaled reach of distinct collaborators who share a repo
+  // (owned/starred/contributed-to) with this user in the graph.
+  const networkScore = Math.min(100, Math.log10(graphStats.collaboratorCount + 1) * 40)
+
+  // Overall Score (Weighted Average: Skill 35%, Quality 25%, Activity 20%, Diversity 10%, Network 10%)
+  const overallScore =
+    (avgSkillScore * 0.35) +
+    (qualityScore * 0.25) +
+    (activityScore * 0.20) +
+    (diversityScore * 0.10) +
+    (networkScore * 0.10)
+
+  const scores = {
+    skillScore: avgSkillScore,
+    activityScore,
+    qualityScore,
+    diversityScore,
+    networkScore,
+    overallScore,
+    repositoryExperience: analyzed.repositoryExperience,
+    contributionHistory: analyzed.contributionHistory ?? Prisma.JsonNull
+  }
+
+  await prisma.contributorProfile.upsert({
+    where: { userId },
+    create: { userId, ...scores },
+    update: scores
+  })
+
+  return overallScore
 }
 
 const analyzeGithubProfile = async (
@@ -353,5 +410,6 @@ const analyzeGithubProfile = async (
 
 export const ContributorAnalysisService = {
   analyzeProfile,
+  finalizeContributorProfile,
   syncStarredRepositories
 }
