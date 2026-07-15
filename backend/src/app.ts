@@ -27,7 +27,13 @@ const redisClient = new Redis({
   port: config.redis.port,
   username: config.redis.username || 'default',
   password: config.redis.password,
+  enableOfflineQueue: false,
   ...(config.redis.tls ? { tls: {} } : {})
+})
+
+redisClient.on('error', (err) => {
+  // Catch Redis connection errors silently to prevent unhandled exception crashes
+  // console.error('[Redis] Connection Error:', err.message)
 })
 
 // ─── CORS ─────────────────────────────────────────────────────────
@@ -51,10 +57,6 @@ const globalLimiter = rateLimit({
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    prefix: 'rl_global:',
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-  }),
   message: { success: false, message: 'Too many requests, please try again later.' }
 })
 
@@ -64,10 +66,6 @@ const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    prefix: 'rl_auth:',
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-  }),
   message: { success: false, message: 'Too many auth requests, please try again later.' }
 })
 
@@ -77,10 +75,6 @@ const jobLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    prefix: 'rl_job:',
-    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-  }),
   message: { success: false, message: 'Too many analysis requests, please slow down.' }
 })
 
