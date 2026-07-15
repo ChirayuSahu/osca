@@ -27,6 +27,7 @@
     "express-rate-limit": "^8.5.2",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
+    "neo4j-driver": "^6.2.0",
     "pg": "^8.22.0",
     "rate-limit-redis": "^5.0.0",
     "swagger-ui-express": "^5.0.1",

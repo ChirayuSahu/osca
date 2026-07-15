@@ -3,9 +3,11 @@ import app from './app'
 import { prisma } from './utils/prisma'
 import { initWorkers, shutdownWorkers } from './workers'
 import { closeAllQueues } from './config/queue'
+import { initNeo4j, neo4jDriver } from './utils/neo4j'
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, async () => {
   console.log(`Server running in ${config.nodeEnv} mode on port ${config.port}`)
+  await initNeo4j()
   initWorkers()
 })
 
@@ -15,6 +17,7 @@ const gracefulShutdown = async () => {
     await shutdownWorkers()
     await closeAllQueues()
     await prisma.$disconnect()
+    await neo4jDriver.close()
     server.close(() => {
       console.log('HTTP server closed')
       process.exit(0)
