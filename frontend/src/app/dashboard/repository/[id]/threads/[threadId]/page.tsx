@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ThreadService } from "@/services/thread.service";
 import { RepositoryService } from "@/services/repository.service";
-import { ArrowLeft, MessageSquare, Share2, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, MessageSquare, Share2, MoreHorizontal, GitPullRequest } from "lucide-react";
 
 function getRelativeTime(dateString: string | Date | number) {
   const date = new Date(dateString);
@@ -48,6 +48,8 @@ export default function ThreadPage() {
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [repoDetails, setRepoDetails] = useState<{owner: string, name: string} | null>(null);
   const [relatedThreads, setRelatedThreads] = useState<ThreadDetail[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [prData, setPrData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isUpvoted, setIsUpvoted] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -64,6 +66,16 @@ export default function ThreadPage() {
 
         const threadRes = await ThreadService.getThread(owner, repo, threadId, token);
         setThread(threadRes.data);
+
+        if (threadRes.data?.pull_request) {
+          try {
+            const prRes = await ThreadService.getPull(owner, repo, threadId, token);
+            // Handling both formats { data: ... } or just raw object
+            setPrData(prRes.data || prRes);
+          } catch (e) {
+            console.error("Failed to fetch PR data", e);
+          }
+        }
 
         // Fetch related threads (using recent threads for now)
         const allThreadsRes = await ThreadService.listThreads(owner, repo, token, 1);
@@ -128,6 +140,19 @@ export default function ThreadPage() {
             <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-snug mb-3">
               {thread.title}
             </h1>
+
+            {prData && (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <GitPullRequest className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <span className="text-neutral-300 font-medium">
+                    <span className="text-emerald-400 font-semibold">{thread.user?.login}</span> wants to merge <span className="text-white font-semibold">{prData.commits || prData.commits_url ? 'some' : '0'}</span> commits into <code className="px-1.5 py-0.5 rounded bg-black/40 text-neutral-300 text-xs border border-white/10">{prData.base?.ref || prData.base?.label || 'base'}</code> from <code className="px-1.5 py-0.5 rounded bg-black/40 text-neutral-300 text-xs border border-white/10">{prData.head?.ref || prData.head?.label || 'head'}</code>
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 mb-8">
               {/* eslint-disable-next-line @next/next/no-img-element */}
