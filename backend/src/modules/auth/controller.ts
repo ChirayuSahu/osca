@@ -33,7 +33,7 @@ const redirectToGithub = (req: Request, res: Response): void => {
     maxAge: 10 * 60 * 1000 // 10 minutes
   })
 
-  let authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${config.githubClientId}&scope=read:user,user:email&state=${state}`
+  let authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${config.githubClientId}&scope=read:user,user:email,public_repo&state=${state}`
   if (config.githubCallbackUrl !== '') {
     authorizeUrl += `&redirect_uri=${encodeURIComponent(config.githubCallbackUrl)}`
   }
