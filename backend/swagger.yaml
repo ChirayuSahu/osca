@@ -731,6 +731,49 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /api/v1/jobs:
+    get:
+      summary: List User Jobs
+      description: Retrieves all jobs from all valid queues that belong to the authenticated user with pagination.
+      tags:
+        - Jobs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+          description: Items per page
+      responses:
+        '200':
+          description: A list of jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: User jobs retrieved
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobStatus'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/v1/jobs/{queueName}/{jobId}:
     get:
