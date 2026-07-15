@@ -20,9 +20,13 @@ const getUserIdFromRequest = (req: Request): string | undefined => {
   return undefined
 }
 
-const store = new RedisStore({
-  sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
-})
+// Helper to create a dedicated RedisStore per limiter to prevent ERR_ERL_STORE_REUSE
+const createRedisStore = (prefix: string) => {
+  return new RedisStore({
+    sendCommand: (...args: string[]) => redisClient.call(args[0], ...args.slice(1)) as any,
+    prefix,
+  })
+}
 
 export const userRateLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -30,24 +34,22 @@ export const userRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
-  store,
+  store: createRedisStore('rl:user:'),
   skip: (req: Request) => !getUserIdFromRequest(req),
   keyGenerator: (req: Request): string => {
-    return `user:${getUserIdFromRequest(req)}`
+    return getUserIdFromRequest(req) || 'unknown'
   }
 })
 
 export const ipRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 50,
+  windowMs: 1000, // 1 second
+  max: 50, // 50 requests per second
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
-  store,
+  store: createRedisStore('rl:ip:'),
   skip: (req: Request) => !!getUserIdFromRequest(req),
-  keyGenerator: (req: Request): string => {
-    return `ip:${req.ip || 'unknown'}`
-  }
+  // Default keyGenerator uses req.ip safely, avoiding ERR_ERL_KEY_GEN_IPV6
 })
 
 export const authLimiter = rateLimit({
@@ -56,7 +58,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many auth requests, please try again later.' },
-  store
+  store: createRedisStore('rl:auth:')
 })
 
 export const jobLimiter = rateLimit({
@@ -65,5 +67,5 @@ export const jobLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many analysis requests, please slow down.' },
-  store
+  store: createRedisStore('rl:job:')
 })
