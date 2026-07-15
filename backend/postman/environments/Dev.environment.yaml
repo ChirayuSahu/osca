@@ -10,3 +10,5 @@ values:
     value: ''
   - key: pull_number
     value: ''
+  - key: queue_name
+    value: ''

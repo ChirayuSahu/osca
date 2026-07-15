@@ -1,6 +1,16 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/repositories"
+name: List Repositories
+url: "{{BASE_URL}}/api/v1/repositories?limit=10&page=1"
 method: GET
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
+queryParams:
+  - key: limit
+    value: "10"
+    disabled: false
+    description: ""
+  - key: page
+    value: "1"
+    disabled: false
+    description: ""
 order: 1000

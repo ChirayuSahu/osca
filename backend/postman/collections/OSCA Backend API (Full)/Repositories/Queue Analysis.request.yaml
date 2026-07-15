@@ -1,6 +1,6 @@
 $kind: http-request
 name: Queue Analysis
-url: "{{BASE_URL}}/api/v1/repositories"
+url: "{{BASE_URL}}/api/v1/repositories/analyze"
 method: POST
 headers:
   Authorization: Bearer {{JWT_TOKEN}}
@@ -9,6 +9,6 @@ body:
   type: json
   content: |-
     {
-      "url": "https://github.com/ChirayuSahu/delivery-app-fe"
+      "url": "https://github.com/docker/cli"
     }
 order: 2000
