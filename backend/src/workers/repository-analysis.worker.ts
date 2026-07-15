@@ -8,15 +8,15 @@ import type { RepositoryAnalysisJobData, RepositoryAnalysisJobResult } from '../
 const processRepositoryAnalysis = async (
   job: Job<RepositoryAnalysisJobData, RepositoryAnalysisJobResult>
 ): Promise<RepositoryAnalysisJobResult> => {
-  const { url, userId } = job.data
+  const { url, userId, force } = job.data
 
-  console.log(`\n[RepositoryWorker] 🚀 Starting job ${job.id} for ${url}`)
+  console.log(`\n[RepositoryWorker] Starting job ${job.id} for ${url} (force: ${!!force})`)
   
   try {
     const repository = await RepositoryAnalysisService.analyzeRepository(url, userId, async (percent, message) => {
-      console.log(`[RepositoryWorker:${job.id}] ⏳ Progress: ${percent}% - ${message}`)
+      console.log(`[RepositoryWorker:${job.id}] Progress: ${percent}% - ${message}`)
       await job.updateProgress({ percent, message })
-    })
+    }, force ?? false)
 
     const languages = repository.languages as Record<string, number> | null
 
@@ -38,7 +38,7 @@ const processRepositoryAnalysis = async (
 
     await Neo4jSyncService.syncRepositoryTopics(repository.id, repository.topics)
 
-    console.log(`[RepositoryWorker:${job.id}] ✅ Job complete for ${repository.fullName}`)
+    console.log(`[RepositoryWorker:${job.id}] Job complete for ${repository.fullName}`)
     return {
       repositoryId: repository.id,
       name: repository.name,
@@ -48,7 +48,7 @@ const processRepositoryAnalysis = async (
     }
   } catch (error: any) {
     const reason = error?.message || error
-    console.error(`[RepositoryWorker:${job.id}] ❌ Job failed for ${url}. Reason:`, reason)
+    console.error(`[RepositoryWorker:${job.id}] Job failed for ${url}. Reason:`, reason)
     throw error
   }
 }

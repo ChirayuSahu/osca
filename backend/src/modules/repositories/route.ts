@@ -7,6 +7,7 @@ const router = Router()
 
 router.post('/', authMiddleware, RepositoryController.queueRepositoryAnalysis)
 router.post('/analyze', authMiddleware, RepositoryController.queueRepositoryAnalysis)
+router.post('/analyze/force', authMiddleware, RepositoryController.queueForceRepositoryAnalysis)
 router.get('/github/personal', authMiddleware, paginationMiddleware, RepositoryController.listPersonalGithubRepositories)
 router.get('/github/organization', authMiddleware, paginationMiddleware, RepositoryController.listOrganizationGithubRepositories)
 router.get('/github', authMiddleware, paginationMiddleware, RepositoryController.listGithubRepositories)

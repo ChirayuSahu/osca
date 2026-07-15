@@ -1,6 +1,7 @@
 export interface RepositoryAnalysisJobData {
   url: string
   userId: string
+  force?: boolean
 }
 
 export interface RepositoryAnalysisJobResult {

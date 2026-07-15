@@ -46,8 +46,15 @@ const assertRepositoryVisible = async (repository: Repository, userId: string): 
 const queueRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const userId = requireUserId(req)
   const url = resolveRepositoryUrl(req.body)
-  const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId)
+  const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId, false)
   sendResponse(res, 202, true, 'Repository analysis queued', queued)
+})
+
+const queueForceRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const url = resolveRepositoryUrl(req.body)
+  const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId, true)
+  sendResponse(res, 202, true, 'Forced repository analysis queued', queued)
 })
 
 const getRepository = asyncHandler(async (req: RequestWithUser, res: Response) => {
@@ -425,6 +432,7 @@ const hideRepository = asyncHandler(async (req: RequestWithUser, res: Response) 
 
 export const RepositoryController = {
   queueRepositoryAnalysis,
+  queueForceRepositoryAnalysis,
   getRepository,
   hideRepository,
   getRepositoryByFullName,
