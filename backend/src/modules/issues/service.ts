@@ -11,6 +11,23 @@ const listIssues = async (userId: string, owner: string, repo: string, page: num
   const response = await fetchGithub(`/repos/${owner}/${repo}/issues?page=${page}&per_page=${limit}&state=all`, { token })
   const issues = await response.json()
   
+  let issuesWithSubIssues = issues
+  if (Array.isArray(issues)) {
+    issuesWithSubIssues = await Promise.all(issues.map(async (issue: any) => {
+      try {
+        const subRes = await fetchGithub(`/repos/${owner}/${repo}/issues/${issue.number}/sub_issues`, { token })
+        if (subRes.ok) {
+          issue.sub_issues = await subRes.json()
+        } else {
+          issue.sub_issues = []
+        }
+      } catch {
+        issue.sub_issues = []
+      }
+      return issue
+    }))
+  }
+
   // Basic pagination header parsing
   const linkHeader = response.headers.get('Link') ?? response.headers.get('link')
   let totalPages = page
@@ -19,13 +36,28 @@ const listIssues = async (userId: string, owner: string, repo: string, page: num
     if (match) totalPages = parseInt(match[1], 10)
   }
   
-  return { issues, page, limit, totalPages }
+  return { issues: issuesWithSubIssues, page, limit, totalPages }
 }
 
 const getIssue = async (userId: string, owner: string, repo: string, issueNumber: number) => {
   const token = await getGithubAccessToken(userId)
   const response = await fetchGithub(`/repos/${owner}/${repo}/issues/${issueNumber}`, { token })
-  return response.json()
+  const issue = await response.json()
+  
+  if (response.ok && issue) {
+    try {
+      const subRes = await fetchGithub(`/repos/${owner}/${repo}/issues/${issue.number}/sub_issues`, { token })
+      if (subRes.ok) {
+        issue.sub_issues = await subRes.json()
+      } else {
+        issue.sub_issues = []
+      }
+    } catch {
+      issue.sub_issues = []
+    }
+  }
+  
+  return issue
 }
 
 const listIssueComments = async (userId: string, owner: string, repo: string, issueNumber: number, page: number, limit: number) => {
