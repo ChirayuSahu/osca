@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
-import { Sparkles, BookOpen, RefreshCw, UserCheck, Shield, ArrowUpRight, ArrowDownRight, FileCode, GitMerge, Code2 } from "lucide-react";
+import { Sparkles, BookOpen, RefreshCw, UserCheck, Shield, Network, ArrowUpRight, ArrowDownRight, FileCode, GitMerge, Code2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback, Badge } from "@/components/ui";
 import { GitHubCalendar } from 'react-github-calendar';
 
@@ -12,6 +12,7 @@ interface ContributorProfile {
   activityScore: number;
   diversityScore: number;
   qualityScore: number;
+  networkScore: number;
   overallScore: number;
   contributionHistory?: unknown;
   repositoryExperience?: unknown;
@@ -250,12 +251,13 @@ export default function ProfilePage() {
             </div>
 
             {/* Sub-Metrics Grid - Premium Redesign */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative z-10">
               {[
                 { label: "Skill Depth", score: analytics.skillScore, desc: "Technical complexity & code variety", icon: BookOpen, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
                 { label: "Activity Rate", score: analytics.activityScore, desc: "Commit frequency & PR velocity", icon: RefreshCw, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
                 { label: "Code Quality", score: analytics.qualityScore, desc: "Best practices & documentation patterns", icon: UserCheck, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
-                { label: "Diversity Scope", score: analytics.diversityScore, desc: "Cross-repo contributions & org involvement", icon: Shield, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" }
+                { label: "Diversity Scope", score: analytics.diversityScore, desc: "Cross-repo contributions & org involvement", icon: Shield, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" },
+                { label: "Network Reach", score: analytics.networkScore, desc: "Collaborator overlap across the contribution graph", icon: Network, color: "from-emerald-500 to-emerald-400", bg: "bg-emerald-500/10" }
               ].map((metric) => {
                 const Icon = metric.icon;
                 return (
