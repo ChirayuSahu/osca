@@ -11,15 +11,13 @@ import { issuesRouter } from './modules/issues/route'
 import { pullsRouter } from './modules/pulls/route'
 import { reactionsRouter } from './modules/reactions/route'
 
-import { userRateLimiter, ipRateLimiter, authLimiter, jobLimiter } from './middlewares/rate-limit.middleware'
-
 const router = Router()
 
-// Apply the global rate limiters to all API routes
+import { userRateLimiter, ipRateLimiter, authLimiter, jobLimiter } from './middlewares/rate-limit.middleware'
+
 router.use(userRateLimiter)
 router.use(ipRateLimiter)
 
-// Mount routes
 router.use('/health', healthRouter)
 router.use('/auth', authLimiter, authRouter)
 router.use('/users', jobLimiter, usersRouter)

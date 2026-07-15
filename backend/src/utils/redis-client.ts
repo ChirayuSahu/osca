@@ -6,6 +6,7 @@ export const redisClient = new Redis({
   port: config.redis.port,
   username: config.redis.username || 'default',
   password: config.redis.password,
+  enableOfflineQueue: true,
   ...(config.redis.tls ? { tls: {} } : {})
 })
 

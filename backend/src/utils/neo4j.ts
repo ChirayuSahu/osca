@@ -1,10 +1,19 @@
-import neo4j from 'neo4j-driver'
+import neo4j, { Session } from 'neo4j-driver'
 import { config } from '../config'
 
 export const neo4jDriver = neo4j.driver(
   config.neo4j.uri,
   neo4j.auth.basic(config.neo4j.user, config.neo4j.password)
 )
+
+export const withSession = async <T>(work: (session: Session) => Promise<T>): Promise<T> => {
+  const session = neo4jDriver.session({ database: config.neo4j.database })
+  try {
+    return await work(session)
+  } finally {
+    await session.close()
+  }
+}
 
 export const initNeo4j = async () => {
   try {
