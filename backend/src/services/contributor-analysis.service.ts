@@ -38,6 +38,15 @@ interface GitHubStatsResponse {
         totalCommitContributions: number
         totalPullRequestContributions: number
         totalPullRequestReviewContributions: number
+        commitContributionsByRepository: {
+          repository: {
+            nameWithOwner: string
+            isFork: boolean
+            languages: {
+              nodes: { name: string }[]
+            }
+          }
+        }[]
       }
       pullRequests: {
         nodes: {
@@ -59,6 +68,17 @@ const fetchAdvancedStats = async (token: string) => {
             totalCommitContributions
             totalPullRequestContributions
             totalPullRequestReviewContributions
+            commitContributionsByRepository(maxRepositories: 25) {
+              repository {
+                nameWithOwner
+                isFork
+                languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+                  nodes {
+                    name
+                  }
+                }
+              }
+            }
           }
           pullRequests(first: 30, states: MERGED, orderBy: {field: CREATED_AT, direction: DESC}) {
             nodes {
@@ -98,11 +118,19 @@ const fetchAdvancedStats = async (token: string) => {
     const reviewRatio = reviews / prs
     const codeReviewScore = Math.min(5.0, 3.0 + (reviewRatio * 1.5))
 
+    const contributedRepos = (viewer.contributionsCollection.commitContributionsByRepository || [])
+      .filter((entry) => !entry.repository.isFork)
+      .map((entry) => ({
+        fullName: entry.repository.nameWithOwner,
+        languages: entry.repository.languages.nodes.map((n) => n.name)
+      }))
+
     return {
       linesAdded: totalAdditions > 0 ? totalAdditions : 0,
       avgPrCycleTime: avgPrCycleTimeDays,
       codeReviewScore: codeReviewScore,
-      totalCommits: viewer.contributionsCollection.totalCommitContributions
+      totalCommits: viewer.contributionsCollection.totalCommitContributions,
+      contributedRepos
     }
   } catch (err) {
     console.error('Failed to fetch advanced stats:', err)
@@ -121,11 +149,11 @@ const analyzeProfile = async (
 
   const accessToken = await getGithubAccessToken(userId)
 
-  await onProgress(10, 'Starting profile analysis...')
-  const skills = await analyzeGithubProfile(accessToken, onProgress)
-
-  await onProgress(85, 'Fetching advanced contribution statistics...')
+  await onProgress(8, 'Fetching advanced contribution statistics...')
   const advancedStats = await fetchAdvancedStats(accessToken)
+
+  await onProgress(10, 'Starting profile analysis...')
+  const skills = await analyzeGithubProfile(accessToken, onProgress, advancedStats?.contributedRepos ?? [])
 
   await onProgress(90, 'Saving extracted skills to database...')
 
@@ -220,7 +248,8 @@ const analyzeProfile = async (
 
 const analyzeGithubProfile = async (
   accessToken: string,
-  onProgress: ProgressCallback = noopProgress
+  onProgress: ProgressCallback = noopProgress,
+  contributedRepos: { fullName: string; languages: string[] }[] = []
 ): Promise<Skill[]> => {
   await onProgress(15, 'Fetching repositories from GitHub...')
 
@@ -229,7 +258,18 @@ const analyzeGithubProfile = async (
     accessToken
   )
 
-  const reposToAnalyze = repos.filter((repo) => !repo.fork).slice(0, 30)
+  const ownedRepos = repos.filter((repo) => !repo.fork).slice(0, 30)
+  const ownedFullNames = new Set(ownedRepos.map((repo) => repo.full_name))
+
+  // Include repos the user has pushed commits to but doesn't own (e.g. OSS PRs
+  // into other orgs' repos), so the skill profile reflects contribution activity
+  // rather than only what the user happens to own.
+  const externalRepos: GitHubRepo[] = contributedRepos
+    .filter((repo) => !ownedFullNames.has(repo.fullName))
+    .slice(0, 15)
+    .map((repo) => ({ name: repo.fullName, full_name: repo.fullName, language: null, fork: false, size: 0 }))
+
+  const reposToAnalyze = [...ownedRepos, ...externalRepos]
   const batchSize = 10
   const totalBatches = Math.ceil(reposToAnalyze.length / batchSize) || 1
   const languageTotals: Record<string, number> = {}
