@@ -14,7 +14,6 @@ const processRepositoryAnalysis = async (
   
   try {
     const repository = await RepositoryAnalysisService.analyzeRepository(url, userId, async (percent, message) => {
-      console.log(`[RepositoryWorker:${job.id}] Progress: ${percent}% - ${message}`)
       await job.updateProgress({ percent, message })
     }, force ?? false)
 
