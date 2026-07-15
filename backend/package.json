@@ -10,6 +10,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
+    "backfill:neo4j": "ts-node --transpile-only scripts/backfill-neo4j-graph.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
