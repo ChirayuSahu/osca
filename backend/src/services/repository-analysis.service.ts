@@ -28,9 +28,13 @@ interface RepoAnalysis {
   languages: Record<string, number>
   frameworks: string[]
   techStack: string[]
+  topics: string[]
   ciCd: string[]
   folderStructure: any
   dependencies: any
+  stars: number
+  forks: number
+  openIssuesCount: number
 }
 
 interface GithubRepoResponse {
@@ -101,25 +105,24 @@ const fetchFullTree = async (
   const repoPath = `/repos/${owner}/${repo}`
 
   // ── Fast path ────────────────────────────────────────────────────────────
-  let fullTree: GithubTreeResponse
+  let fullTree: GithubTreeResponse | null = null
   try {
     fullTree = await githubGetJson<GithubTreeResponse>(
       `${repoPath}/git/trees/${branch}?recursive=1`,
       token
     )
-  } catch (err) {
-    console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo}, trying root-only.`)
-    return []
+  } catch (err: any) {
+    console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo} (${err?.message}), falling back to subtree fetching.`)
   }
 
-  if (!fullTree.truncated) {
+  if (fullTree && !fullTree.truncated) {
     console.log(`[RepoService] Full recursive tree fetched (${fullTree.tree.length} entries).`)
     return fullTree.tree
   }
 
   // ── Truncated path ───────────────────────────────────────────────────────
   console.warn(
-    `[RepoService] Tree truncated for ${owner}/${repo} (>100k entries). ` +
+    `[RepoService] Tree truncated or fetch failed for ${owner}/${repo}. ` +
     `Fetching subtrees per top-level directory...`
   )
 
@@ -192,17 +195,7 @@ const analyzeRepository = async (
     }
   })
 
-  // Only skip if the repo has been fully analyzed (has folder structure AND frameworks/ciCd populated)
-  const fs = existingRepo?.folderStructure
-  const hasFullAnalysis = existingRepo &&
-    Array.isArray(fs) && fs.length > 0 &&
-    (existingRepo.frameworks.length > 0 || existingRepo.ciCd.length > 0)
-
-  if (hasFullAnalysis) {
-    console.log(`[RepoService] Repository ${fullName} already fully analyzed. Skipping.`)
-    await onProgress(100, 'Repository already analyzed.')
-    return existingRepo
-  }
+  // User requested to re-analyze even if the repository exists, so we proceed without early exit.
 
   await onProgress(8, 'Fetching user credentials...')
   const accessToken = await getGithubAccessToken(userId)
@@ -224,43 +217,54 @@ const analyzeRepository = async (
     ? analysis.dependencies
     : undefined
 
-  const saved = await prisma.repository.upsert({
-    where: { 
-      provider_fullName: {
-        provider: 'github',
-        fullName: analysis.fullName
-      }
-    },
-    update: {
-      name: analysis.name,
-      owner: analysis.owner,
-      description: analysis.description,
-      url: analysis.url,
-      provider: 'github',
-      githubId: analysis.githubId,
-      languages: analysis.languages,
-      frameworks: analysis.frameworks,
-      techStack: analysis.techStack,
-      ciCd: analysis.ciCd,
-      ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
-      ...(persistDependencies !== undefined && { dependencies: persistDependencies })
-    },
-    create: {
-      name: analysis.name,
-      owner: analysis.owner,
-      fullName: analysis.fullName,
-      description: analysis.description,
-      url: analysis.url,
-      provider: 'github',
-      githubId: analysis.githubId,
-      languages: analysis.languages,
-      frameworks: analysis.frameworks,
-      techStack: analysis.techStack,
-      ciCd: analysis.ciCd,
-      ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
-      ...(persistDependencies !== undefined && { dependencies: persistDependencies })
-    }
+  const repoData = {
+    name: analysis.name,
+    owner: analysis.owner,
+    fullName: analysis.fullName,
+    description: analysis.description,
+    url: analysis.url,
+    provider: 'github',
+    githubId: analysis.githubId,
+    languages: analysis.languages,
+    frameworks: analysis.frameworks,
+    techStack: analysis.techStack,
+    topics: analysis.topics,
+    ciCd: analysis.ciCd,
+    stars: analysis.stars,
+    forks: analysis.forks,
+    openIssuesCount: analysis.openIssuesCount,
+    ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
+    ...(persistDependencies !== undefined && { dependencies: persistDependencies })
+  }
+
+  // 1. Try to find by githubId (best identifier, handles repo renames)
+  let targetRepo = await prisma.repository.findUnique({
+    where: { githubId: analysis.githubId }
   })
+
+  // 2. Fallback to provider_fullName in case githubId is missing
+  if (!targetRepo) {
+    targetRepo = await prisma.repository.findUnique({
+      where: { 
+        provider_fullName: {
+          provider: 'github',
+          fullName: analysis.fullName
+        }
+      }
+    })
+  }
+
+  let saved
+  if (targetRepo) {
+    saved = await prisma.repository.update({
+      where: { id: targetRepo.id },
+      data: repoData
+    })
+  } else {
+    saved = await prisma.repository.create({
+      data: repoData
+    })
+  }
 
   await onProgress(100, 'Repository analysis complete!')
   console.log(`[RepoService] Repository ${saved.fullName} successfully saved to database.`)
@@ -284,6 +288,14 @@ const analyzeGithubRepo = async (
     languagesData = await githubGetJson<Record<string, number>>(`${repoPath}/languages`, token)
   } catch {
     languagesData = {}
+  }
+
+  let topics: string[] = []
+  try {
+    const topicsRes = await githubGetJson<{ names: string[] }>(`${repoPath}/topics`, token)
+    topics = topicsRes.names || []
+  } catch {
+    topics = []
   }
 
   await onProgress(25, 'Fetching repository file tree for visual map...')
@@ -376,7 +388,7 @@ const analyzeGithubRepo = async (
         }
       }
     `
-    const depRes = await githubGraphQL<GithubDependencyGraphResponse>(query, token, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json')
+    const depRes = await githubGraphQL<GithubDependencyGraphResponse>(query, token, { owner, repo })
     dependenciesData = depRes.data?.repository?.dependencyGraphManifests?.nodes || []
     
     // Auto-detect frameworks from deep dependencies if missed by root scan
@@ -409,9 +421,13 @@ const analyzeGithubRepo = async (
     languages: languagesData,
     frameworks: Array.from(frameworks),
     techStack: Array.from(techStack),
+    topics,
     ciCd,
     folderStructure,
-    dependencies: dependenciesData
+    dependencies: dependenciesData,
+    stars: Number(repoData.stargazers_count) || 0,
+    forks: Number(repoData.forks_count) || 0,
+    openIssuesCount: Number(repoData.open_issues_count) || 0
   }
 }
 

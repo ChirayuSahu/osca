@@ -2,6 +2,7 @@ import { Worker, Job } from 'bullmq'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { RepositoryAnalysisService } from '../services/repository-analysis.service'
+import { Neo4jSyncService } from '../services/neo4j-sync.service'
 import type { RepositoryAnalysisJobData, RepositoryAnalysisJobResult } from '../types/jobs'
 
 const processRepositoryAnalysis = async (
@@ -19,6 +20,24 @@ const processRepositoryAnalysis = async (
 
     const languages = repository.languages as Record<string, number> | null
 
+    // Sync to Neo4j
+    await Neo4jSyncService.syncRepository({
+      id: repository.id,
+      name: repository.name,
+      owner: repository.owner,
+      description: repository.description,
+      stars: repository.stars
+    })
+
+    await Neo4jSyncService.syncRepositoryTechStack(repository.id, {
+      languages: languages || {},
+      frameworks: repository.frameworks,
+      techStack: repository.techStack,
+      ciCd: repository.ciCd
+    })
+
+    await Neo4jSyncService.syncRepositoryTopics(repository.id, repository.topics)
+
     console.log(`[RepositoryWorker:${job.id}] ✅ Job complete for ${repository.fullName}`)
     return {
       repositoryId: repository.id,
@@ -27,8 +46,9 @@ const processRepositoryAnalysis = async (
       languageCount: languages !== null ? Object.keys(languages).length : 0,
       frameworkCount: repository.frameworks.length
     }
-  } catch (error) {
-    console.error(`[RepositoryWorker:${job.id}] ❌ Job failed for ${url}:`, error)
+  } catch (error: any) {
+    const reason = error?.message || error
+    console.error(`[RepositoryWorker:${job.id}] ❌ Job failed for ${url}. Reason:`, reason)
     throw error
   }
 }
