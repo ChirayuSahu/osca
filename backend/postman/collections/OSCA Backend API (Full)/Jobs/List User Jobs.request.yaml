@@ -1,0 +1,7 @@
+$kind: http-request
+name: List User Jobs
+url: "{{BASE_URL}}/api/v1/jobs"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 1001
