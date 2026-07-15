@@ -8,6 +8,7 @@ import { githubGetJson, githubPostJson } from '../../lib/github'
 import { AppError } from '../../lib/errors'
 import { asyncHandler } from '../../utils/async-handler'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
+import { selfUserSelect } from '../../utils/user-response'
 
 interface GithubTokenResponse {
   access_token?: string
@@ -151,23 +152,14 @@ const getCurrentUser = asyncHandler(async (req: RequestWithUser, res: Response) 
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      username: true,
-      email: true,
-      avatarUrl: true,
-      skills: true,
-      contributionScore: true,
-      createdAt: true,
-    }
+    select: selfUserSelect
   })
 
   if (user === null) {
     throw new AppError('User not found', 404)
   }
 
-  sendResponse(res, 200, true, 'User profile retrieved successfully', { user })
+  sendResponse(res, 200, true, 'User profile retrieved successfully', user)
 })
 
 // #3: dev-token requires BOTH non-production AND a matching DEV_TOKEN_SECRET header
