@@ -1,9 +1,20 @@
 import type { Config } from "tailwindcss";
 
-export default {
+const config: Config = {
   content: [
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-} satisfies Config;
+  theme: {
+    extend: {
+      fontFamily: {
+  
+        serif: ["var(--font-libre-baskerville)", "serif"],
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
