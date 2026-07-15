@@ -1,189 +1,222 @@
 import { prisma } from '../utils/prisma'
+import { neo4jDriver } from '../utils/neo4j'
+import { config } from '../config'
 
-interface RepoScore {
-  repositoryId: string
-  totalScore: number
-  breakdown: {
-    languageMatchScore: number
-    topicMatchScore: number
-    popularityScore: number
-    activityScore: number
+const REPO_SELECT = {
+  id: true,
+  name: true,
+  owner: true,
+  fullName: true,
+  provider: true,
+  githubId: true,
+  description: true,
+  url: true,
+  languages: true,
+  frameworks: true,
+  techStack: true,
+  topics: true,
+  ciCd: true,
+  stars: true,
+  createdAt: true,
+  updatedAt: true,
+  _count: {
+    select: { likes: true, interactions: true }
   }
-}
+} as const
 
-const normalize = (value: number, min: number, max: number) => {
-  if (max === min) return 0
-  const normalized = ((value - min) / (max - min)) * 100
-  return Math.min(Math.max(normalized, 0), 100)
-}
+// Fallback feed used when Neo4j is unavailable or has no graph edges yet for
+// this user (e.g. contributor/repository analysis hasn't run). Not personalized,
+// but ensures the user sees something instead of a blank page.
+const fallbackFeed = async (userId: string, page: number, limit: number) => {
+  const skip = (page - 1) * limit
 
-export const generateFeed = async (userId: string, page: number = 1, limit: number = 20) => {
-  // 1. Load user skills & interests
+  // Repository.owner stores the GitHub login, not our internal user id, so
+  // resolve the user's GitHub username to exclude their own repos.
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { skills: true }
+    select: { oauthAccounts: { where: { provider: 'github' }, select: { username: true } } }
   })
-  
-  const interests = await prisma.userInterest.findMany({
-    where: { userId }
-  })
+  const githubUsername = user?.oauthAccounts[0]?.username
 
-  // Build interest map with 30-day half-life decay
-  const interestMap = new Map<string, number>()
-  if (user?.skills) {
-    user.skills.forEach(skill => interestMap.set(skill.toLowerCase(), 10)) // Base weight for skills
-  }
-  
-  const now = new Date().getTime()
-  const HALF_LIFE_DAYS = 30
-  const MS_PER_DAY = 1000 * 60 * 60 * 24
-
-  interests.forEach(interest => {
-    const existing = interestMap.get(interest.tag) || 0
-    const daysSinceUpdate = (now - interest.updatedAt.getTime()) / MS_PER_DAY
-    const decayedScore = interest.score * Math.pow(0.5, daysSinceUpdate / HALF_LIFE_DAYS)
-    interestMap.set(interest.tag, existing + decayedScore)
-  })
-
-  // 2. Fetch candidate repositories
-  // Limit to top 1000 recently updated to prevent memory bottleneck
-  const repositories = await prisma.repository.findMany({
-    where: { hidden: false },
-    take: 1000,
-    orderBy: { updatedAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      owner: true,
-      fullName: true,
-      provider: true,
-      githubId: true,
-      description: true,
-      url: true,
-      languages: true,
-      frameworks: true,
-      techStack: true,
-      ciCd: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: {
-        select: { likes: true, interactions: true }
-      }
-    }
-  })
-
-  // Pre-calculate min/max for normalization
-  let maxLikes = 0
-  let maxActivity = 0
-  
-  repositories.forEach(repo => {
-    maxLikes = Math.max(maxLikes, repo._count.likes)
-    maxActivity = Math.max(maxActivity, repo._count.interactions)
-  })
-
-  // 3. Calculate scores
-  const scoredRepos = repositories.map(repo => {
-    let languageMatchScore = 0
-    let topicMatchScore = 0
-
-    if (repo.languages && typeof repo.languages === 'object') {
-      const langs = Object.keys(repo.languages as Record<string, any>)
-      langs.forEach(lang => {
-        const lower = lang.toLowerCase()
-        if (interestMap.has(lower)) {
-          languageMatchScore += interestMap.get(lower)!
-        }
-      })
-    }
-
-    if (repo.techStack && Array.isArray(repo.techStack)) {
-      repo.techStack.forEach(topic => {
-        const lower = String(topic).toLowerCase()
-        if (interestMap.has(lower)) {
-          topicMatchScore += interestMap.get(lower)!
-        }
-      })
-    }
-
-    languageMatchScore = Math.min(languageMatchScore, 100)
-    topicMatchScore = Math.min(topicMatchScore, 100)
-
-    const popularityScore = normalize(repo._count.likes, 0, maxLikes)
-    const activityScore = normalize(repo._count.interactions, 0, maxActivity)
-
-    const totalScore = 
-      (languageMatchScore * 0.4) + 
-      (topicMatchScore * 0.4) + 
-      (popularityScore * 0.1) + 
-      (activityScore * 0.1)
-
-    return {
-      repository: repo,
-      scoreInfo: {
-        repositoryId: repo.id,
-        totalScore,
-        breakdown: {
-          languageMatchScore,
-          topicMatchScore,
-          popularityScore,
-          activityScore
-        }
-      }
-    }
-  })
-
-  // 4. Split into Relevant and Discovery Buckets
-  const relevantBucket: typeof scoredRepos = []
-  const discoveryBucket: typeof scoredRepos = []
-
-  scoredRepos.forEach(r => {
-    if (r.scoreInfo.breakdown.languageMatchScore > 0 || r.scoreInfo.breakdown.topicMatchScore > 0) {
-      relevantBucket.push(r)
-    } else {
-      discoveryBucket.push(r)
-    }
-  })
-
-  relevantBucket.sort((a, b) => b.scoreInfo.totalScore - a.scoreInfo.totalScore)
-  discoveryBucket.sort((a, b) => b.scoreInfo.totalScore - a.scoreInfo.totalScore)
-
-  // 5. Merge based on 80/20 ratio for the ENTIRE candidate pool
-  let mergedCandidates: typeof scoredRepos = []
-
-  if (interestMap.size === 0) {
-    // Cold start: 100% discovery
-    mergedCandidates = discoveryBucket
-  } else {
-    // Calculate total proportional sizes
-    // We want the final feed to be ~80% relevant, ~20% discovery across the whole pool
-    // To do this simply, we will interleave them in a 4:1 ratio
-    let rIdx = 0
-    let dIdx = 0
-
-    while (rIdx < relevantBucket.length || dIdx < discoveryBucket.length) {
-      for (let i = 0; i < 4 && rIdx < relevantBucket.length; i++) {
-        mergedCandidates.push(relevantBucket[rIdx++])
-      }
-      if (dIdx < discoveryBucket.length) {
-        mergedCandidates.push(discoveryBucket[dIdx++])
-      }
-    }
+  const where = {
+    hidden: false,
+    ...(githubUsername ? { NOT: { owner: githubUsername } } : {})
   }
 
-  // 6. Paginate the merged candidates
-  const total = mergedCandidates.length
-  const totalPages = Math.ceil(total / limit)
-  const startIndex = (page - 1) * limit
-  const endIndex = startIndex + limit
-  
-  const paginatedFeed = mergedCandidates.slice(startIndex, endIndex)
+  const [repositories, total] = await Promise.all([
+    prisma.repository.findMany({
+      where,
+      select: REPO_SELECT,
+      orderBy: [{ stars: 'desc' }, { updatedAt: 'desc' }],
+      skip,
+      take: limit
+    }),
+    prisma.repository.count({ where })
+  ])
 
   return {
-    feed: paginatedFeed,
+    feed: repositories.map((repository) => ({
+      repository,
+      scoreInfo: {
+        repositoryId: repository.id,
+        totalScore: repository.stars,
+        breakdown: { contentScore: 0, collabScore: 0, topicScore: 0, fallback: true }
+      }
+    })),
     total,
     page,
     limit,
-    totalPages
+    totalPages: Math.ceil(total / limit)
+  }
+}
+
+export const generateFeed = async (userId: string, page: number = 1, limit: number = 20) => {
+  // 1. Fetch user to get githubId
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, oauthAccounts: { where: { provider: 'github' } } }
+  })
+
+  if (!user || !user.oauthAccounts[0]?.providerId) {
+    return fallbackFeed(userId, page, limit)
+  }
+
+  const githubId = parseInt(user.oauthAccounts[0].providerId, 10)
+  const skip = (page - 1) * limit
+  const weights = config.recommendation
+
+  const session = neo4jDriver.session({ database: config.neo4j.database })
+
+  try {
+    // Candidate repos are the UNION of three independent sources (skill match,
+    // topic similarity, collaborative filtering) so a user with no HAS_SKILL
+    // edges yet can still surface candidates via topic/collaborative signals —
+    // each candidate is then scored on all three dimensions together.
+    const cypher = `
+      MATCH (u:User {githubId: $githubId})
+      CALL {
+        WITH u
+        MATCH (u)-[:HAS_SKILL]->(:Skill)<-[:USES_LANGUAGE|USES_FRAMEWORK]-(r:Repository)
+        RETURN r
+        UNION
+        WITH u
+        MATCH (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(:Repository)-[:HAS_TOPIC]->(:Topic)<-[:HAS_TOPIC]-(r:Repository)
+        RETURN r
+        UNION
+        WITH u
+        MATCH (u)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(:Repository)<-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]-(:User)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r:Repository)
+        RETURN r
+      }
+      WITH DISTINCT u, r
+      WHERE NOT (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(r)
+
+      OPTIONAL MATCH (u)-[hs:HAS_SKILL]->(s:Skill)<-[:USES_LANGUAGE|USES_FRAMEWORK]-(r)
+      WITH u, r, sum(hs.score) AS contentScore
+
+      OPTIONAL MATCH (u)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r2:Repository)<-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]-(other:User)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r)
+      WHERE r <> r2
+      WITH u, r, contentScore, count(DISTINCT other) AS collabScore
+
+      OPTIONAL MATCH (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(r3:Repository)-[:HAS_TOPIC]->(t:Topic)<-[:HAS_TOPIC]-(r)
+      WHERE r <> r3
+      WITH r, contentScore, collabScore, count(DISTINCT t) AS topicScore
+
+      WITH r, contentScore, collabScore, topicScore,
+        (coalesce(contentScore, 0) * $contentWeight
+          + coalesce(collabScore, 0) * $collabWeight
+          + coalesce(topicScore, 0) * $topicWeight
+          + log(coalesce(r.stars, 0) + 1) * $starsWeight) AS totalScore
+      ORDER BY totalScore DESC
+
+      SKIP $skip
+      LIMIT $limit
+
+      RETURN r.id AS repositoryId, totalScore, contentScore, collabScore, topicScore
+    `
+
+    const result = await session.run(cypher, {
+      githubId,
+      skip,
+      limit,
+      contentWeight: weights.contentWeight,
+      collabWeight: weights.collabWeight,
+      topicWeight: weights.topicWeight,
+      starsWeight: weights.starsWeight
+    })
+
+    const recommendations = result.records.map(record => ({
+      repositoryId: record.get('repositoryId'),
+      totalScore: record.get('totalScore'),
+      contentScore: record.get('contentScore'),
+      collabScore: record.get('collabScore'),
+      topicScore: record.get('topicScore')
+    }))
+
+    const repoIds = recommendations.map(r => r.repositoryId)
+
+    if (repoIds.length === 0) {
+      return fallbackFeed(userId, page, limit)
+    }
+
+    // 2. Fetch full repository data from Prisma based on the IDs returned by Neo4j
+    const repositories = await prisma.repository.findMany({
+      where: { id: { in: repoIds } },
+      select: REPO_SELECT
+    })
+
+    // Map the Prisma repositories back to the scored recommendations
+    const feed = recommendations.map(rec => {
+      const repo = repositories.find(r => r.id === rec.repositoryId)
+      return {
+        repository: repo,
+        scoreInfo: {
+          repositoryId: rec.repositoryId,
+          totalScore: rec.totalScore,
+          breakdown: {
+            contentScore: rec.contentScore,
+            collabScore: rec.collabScore,
+            topicScore: rec.topicScore
+          }
+        }
+      }
+    }).filter(f => f.repository != null)
+
+    // For total count, reuse the same candidate-union but skip scoring
+    const countCypher = `
+      MATCH (u:User {githubId: $githubId})
+      CALL {
+        WITH u
+        MATCH (u)-[:HAS_SKILL]->(:Skill)<-[:USES_LANGUAGE|USES_FRAMEWORK]-(r:Repository)
+        RETURN r
+        UNION
+        WITH u
+        MATCH (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(:Repository)-[:HAS_TOPIC]->(:Topic)<-[:HAS_TOPIC]-(r:Repository)
+        RETURN r
+        UNION
+        WITH u
+        MATCH (u)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(:Repository)<-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]-(:User)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r:Repository)
+        RETURN r
+      }
+      WITH DISTINCT u, r
+      WHERE NOT (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(r)
+      RETURN count(r) AS total
+    `
+    const countResult = await session.run(countCypher, { githubId })
+    const total = countResult.records[0]?.get('total')?.toNumber() || 0
+    const totalPages = Math.ceil(total / limit)
+
+    return {
+      feed,
+      total,
+      page,
+      limit,
+      totalPages
+    }
+  } catch (error) {
+    console.error(`[RecommendationEngine] Failed to generate feed from Neo4j for user ${userId}:`, error)
+    return fallbackFeed(userId, page, limit)
+  } finally {
+    await session.close()
   }
 }
 
