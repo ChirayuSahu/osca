@@ -31,8 +31,6 @@ const REPO_SELECT = {
 const fallbackFeed = async (userId: string, page: number, limit: number) => {
   const skip = (page - 1) * limit
 
-  // Repository.owner stores the GitHub login, not our internal user id, so
-  // resolve the user's GitHub username to exclude their own repos.
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { oauthAccounts: { where: { provider: 'github' }, select: { username: true } } }
@@ -80,6 +78,12 @@ type GraphFeedParams = {
   weights: typeof config.recommendation
 }
 
+const toNum = (value: unknown): number => {
+  if (value == null) return 0
+  const boxed = value as { toNumber?: () => number }
+  return typeof boxed.toNumber === 'function' ? boxed.toNumber() : Number(value)
+}
+
 // Candidate repos are the UNION of three independent sources (skill match,
 // topic similarity, collaborative filtering) so a user with no HAS_SKILL
 // edges yet can still surface candidates via topic/collaborative signals —
@@ -87,9 +91,17 @@ type GraphFeedParams = {
 const runGraphFeed = async (session: Session, { userId, githubId, page, limit, skip, weights }: GraphFeedParams) => {
   const cypher = `
     MATCH (u:User {githubId: $githubId})
+    
+    // 1. Collect all user skills
+    OPTIONAL MATCH (u)-[hs:HAS_SKILL]->(s:Skill)
+    WITH u, collect({name: toLower(s.name), score: hs.score}) AS userSkills
+
+    // 2. Candidate generation
     CALL {
-      WITH u
-      MATCH (u)-[:HAS_SKILL]->(:Skill)<-[:USES_LANGUAGE|USES_FRAMEWORK]-(r:Repository)
+      WITH u, userSkills
+      UNWIND userSkills AS us
+      MATCH (r:Repository)-[:USES_LANGUAGE|USES_FRAMEWORK]->(lf)
+      WHERE toLower(lf.name) = us.name
       RETURN r
       UNION
       WITH u
@@ -100,19 +112,33 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
       MATCH (u)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(:Repository)<-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]-(:User)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r:Repository)
       RETURN r
     }
-    WITH DISTINCT u, r
+    WITH DISTINCT u, userSkills, r
     WHERE NOT (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(r)
 
-    OPTIONAL MATCH (u)-[hs:HAS_SKILL]->(s:Skill)<-[:USES_LANGUAGE|USES_FRAMEWORK]-(r)
-    WITH u, r, sum(hs.score) AS contentScore
+    // 3. Compute contentScore matching skill names
+    OPTIONAL MATCH (r)-[:USES_LANGUAGE|USES_FRAMEWORK]->(lf)
+    WITH u, userSkills, r, collect(DISTINCT toLower(lf.name)) AS repoLangs
+    
+    WITH u, r, 
+         reduce(acc = 0.0, us IN userSkills | 
+            acc + CASE WHEN us.name IN repoLangs THEN us.score ELSE 0.0 END
+         ) AS contentScore
 
-    OPTIONAL MATCH (u)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r2:Repository)<-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]-(other:User)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r)
-    WHERE r <> r2
-    WITH u, r, contentScore, count(DISTINCT other) AS collabScore
+    // 4. Compute collabScore
+    CALL {
+      WITH u, r
+      OPTIONAL MATCH (u)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r2:Repository)<-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]-(other:User)-[:STARRED|CONTRIBUTED_TO|INTERACTED_WITH]->(r)
+      WHERE r <> r2
+      RETURN count(DISTINCT other) AS collabScore
+    }
 
-    OPTIONAL MATCH (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(r3:Repository)-[:HAS_TOPIC]->(t:Topic)<-[:HAS_TOPIC]-(r)
-    WHERE r <> r3
-    WITH r, contentScore, collabScore, count(DISTINCT t) AS topicScore
+    // 5. Compute topicScore
+    CALL {
+      WITH u, r
+      OPTIONAL MATCH (u)-[:STARRED|CONTRIBUTED_TO|OWNS]->(r3:Repository)-[:HAS_TOPIC]->(t:Topic)<-[:HAS_TOPIC]-(r)
+      WHERE r <> r3
+      RETURN count(DISTINCT t) AS topicScore
+    }
 
     WITH r, contentScore, collabScore, topicScore,
       (coalesce(contentScore, 0) * $contentWeight
@@ -139,10 +165,10 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
 
   const recommendations = result.records.map(record => ({
     repositoryId: record.get('repositoryId'),
-    totalScore: record.get('totalScore'),
-    contentScore: record.get('contentScore'),
-    collabScore: record.get('collabScore'),
-    topicScore: record.get('topicScore')
+    totalScore: toNum(record.get('totalScore')),
+    contentScore: toNum(record.get('contentScore')),
+    collabScore: toNum(record.get('collabScore')),
+    topicScore: toNum(record.get('topicScore'))
   }))
 
   const repoIds = recommendations.map(r => r.repositoryId)
@@ -177,9 +203,15 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
   // For total count, reuse the same candidate-union but skip scoring
   const countCypher = `
     MATCH (u:User {githubId: $githubId})
+    
+    OPTIONAL MATCH (u)-[hs:HAS_SKILL]->(s:Skill)
+    WITH u, collect({name: toLower(s.name)}) AS userSkills
+
     CALL {
-      WITH u
-      MATCH (u)-[:HAS_SKILL]->(:Skill)<-[:USES_LANGUAGE|USES_FRAMEWORK]-(r:Repository)
+      WITH u, userSkills
+      UNWIND userSkills AS us
+      MATCH (r:Repository)-[:USES_LANGUAGE|USES_FRAMEWORK]->(lf)
+      WHERE toLower(lf.name) = us.name
       RETURN r
       UNION
       WITH u
