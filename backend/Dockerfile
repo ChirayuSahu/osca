@@ -12,6 +12,7 @@ RUN npm ci
 
 # Copy source files
 COPY src ./src/
+COPY scripts ./scripts/
 COPY swagger.yaml ./
 
 # Generate Prisma Client
