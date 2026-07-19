@@ -50,9 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (res.ok) {
           const data = await res.json();
-          if (data.success && data.data?.user) {
+          if (data.success && data.data) {
             setToken(storedToken);
-            setUser(data.data.user);
+            setUser(data.data);
           } else {
             // Token is invalid/expired
             localStorage.removeItem("osca_token");
