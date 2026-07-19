@@ -1,6 +1,7 @@
 import express, { Application, Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
 import { config } from './config'
 import { mountSwaggerDocs } from './config/swagger'
 import { apiRouter } from './router'
@@ -9,6 +10,8 @@ import { requestLogger } from './middlewares/logger.middleware'
 
 const app: Application = express()
 
+app.set('trust proxy', 1)
+app.use(helmet())
 app.use(cors({
   origin: config.frontendUrl,
   credentials: true,

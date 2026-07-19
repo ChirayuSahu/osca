@@ -2,11 +2,23 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+const INSECURE_JWT_FALLBACK = 'supersecretjwtkey-change-me-in-production'
+
 const nodeEnv = process.env.NODE_ENV ?? 'development'
 
-// Fail-fast: JWT_SECRET is mandatory in production
 if (nodeEnv === 'production' && !process.env.JWT_SECRET) {
   throw new Error('[Config] JWT_SECRET environment variable is required in production')
+}
+
+if (process.env.JWT_SECRET && process.env.JWT_SECRET === INSECURE_JWT_FALLBACK) {
+  throw new Error(
+    `[Config] JWT_SECRET is set to the insecure default placeholder. Choose a strong, unique secret.`
+  )
+}
+
+const jwtSecret = process.env.JWT_SECRET ?? INSECURE_JWT_FALLBACK
+if (!jwtSecret || jwtSecret.length < 32) {
+  throw new Error('[Config] JWT_SECRET must be at least 32 characters long')
 }
 
 export const config = {
@@ -15,8 +27,10 @@ export const config = {
   githubClientId: process.env.GITHUB_CLIENT_ID ?? '',
   githubClientSecret: process.env.GITHUB_CLIENT_SECRET ?? '',
   githubCallbackUrl: process.env.GITHUB_CALLBACK_URL ?? '',
-  // Falls back to dev-only default; production enforced above
-  jwtSecret: process.env.JWT_SECRET ?? 'supersecretjwtkey-change-me-in-production',
+  jwtSecret,
+  jwtIssuer: process.env.JWT_ISSUER ?? 'osca',
+  jwtAudience: process.env.JWT_AUDIENCE ?? 'osca-web',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
   // Secondary secret required to call the /auth/dev-token endpoint
   devTokenSecret: process.env.DEV_TOKEN_SECRET ?? '',
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
