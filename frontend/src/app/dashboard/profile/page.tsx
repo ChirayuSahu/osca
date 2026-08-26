@@ -5,6 +5,7 @@ import { useAuth } from "@/context/auth-context";
 import { Sparkles, BookOpen, RefreshCw, UserCheck, Shield, Network, ArrowUpRight, ArrowDownRight, FileCode, GitMerge, Code2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback, Badge } from "@/components/ui";
 import { GitHubCalendar } from 'react-github-calendar';
+import { ErrorState } from "@/components/ui/error-state";
 
 interface ContributorProfile {
   id: string;
@@ -140,18 +141,12 @@ export default function ProfilePage() {
   }
 
   if (error) {
-    return (
-      <div className="max-w-7xl mx-auto mt-12 text-center py-12 border border-dashed border-red-500/20 rounded-3xl bg-red-950/5">
-        <p className="text-red-400 text-sm font-light">{error}</p>
-        <button 
-          onClick={() => fetchProfile()} 
-          className="mt-4 px-4 py-2 text-xs border border-white/[0.04] bg-neutral-950/40 rounded-xl text-white hover:bg-white/[0.02]"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
+  return (
+    <div className="max-w-7xl mx-auto mt-12">
+      <ErrorState message={error} onRetry={() => fetchProfile()} />
+    </div>
+  );
+}
 
   const hasAnalytics = !!profile?.contributorProfile;
   const analytics = profile?.contributorProfile;

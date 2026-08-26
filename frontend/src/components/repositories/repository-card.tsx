@@ -74,7 +74,7 @@ export function RepositoryCard({ repo, mode = "view", onAction, onDelete }: Repo
       </div>
 
       {/* Footer Metrics */}
-      <div className="flex items-center justify-between pt-5 border-t border-neutral-800 mt-5">
+      <div className="flex flex-wrap items-center justify-between gap-y-4 pt-5 border-t border-neutral-800 mt-5">
         <div className="flex items-center gap-4 text-xs text-neutral-400 font-light">
           {/* Language */}
           {repo.language && (

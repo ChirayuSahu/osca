@@ -25,6 +25,7 @@ import {
   DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
+import { ErrorState } from "@/components/ui/error-state";
 
 interface ExtendedRepository extends Repository {
   ownerType?: string;
@@ -62,11 +63,11 @@ function GitHubReposContent() {
   const router = useRouter();
   const pathname = usePathname();
   const { token } = useAuth();
-  
+
   const queryParam = searchParams.get("q") || "";
   const pageParam = parseInt(searchParams.get("page") || "1", 10);
   const includeOrgParam = searchParams.get("includeOrg") === "true";
-  
+
   const [searchQuery, setSearchQuery] = useState(queryParam);
   const [repos, setRepos] = useState<ExtendedRepository[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +75,7 @@ function GitHubReposContent() {
   const [pagination, setPagination] = useState<PaginationMeta>({ page: 1, limit: 8, total: 0, totalPages: 1 });
   const [includeOrg, setIncludeOrg] = useState(includeOrgParam);
   const [importedUrls, setImportedUrls] = useState<Record<string, string>>({});
-  
+
   const [dialogState, setDialogState] = useState<{
     isOpen: boolean;
     type: "success" | "error" | "already_imported" | null;
@@ -102,78 +103,80 @@ function GitHubReposContent() {
 
   useEffect(() => { setIncludeOrg(includeOrgParam); }, [includeOrgParam]);
 
-  useEffect(() => {
-    async function fetchRepos() {
-      if (!token) return;
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(
-          `${API_URL}/repositories/github?page=${pageParam}&limit=8&q=${encodeURIComponent(queryParam)}&includeOrg=${includeOrg}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+  const fetchRepos = async () => {
+    if (!token) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(
+        `${API_URL}/repositories/github?page=${pageParam}&limit=8&q=${encodeURIComponent(queryParam)}&includeOrg=${includeOrg}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.data)) {
-            const mappedRepos = data.data.map((repo: GitHubRepo, index: number) => {
-              const lang = repo.language || "TypeScript";
-              let langColor = "bg-neutral-500";
-              if (lang === "TypeScript") langColor = "bg-blue-500";
-              else if (lang === "JavaScript") langColor = "bg-yellow-500";
-              else if (lang === "Python") langColor = "bg-blue-700";
-              else if (lang === "Go") langColor = "bg-cyan-500";
-              else if (lang === "Rust") langColor = "bg-orange-600";
-              else if (lang === "HTML") langColor = "bg-red-500";
-              else if (lang === "CSS") langColor = "bg-purple-500";
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data)) {
+          const mappedRepos = data.data.map((repo: GitHubRepo, index: number) => {
+            const lang = repo.language || "TypeScript";
+            let langColor = "bg-neutral-500";
+            if (lang === "TypeScript") langColor = "bg-blue-500";
+            else if (lang === "JavaScript") langColor = "bg-yellow-500";
+            else if (lang === "Python") langColor = "bg-blue-700";
+            else if (lang === "Go") langColor = "bg-cyan-500";
+            else if (lang === "Rust") langColor = "bg-orange-600";
+            else if (lang === "HTML") langColor = "bg-red-500";
+            else if (lang === "CSS") langColor = "bg-purple-500";
 
-              return {
-                id: repo.id,
-                name: repo.full_name,
-                description: repo.description || "",
-                stars: repo.stargazers_count || 0,
-                forks: repo.forks_count || 0,
-                language: lang,
-                languageColor: langColor,
-                matchScore: 95 - (index % 5) * 3,
-                issuesCount: repo.open_issues_count || 0,
-                ownerType: repo.owner?.type || "User",
-                url: repo.html_url
-              };
-            });
-            setRepos(mappedRepos);
-            if (data.pagination) setPagination(data.pagination);
-          } else {
-            setError("Failed to parse repository list.");
-          }
+            return {
+              id: repo.id,
+              name: repo.full_name,
+              description: repo.description || "",
+              stars: repo.stargazers_count || 0,
+              forks: repo.forks_count || 0,
+              language: lang,
+              languageColor: langColor,
+              matchScore: 95 - (index % 5) * 3,
+              issuesCount: repo.open_issues_count || 0,
+              ownerType: repo.owner?.type || "User",
+              url: repo.html_url
+            };
+          });
+          setRepos(mappedRepos);
+          if (data.pagination) setPagination(data.pagination);
         } else {
-          setError("Failed to load GitHub repositories.");
+          setError("Failed to parse repository list.");
         }
-        
-        // Also fetch imported repositories to check if they are already imported
-        try {
-          const importedRes = await fetch(`${API_URL}/repositories?limit=100`, { headers: { Authorization: `Bearer ${token}` } });
-          if (importedRes.ok) {
-            const importedData = await importedRes.json();
-            if (importedData.success && Array.isArray(importedData.data)) {
-              const urlMap: Record<string, string> = {};
-              importedData.data.forEach((r: ImportedRepo) => {
-                if (r.url) urlMap[r.url.toLowerCase()] = r.id;
-              });
-              setImportedUrls(urlMap);
-            }
-          }
-        } catch {
-          // Silent fail for imported repos fetch
-        }
-      } catch (err) {
-        console.error("Error fetching repositories:", err);
-        setError("An error occurred while loading repositories.");
-      } finally {
-        setLoading(false);
+      } else {
+        setError("Failed to load GitHub repositories.");
       }
+
+      // Also fetch imported repositories to check if they are already imported
+      try {
+        const importedRes = await fetch(`${API_URL}/repositories?limit=100`, { headers: { Authorization: `Bearer ${token}` } });
+        if (importedRes.ok) {
+          const importedData = await importedRes.json();
+          if (importedData.success && Array.isArray(importedData.data)) {
+            const urlMap: Record<string, string> = {};
+            importedData.data.forEach((r: ImportedRepo) => {
+              if (r.url) urlMap[r.url.toLowerCase()] = r.id;
+            });
+            setImportedUrls(urlMap);
+          }
+        }
+      } catch {
+        // Silent fail for imported repos fetch
+      }
+    } catch (err) {
+      console.error("Error fetching repositories:", err);
+      setError("An error occurred while loading repositories.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     fetchRepos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, pageParam, includeOrg, queryParam]);
 
   const handlePageChange = (newPage: number) => {
@@ -195,9 +198,9 @@ function GitHubReposContent() {
     const targetUrl = repo.url || `https://github.com/${repo.name}`;
     if (importedUrls[targetUrl.toLowerCase()]) {
       const internalId = importedUrls[targetUrl.toLowerCase()];
-      setDialogState({ 
-        isOpen: true, 
-        type: "already_imported", 
+      setDialogState({
+        isOpen: true,
+        type: "already_imported",
         internalId,
         message: "This repository has already been imported into OSCA."
       });
@@ -241,7 +244,7 @@ function GitHubReposContent() {
   };
 
   return (
-    <div className="max-w-7xl w-full mx-auto flex flex-col select-none relative space-y-10 pb-16 px-4 sm:px-6">
+    <div className="max-w-7xl w-full mx-auto flex flex-col select-none relative space-y-10 pb-16">
       {/* Decorative background gradients */}
       <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none blur-3xl -z-10" />
 
@@ -249,7 +252,7 @@ function GitHubReposContent() {
       <SearchHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between border-b border-neutral-800/50 pb-5 sticky top-0 z-20 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-neutral-800/50 pb-5 pt-2 sticky top-0 z-20 bg-black/80 backdrop-blur-md shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
           <div className="flex items-center gap-3 mb-2">
             <label className="flex items-center gap-3 text-sm text-neutral-400 font-medium hover:text-neutral-200 cursor-pointer select-none transition-colors group">
               <div className="relative flex items-center">
@@ -272,10 +275,7 @@ function GitHubReposContent() {
             </div>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4 text-center border border-red-500/20 rounded-3xl bg-gradient-to-b from-red-500/5 to-transparent relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-red-500/50 to-transparent"></div>
-            <p className="text-red-400 text-base font-medium">{error}</p>
-          </div>
+          <ErrorState message={error} onRetry={fetchRepos} />
         ) : repos.length > 0 ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-6">
             {repos.map((repo) => (
@@ -333,7 +333,7 @@ function GitHubReposContent() {
                 </div>
               )}
               <DialogTitle className="text-lg font-medium tracking-tight text-neutral-100">
-                {dialogState.type === "success" ? "Success" : 
+                {dialogState.type === "success" ? "Success" :
                  dialogState.type === "error" ? "Import Failed" : "Already Imported"}
               </DialogTitle>
             </div>
@@ -352,7 +352,7 @@ function GitHubReposContent() {
               </button>
             </DialogClose>
             {dialogState.type === "already_imported" && dialogState.internalId && (
-              <button 
+              <button
                 onClick={() => router.push(`/dashboard/repository/${dialogState.internalId}`)}
                 className="px-4 py-2 rounded-lg bg-emerald-500 text-neutral-950 hover:bg-emerald-400 text-sm font-medium transition-colors"
               >

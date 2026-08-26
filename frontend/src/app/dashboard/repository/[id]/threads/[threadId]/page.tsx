@@ -1,5 +1,5 @@
 "use client";
-
+import { ErrorState } from "@/components/ui/error-state";
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
@@ -94,7 +94,17 @@ export default function ThreadPage() {
   }, [repositoryId, threadId, token]);
 
   if (loading) return <div className="p-12 text-center text-neutral-400 animate-pulse">Loading Thread...</div>;
-  if (!thread || !repoDetails) return <div className="p-12 text-center text-red-400">Failed to load thread.</div>;
+  if (!thread || !repoDetails) {
+  return (
+    <div className="max-w-2xl mx-auto mt-20">
+      <ErrorState
+        message="Failed to load thread."
+        onRetry={() => window.location.reload()}
+      />
+    </div>
+  );
+}
+
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-8 pb-16 pt-8">

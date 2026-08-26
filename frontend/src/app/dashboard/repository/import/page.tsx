@@ -1,5 +1,5 @@
 "use client";
-
+import { ErrorState } from "@/components/ui/error-state";
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
@@ -74,8 +74,12 @@ function ImportContent() {
   }, [url, token, router]);
 
   if (!url) {
-    return <div className="text-red-500 text-center mt-20">Missing repository URL</div>;
-  }
+  return (
+    <div className="max-w-2xl mx-auto mt-20">
+      <ErrorState message="Missing repository URL." />
+    </div>
+  );
+}
 
   return (
     <div className="w-full h-[60vh] flex flex-col items-center justify-center text-center space-y-12 max-w-2xl mx-auto z-10 relative">
@@ -83,10 +87,10 @@ function ImportContent() {
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none" />
 
       {error ? (
-        <div className="w-full text-red-400 bg-red-500/10 border border-red-500/20 p-6 rounded-[24px]">
-          <p className="font-medium mb-1">Import Failed</p>
-          <p className="text-sm opacity-80">{error}</p>
-        </div>
+        <ErrorState
+    message={error}
+    onRetry={() => window.location.reload()}
+  />
       ) : (
         <div className="space-y-12 flex flex-col items-center w-full z-10">
           <div className="space-y-4">
