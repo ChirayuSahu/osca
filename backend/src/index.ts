@@ -32,9 +32,10 @@ process.on('SIGTERM', gracefulShutdown)
 process.on('SIGINT', gracefulShutdown)
 
 process.on('unhandledRejection', (err: Error) => {
-  console.error('Unhandled Rejection! Shutting down...')
-  console.error(err.name, err.message)
-  server.close(() => {
-    process.exit(1)
-  })
+  console.error('Unhandled Rejection:', err.name, err.message)
+  if (config.nodeEnv === 'production') {
+    server.close(() => {
+      process.exit(1)
+    })
+  }
 })

@@ -51,25 +51,25 @@ const renderLink = (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
         className="group relative flex items-center justify-between p-4 my-4 rounded-2xl bg-neutral-900/40 border border-white/[0.08] hover:border-emerald-500/30 hover:bg-neutral-900/80 transition-all duration-300 overflow-hidden no-underline w-full max-w-md shadow-lg"
       >
         {/* Subtle gradient hover background */}
-        <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <span className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 via-emerald-500/0 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-10 h-10 rounded-full bg-white/[0.05] border border-white/[0.1] flex items-center justify-center group-hover:scale-110 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-all duration-300 shadow-inner">
+        <span className="flex items-center gap-4 relative z-10">
+          <span className="w-10 h-10 rounded-full bg-white/[0.05] border border-white/[0.1] flex items-center justify-center group-hover:scale-110 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-all duration-300 shadow-inner">
             <GithubIcon className="w-5 h-5 text-neutral-300 group-hover:text-emerald-400 transition-colors" />
-          </div>
-          <div className="flex flex-col">
+          </span>
+          <span className="flex flex-col">
             <span className="text-sm font-medium text-white group-hover:text-emerald-300 transition-colors truncate max-w-[200px]">
               {repoName}
             </span>
             <span className="text-xs text-neutral-500 group-hover:text-neutral-400">
               View Repository
             </span>
-          </div>
-        </div>
+          </span>
+        </span>
 
-        <div className="relative z-10 w-8 h-8 rounded-full bg-white/[0.03] flex items-center justify-center group-hover:bg-emerald-500 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all duration-300">
+        <span className="relative z-10 w-8 h-8 rounded-full bg-white/[0.03] flex items-center justify-center group-hover:bg-emerald-500 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all duration-300">
           <ExternalLink className="w-4 h-4 text-neutral-400 group-hover:text-neutral-950 transition-colors" />
-        </div>
+        </span>
       </a>
     );
   }
