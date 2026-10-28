@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dither } from "@/components/ui/dither";
 import { GithubIcon } from "@/components/icons";
 import { Wordmark } from "@/components/landing/navbar";
+import { Reveal } from "@/components/landing/reveal";
 
 const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   { icon: Compass, title: "Skill-based matches", description: "Ranked by how much of a repo is written in languages you actually use." },
@@ -31,7 +32,7 @@ export default function BenefitsSection() {
     <>
       <section id="features" className="scroll-mt-16 border-t border-border">
         <div className="mx-auto w-full max-w-7xl px-4 py-20 md:px-6 md:py-28">
-          <div className="mb-12 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <Reveal className="mb-12 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="space-y-3">
               <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
                 <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
@@ -42,8 +43,8 @@ export default function BenefitsSection() {
             <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
               Everything is aimed at one thing: getting from &ldquo;I want to contribute&rdquo; to an open PR.
             </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          </Reveal>
+          <Reveal stagger className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map(({ icon: Icon, title, description }) => (
               <div key={title} className="flex flex-col gap-3 rounded-md border border-border bg-card p-6">
                 <Icon className="size-5 text-emerald-600 dark:text-emerald-400" />
@@ -51,7 +52,7 @@ export default function BenefitsSection() {
                 <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
               </div>
             ))}
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -65,7 +66,7 @@ export default function BenefitsSection() {
           peak={0.55}
           className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
         />
-        <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center md:px-6">
+        <Reveal stagger className="mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-4 py-24 text-center md:px-6">
           <h2 className="text-balance font-serif text-4xl font-medium italic tracking-tight md:text-5xl">
             Your first contribution is closer than you think.
           </h2>
@@ -77,7 +78,7 @@ export default function BenefitsSection() {
               <GithubIcon /> Continue with GitHub
             </Link>
           </Button>
-        </div>
+        </Reveal>
       </section>
 
       <footer className="border-t border-border">

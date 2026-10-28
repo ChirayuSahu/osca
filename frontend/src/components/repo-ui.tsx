@@ -209,13 +209,28 @@ export function StatStrip({ stats, className }: { stats: Stat[]; className?: str
 /* ─── Meter ────────────────────────────────────────────────────────────────── */
 
 /** Pixel meter in the dither style: filled squares out of `segments` */
-export function SegmentedMeter({ value, segments = 24, className }: { value: number; segments?: number; className?: string }) {
+export function SegmentedMeter({
+  value,
+  segments = 24,
+  animated = false,
+  className,
+}: {
+  value: number;
+  segments?: number;
+  /** Filled segments light up left to right once a parent gets `in-view` (landing page) */
+  animated?: boolean;
+  className?: string;
+}) {
   const clamped = Math.max(0, Math.min(100, value));
   const filled = Math.round((clamped / 100) * segments);
   return (
     <div className={cn("flex gap-[3px]", className)} role="meter" aria-valuenow={Math.round(clamped)} aria-valuemin={0} aria-valuemax={100}>
       {Array.from({ length: segments }, (_, i) => (
-        <span key={i} className={cn("h-2 flex-1 rounded-[1px]", i < filled ? "bg-emerald-500" : "bg-muted")} />
+        <span
+          key={i}
+          className={cn("h-2 flex-1 rounded-[1px]", i < filled ? "bg-emerald-500" : "bg-muted", animated && i < filled && "segment-on")}
+          style={animated && i < filled ? ({ "--i": i } as React.CSSProperties) : undefined}
+        />
       ))}
     </div>
   );

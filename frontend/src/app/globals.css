@@ -323,3 +323,69 @@
     animation-duration: 1ms;
   }
 }
+
+/* ── Landing motion ──────────────────────────────────────────────────────────
+   .reveal / .reveal-stagger wait until they get .in-view (IntersectionObserver),
+   then rise in. Descendants can animate on .in-view too: meters, bars, flows. */
+.reveal { opacity: 0; transform: translateY(14px); }
+.reveal.in-view { opacity: 1; transform: none; animation: fluid-rise 700ms var(--ease-fluid) both; }
+
+.reveal-stagger > * { opacity: 0; transform: translateY(14px); }
+.reveal-stagger.in-view > * { opacity: 1; transform: none; animation: fluid-rise 700ms var(--ease-fluid) both; }
+.reveal-stagger.in-view > *:nth-child(2) { animation-delay: 80ms; }
+.reveal-stagger.in-view > *:nth-child(3) { animation-delay: 160ms; }
+.reveal-stagger.in-view > *:nth-child(4) { animation-delay: 240ms; }
+.reveal-stagger.in-view > *:nth-child(5) { animation-delay: 320ms; }
+.reveal-stagger.in-view > *:nth-child(6) { animation-delay: 400ms; }
+.reveal-stagger.in-view > *:nth-child(7) { animation-delay: 480ms; }
+.reveal-stagger.in-view > *:nth-child(8) { animation-delay: 560ms; }
+
+/* Hero: rises in on load, one line after another */
+.hero-rise > * { animation: fluid-rise 800ms var(--ease-fluid) both; }
+.hero-rise > *:nth-child(2) { animation-delay: 90ms; }
+.hero-rise > *:nth-child(3) { animation-delay: 180ms; }
+.hero-rise > *:nth-child(4) { animation-delay: 270ms; }
+.hero-rise > *:nth-child(5) { animation-delay: 360ms; }
+
+/* Meter segments light up left to right (each sets --i) */
+@keyframes segment-on {
+  from { background-color: var(--muted); }
+}
+.in-view .segment-on {
+  animation: segment-on 380ms var(--ease-fluid) both;
+  animation-delay: calc(250ms + var(--i, 0) * 28ms);
+}
+.reveal:not(.in-view) .segment-on,
+.reveal-stagger:not(.in-view) .segment-on { background-color: var(--muted); }
+
+/* Bars grow from the left */
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+}
+.in-view .grow-x {
+  transform-origin: left center;
+  animation: grow-x 900ms var(--ease-fluid) both;
+  animation-delay: calc(300ms + var(--i, 0) * 120ms);
+}
+
+/* Dashed connector flowing towards OSCA */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -16; }
+}
+.dash-flow { animation: dash-flow 900ms linear infinite; }
+
+/* Rows slide in from the left */
+@keyframes slide-in-x {
+  from { opacity: 0; transform: translateX(-10px); }
+}
+.in-view .slide-row {
+  animation: slide-in-x 600ms var(--ease-fluid) both;
+  animation-delay: calc(300ms + var(--i, 0) * 110ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal:not(.in-view) .segment-on,
+  .reveal-stagger:not(.in-view) .segment-on { background-color: revert-layer; }
+  .reveal, .reveal-stagger > *, .hero-rise > * { opacity: 1; transform: none; animation: none !important; }
+  .in-view .segment-on, .in-view .grow-x, .in-view .slide-row, .dash-flow { animation: none !important; }
+}

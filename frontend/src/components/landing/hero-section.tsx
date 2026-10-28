@@ -17,7 +17,7 @@ export default function HeroSection() {
         peak={0.6}
         className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
       />
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-7 px-4 pb-24 pt-20 text-center md:px-6 md:pb-32 md:pt-28">
+      <div className="hero-rise mx-auto flex w-full max-w-3xl flex-col items-center gap-7 px-4 pb-24 pt-20 text-center md:px-6 md:pb-32 md:pt-28">
         <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
           <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
           Open-source matchmaking
