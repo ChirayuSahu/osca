@@ -215,3 +215,17 @@ export type ReactionContent = typeof VALID_REACTIONS[number]
 
 export const isValidReaction = (content: string): content is ReactionContent =>
   (VALID_REACTIONS as readonly string[]).includes(content)
+
+// ─── Newcomer-friendly issue labels ──────────────────────────────────────────
+
+// Label spellings projects commonly use for newcomer-friendly issues. GitHub's
+// `labels` filter is case-insensitive and matches issues carrying ANY of them,
+// so nothing is double-counted.
+export const GOOD_FIRST_ISSUE_LABELS = [
+  'good first issue', 'good-first-issue', 'good first bug', 'good first contribution',
+  'first timers only', 'first-timers-only', 'first-timer', 'newcomer', 'newcomers',
+  'beginner', 'beginner friendly', 'beginner-friendly', 'easy', 'starter', 'E-easy'
+]
+export const HELP_WANTED_LABELS = [
+  'help wanted', 'help-wanted', 'contribution welcome', 'contributions welcome', 'up-for-grabs'
+]

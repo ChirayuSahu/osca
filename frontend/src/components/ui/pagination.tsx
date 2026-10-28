@@ -54,10 +54,10 @@ const PaginationLink = ({
     variant={variant}
     size={size}
     className={cn(
-      "rounded-xl border transition-all duration-200",
+      "rounded-md border transition-all duration-200",
       isActive 
-        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-400 hover:border-emerald-500/40 shadow-[0_0_12px_rgba(16,185,129,0.05)] font-medium"
-        : "border-white/[0.06] bg-neutral-950/60 text-neutral-400 hover:text-white hover:bg-white/[0.02] hover:border-white/[0.1]",
+        ? "border-input bg-background font-medium text-foreground shadow-xs"
+        : "border-transparent text-muted-foreground hover:bg-accent hover:text-accent-foreground",
       disabled && "opacity-25 pointer-events-none cursor-not-allowed",
       className
     )}
@@ -107,7 +107,7 @@ const PaginationEllipsis = ({
     className={cn("flex h-9 w-9 items-center justify-center", className)}
     {...props}
   >
-    <MoreHorizontal className="h-4 w-4 text-neutral-500" />
+    <MoreHorizontal className="size-4 text-muted-foreground" />
     <span className="sr-only">More pages</span>
   </span>
 )

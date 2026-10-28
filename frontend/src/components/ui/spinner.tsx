@@ -1,9 +1,9 @@
-export function Spinner() {
-  return (
-    <span
-      role="status"
-      className="inline-flex h-6 w-6 animate-spin rounded-full border-4 border-slate-300 border-t-transparent text-slate-900"
-      aria-label="Loading"
-    />
-  );
+import { Loader2Icon } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+
+function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
+  return <Loader2Icon role="status" aria-label="Loading" className={cn("size-4 animate-spin text-muted-foreground", className)} {...props} />
 }
+
+export { Spinner }

@@ -1,6 +1,7 @@
 export interface RepositoryAnalysisJobData {
   url: string
-  userId: string
+  /** Omitted for system jobs (seeding), which use the server GITHUB_TOKEN */
+  userId?: string
   force?: boolean
 }
 

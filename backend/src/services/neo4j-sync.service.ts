@@ -18,6 +18,16 @@ const toNum = (value: unknown): number => {
   return typeof boxed.toNumber === 'function' ? boxed.toNumber() : Number(value)
 }
 
+const relTypeFor = (action: string): string => {
+  if (action === 'STARRED') return 'STARRED'
+  if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') return 'CONTRIBUTED_TO'
+  if (action === 'OWNS') return 'OWNS'
+  // Negative feedback: its own edge type so it never counts as a positive
+  // co-interaction in collaborative filtering.
+  if (action === 'REPOSITORY_NOT_INTERESTED') return 'NOT_INTERESTED'
+  return 'INTERACTED_WITH'
+}
+
 export const Neo4jSyncService = {
   async syncUser(user: { githubId?: number; username: string }) {
     if (!user.githubId) return
@@ -39,6 +49,11 @@ export const Neo4jSyncService = {
     owner: string;
     description?: string | null;
     stars?: number;
+    goodFirstIssueCount?: number;
+    helpWantedCount?: number;
+    hasContributingGuide?: boolean;
+    archived?: boolean;
+    pushedAt?: Date | null;
   }) {
     await withSession(session =>
       session.run(
@@ -47,35 +62,48 @@ export const Neo4jSyncService = {
         SET r.name = $name,
             r.owner = $owner,
             r.description = $description,
-            r.stars = $stars
+            r.stars = $stars,
+            r.goodFirstIssues = $goodFirstIssues,
+            r.helpWanted = $helpWanted,
+            r.hasContributing = $hasContributing,
+            r.archived = $archived,
+            r.pushedAt = $pushedAt
         `,
         {
           id: repo.id,
           name: repo.name,
           owner: repo.owner,
           description: repo.description ?? '',
-          stars: repo.stars ?? 0
+          stars: repo.stars ?? 0,
+          goodFirstIssues: repo.goodFirstIssueCount ?? 0,
+          helpWanted: repo.helpWantedCount ?? 0,
+          hasContributing: repo.hasContributingGuide ?? false,
+          archived: repo.archived ?? false,
+          // epoch ms; null when unknown
+          pushedAt: repo.pushedAt ? repo.pushedAt.getTime() : null
         }
       )
     )
   },
 
   async syncInteraction(userGithubId: number, repoId: string, action: string) {
-    // Basic interaction mapping (example)
-    let relType = 'INTERACTED_WITH'
-    if (action === 'STARRED') relType = 'STARRED'
-    else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
-    else if (action === 'OWNS') relType = 'OWNS'
+    const relType = relTypeFor(action)
+
+    // INTERACTED_WITH edges are keyed by action so undoing one (e.g. unliking)
+    // doesn't erase the user's other history with the same repo.
+    const relPattern = relType === 'INTERACTED_WITH'
+      ? 'MERGE (u)-[rel:INTERACTED_WITH {action: $action}]->(r)'
+      : `MERGE (u)-[rel:${relType}]->(r)`
 
     await withSession(session =>
       session.run(
         `
         MATCH (u:User {githubId: $userGithubId})
         MATCH (r:Repository {id: $repoId})
-        MERGE (u)-[rel:${relType}]->(r)
+        ${relPattern}
         SET rel.updatedAt = datetime()
         `,
-        { userGithubId, repoId }
+        { userGithubId, repoId, action }
       )
     )
   },
@@ -83,107 +111,134 @@ export const Neo4jSyncService = {
   // Mirrors syncInteraction's action->relType mapping so callers can undo a
   // toggle (e.g. unliking a repo) without needing to know the Cypher rel type.
   async removeInteraction(userGithubId: number, repoId: string, action: string) {
-    let relType = 'INTERACTED_WITH'
-    if (action === 'STARRED') relType = 'STARRED'
-    else if (action === 'CONTRIBUTED_TO' || action === 'CONTRIBUTION') relType = 'CONTRIBUTED_TO'
-    else if (action === 'OWNS') relType = 'OWNS'
+    const relType = relTypeFor(action)
+
+    // Edges written before actions were recorded have no `action`; they can't
+    // be attributed, so they go too (matching the old behaviour).
+    const actionFilter = relType === 'INTERACTED_WITH'
+      ? 'WHERE rel.action = $action OR rel.action IS NULL'
+      : ''
 
     await withSession(session =>
       session.run(
         `
         MATCH (u:User {githubId: $userGithubId})-[rel:${relType}]->(r:Repository {id: $repoId})
+        ${actionFilter}
         DELETE rel
         `,
-        { userGithubId, repoId }
+        { userGithubId, repoId, action }
       )
     )
   },
 
+  // Replaces the user's skill edges wholesale so skills dropped by a
+  // re-analysis stop driving recommendations.
   async syncUserSkills(userGithubId: number, skills: { name: string; proficiencyScore: number }[]) {
-    await withSession(async session => {
-      for (const skill of skills) {
-        await session.run(
+    await withSession(session =>
+      session.executeWrite(async tx => {
+        await tx.run(
+          `
+          MATCH (u:User {githubId: $userGithubId})-[rel:HAS_SKILL]->(s:Skill)
+          WHERE NOT s.name IN $skillNames
+          DELETE rel
+          `,
+          { userGithubId, skillNames: skills.map(skill => skill.name) }
+        )
+        await tx.run(
           `
           MATCH (u:User {githubId: $userGithubId})
-          MERGE (s:Skill {name: $skillName})
+          UNWIND $skills AS skill
+          MERGE (s:Skill {name: skill.name})
           MERGE (u)-[rel:HAS_SKILL]->(s)
-          SET rel.score = $score
+          SET rel.score = skill.score
           `,
-          { userGithubId, skillName: skill.name, score: skill.proficiencyScore }
+          {
+            userGithubId,
+            skills: skills.map(skill => ({ name: skill.name, score: skill.proficiencyScore }))
+          }
         )
-      }
-    })
+      })
+    )
   },
 
+  // Replaces the repo's language/framework/tool/CI edges so a re-analysis
+  // reflects what the repo uses now, not everything it ever used.
   async syncRepositoryTechStack(repoId: string, data: { languages: Record<string, number>, frameworks: string[], techStack: string[], ciCd: string[] }) {
-    await withSession(async session => {
-      // 1. Sync Languages
-      for (const [lang, bytes] of Object.entries(data.languages)) {
-        await session.run(
-          `
-          MATCH (r:Repository {id: $repoId})
-          MERGE (l:Language {name: $lang})
-          MERGE (r)-[rel:USES_LANGUAGE]->(l)
-          SET rel.bytes = $bytes
-          `,
-          { repoId, lang, bytes }
-        )
-      }
+    const languages = Object.entries(data.languages).map(([name, bytes]) => ({ name, bytes }))
+    const tools = data.techStack.filter(tech => !data.frameworks.includes(tech))
 
-      // 2. Sync Frameworks
-      for (const framework of data.frameworks) {
-        await session.run(
+    await withSession(session =>
+      session.executeWrite(async tx => {
+        await tx.run(
+          `
+          MATCH (r:Repository {id: $repoId})-[rel:USES_LANGUAGE|USES_FRAMEWORK|USES_TOOL|USES_CI]->()
+          DELETE rel
+          `,
+          { repoId }
+        )
+        await tx.run(
           `
           MATCH (r:Repository {id: $repoId})
-          MERGE (f:Framework {name: $framework})
+          UNWIND $languages AS lang
+          MERGE (l:Language {name: lang.name})
+          MERGE (r)-[rel:USES_LANGUAGE]->(l)
+          SET rel.bytes = lang.bytes
+          `,
+          { repoId, languages }
+        )
+        await tx.run(
+          `
+          MATCH (r:Repository {id: $repoId})
+          UNWIND $frameworks AS framework
+          MERGE (f:Framework {name: framework})
           MERGE (r)-[:USES_FRAMEWORK]->(f)
           `,
-          { repoId, framework }
+          { repoId, frameworks: data.frameworks }
         )
-      }
-
-      // 3. Sync Tools/Databases/CI_CD
-      for (const tech of data.techStack) {
-        if (!data.frameworks.includes(tech)) {
-          await session.run(
-            `
-            MATCH (r:Repository {id: $repoId})
-            MERGE (t:Tool {name: $tech})
-            MERGE (r)-[:USES_TOOL]->(t)
-            `,
-            { repoId, tech }
-          )
-        }
-      }
-
-      for (const ci of data.ciCd) {
-        await session.run(
+        await tx.run(
           `
           MATCH (r:Repository {id: $repoId})
-          MERGE (c:CI_CD {name: $ci})
+          UNWIND $tools AS tech
+          MERGE (t:Tool {name: tech})
+          MERGE (r)-[:USES_TOOL]->(t)
+          `,
+          { repoId, tools }
+        )
+        await tx.run(
+          `
+          MATCH (r:Repository {id: $repoId})
+          UNWIND $ciCd AS ci
+          MERGE (c:CI_CD {name: ci})
           MERGE (r)-[:USES_CI]->(c)
           `,
-          { repoId, ci }
+          { repoId, ciCd: data.ciCd }
         )
-      }
-    })
+      })
+    )
   },
 
   async syncRepositoryTopics(repoId: string, topics: string[]) {
-    if (!topics.length) return
-
-    await withSession(async session => {
-      for (const topic of topics) {
-        await session.run(
+    await withSession(session =>
+      session.executeWrite(async tx => {
+        await tx.run(
+          `
+          MATCH (r:Repository {id: $repoId})-[rel:HAS_TOPIC]->(t:Topic)
+          WHERE NOT t.name IN $topics
+          DELETE rel
+          `,
+          { repoId, topics }
+        )
+        await tx.run(
           `
           MATCH (r:Repository {id: $repoId})
-          MERGE (t:Topic {name: $topic})
+          UNWIND $topics AS topic
+          MERGE (t:Topic {name: topic})
           MERGE (r)-[:HAS_TOPIC]->(t)
           `,
-          { repoId, topic }
+          { repoId, topics }
         )
-      }
-    })
+      })
+    )
   },
 
   // Aggregates everything the contributor-analysis scoring needs from the graph:

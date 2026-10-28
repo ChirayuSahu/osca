@@ -1,4 +1,14 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+import { API_URL, readApiError } from '@/lib/api'
+
+export interface StarterIssue {
+  number: number
+  title: string
+  url: string
+  createdAt: string
+  comments: number
+  assigned: boolean
+  labels: { name: string; color: string }[]
+}
 
 export const RepositoryService = {
   async analyzeRepository(url: string, token: string) {
@@ -10,7 +20,7 @@ export const RepositoryService = {
       },
       body: JSON.stringify({ url })
     })
-    if (!res.ok) throw new Error('Failed to start repository analysis')
+    if (!res.ok) throw await readApiError(res, 'Failed to start repository analysis')
     return res.json()
   },
 
@@ -18,16 +28,26 @@ export const RepositoryService = {
     const res = await fetch(`${API_URL}/repositories/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (!res.ok) throw new Error('Failed to fetch repository')
+    if (!res.ok) throw await readApiError(res, 'Failed to fetch repository')
     return res.json()
   },
 
-  async getRepositoryThreads(id: string, token: string, page = 1) {
-    const res = await fetch(`${API_URL}/repositories/${id}/threads?page=${page}`, {
+  // Adds a catalogue repo (already analyzed) to the user's imports
+  async importRepository(id: string, token: string): Promise<{ alreadyImported: boolean }> {
+    const res = await fetch(`${API_URL}/repositories/${id}/import`, {
+      method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (!res.ok) throw new Error('Failed to fetch threads')
-    return res.json()
+    if (!res.ok) throw await readApiError(res, 'Failed to import repository')
+    return { alreadyImported: !!(await res.json()).data?.alreadyImported }
+  },
+
+  async getStarterIssues(id: string, token: string): Promise<StarterIssue[]> {
+    const res = await fetch(`${API_URL}/repositories/${id}/starter-issues`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw await readApiError(res, 'Failed to fetch starter issues')
+    return (await res.json()).data ?? []
   },
 
   async toggleLike(id: string, token: string) {
@@ -35,7 +55,8 @@ export const RepositoryService = {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (!res.ok) throw new Error('Failed to toggle repository like')
-    return res.json()
+    if (!res.ok) throw await readApiError(res, 'Failed to toggle repository like')
+    // 201 = now liked, 200 = like removed
+    return { liked: res.status === 201 }
   }
 }

@@ -1,43 +1,51 @@
-import React from "react";
+import * as React from "react"
 
-interface PageHeaderProps {
-  title: string;
-  description?: string;
-  icon?: React.ReactNode;
-  actions?: React.ReactNode;
-  children?: React.ReactNode; // Optional extra content like search bar or filters below
+import { cn } from "@/lib/utils"
+import { Dither } from "@/components/ui/dither"
+
+interface PageHeaderProps extends Omit<React.ComponentProps<"div">, "title"> {
+  title: React.ReactNode
+  description?: React.ReactNode
+  /** Small label above the title, e.g. the section ("Discover") */
+  eyebrow?: React.ReactNode
+  actions?: React.ReactNode
 }
 
-export function PageHeader({ title, description, icon, actions, children }: PageHeaderProps) {
+// Page heading: eyebrow, italic display title, muted subtitle and actions,
+// over a soft emerald dither cloud on the right that fades out on every side.
+function PageHeader({ title, description, eyebrow, actions, className, children, ...props }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-6 mb-8 pt-4 z-10 relative">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-2.5">
-          <h1 className="text-3xl font-medium tracking-tight text-neutral-100 flex items-center gap-3">
-            {icon && (
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                {icon}
-              </div>
-            )}
-            {title}
-          </h1>
-          {description && (
-            <p className="text-neutral-400 text-base font-light">
-              {description}
-            </p>
-          )}
-        </div>
-        {actions && (
-          <div className="flex items-center gap-3">
-            {actions}
-          </div>
-        )}
-      </div>
-      {children && (
-        <div className="w-full">
-          {children}
-        </div>
+    <div data-slot="page-header" className={cn("relative isolate flex flex-col gap-4", className)} {...props}>
+      <Dither
+        cols={120}
+        rows={34}
+        cell={4}
+        direction="radial"
+        falloff={1.2}
+        peak={0.75}
+        className="absolute -top-8 -right-6 -z-10 text-emerald-500/[0.16]"
+      />
+
+      {eyebrow && (
+        <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">
+          <span className="size-1.5 rounded-full bg-emerald-500" />
+          {eyebrow}
+        </p>
       )}
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0 space-y-2">
+          <h1 className="font-serif text-4xl leading-[1.05] font-medium tracking-tight italic md:text-5xl">{title}</h1>
+          {description && <p className="max-w-2xl text-base text-muted-foreground">{description}</p>}
+        </div>
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      </div>
+
+      {children}
+
+      <div className="mt-2 h-px bg-border" />
     </div>
-  );
+  )
 }
+
+export { PageHeader }

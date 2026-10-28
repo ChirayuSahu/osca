@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-COPY tsconfig.json ./
+COPY tsconfig.json prisma.config.ts ./
 COPY prisma ./prisma/
 
 # Install all dependencies (including devDependencies)
@@ -12,6 +12,7 @@ RUN npm ci
 
 # Copy source files
 COPY src ./src/
+COPY scripts ./scripts/
 COPY swagger.yaml ./
 
 # Generate Prisma Client
@@ -28,7 +29,7 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy compiled files and generated prisma client from builder
 COPY --from=builder /usr/src/app/dist ./dist

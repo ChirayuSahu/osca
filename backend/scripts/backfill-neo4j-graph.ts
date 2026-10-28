@@ -22,6 +22,7 @@ import { neo4jDriver } from '../src/utils/neo4j'
 import { Neo4jSyncService } from '../src/services/neo4j-sync.service'
 import { ContributorAnalysisService } from '../src/services/contributor-analysis.service'
 import { JobEnqueueService } from '../src/services/job-enqueue.service'
+import { config } from '../src/config'
 
 const backfillInteractions = async () => {
   const interactions = await prisma.userInteraction.findMany({
@@ -71,7 +72,7 @@ const backfillStarredRepos = async () => {
     select: {
       id: true,
       username: true,
-      oauthAccounts: { where: { provider: 'github' }, select: { providerId: true } }
+      oauthAccounts: { where: { provider: 'github' }, select: { providerId: true, username: true } }
     }
   })
 
@@ -93,6 +94,8 @@ const backfillStarredRepos = async () => {
       await Neo4jSyncService.syncUser({ githubId, username: user.username })
       const count = await ContributorAnalysisService.syncStarredRepositories(user.id, githubId, user.username)
       console.log(`[Backfill] ${user.username} — synced ${count} STARRED edges`)
+      const ownedCount = await ContributorAnalysisService.syncOwnedRepositories(githubId, user.oauthAccounts[0].username)
+      console.log(`[Backfill] ${user.username} — synced ${ownedCount} OWNS edges`)
       processed++
     } catch (err) {
       console.error(`[Backfill] Failed to sync starred repos for ${user.username}:`, err)
@@ -102,10 +105,11 @@ const backfillStarredRepos = async () => {
   console.log(`[Backfill] Starred repos: processed ${processed} users, skipped ${skipped} (no linked GitHub account)`)
 }
 
+// Runs as system jobs on the server GITHUB_TOKEN rather than borrowing some
+// user's personal OAuth token.
 const backfillRepositoryAnalysis = async () => {
-  const user = await prisma.user.findFirst()
-  if (!user) {
-    console.error('[Backfill] Cannot re-analyze repos: No user found in database to attach to jobs')
+  if (!config.githubServerToken) {
+    console.error('[Backfill] Cannot re-analyze repos: GITHUB_TOKEN is not set')
     return
   }
 
@@ -116,7 +120,7 @@ const backfillRepositoryAnalysis = async () => {
   for (const repo of repos) {
     if (!repo.url) continue
     try {
-      const job = await JobEnqueueService.enqueueRepositoryAnalysis(repo.url, user.id)
+      const job = await JobEnqueueService.enqueueRepositoryAnalysis(repo.url)
       console.log(`[Backfill] Enqueued repo ${repo.fullName || repo.url} -> Queue: ${job.queue}, Job ID: ${job.jobId}${job.alreadyQueued ? ' (already queued)' : ''}`)
       enqueued++
     } catch (err) {

@@ -1,0 +1,7 @@
+$kind: http-request
+name: Search GitHub
+url: "{{BASE_URL}}/api/v1/repositories/github/search?q=language:rust cli&page=1&limit=9&goodFirst=true"
+method: GET
+headers:
+  Authorization: Bearer {{JWT_TOKEN}}
+order: 3600

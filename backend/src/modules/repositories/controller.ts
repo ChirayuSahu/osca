@@ -7,12 +7,14 @@ import { AppError, assertFound } from '../../lib/errors'
 import { resolveRepositoryUrl, getGithubIdForUser } from '../../lib/github'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { RepositoryService } from './service'
+import { NOT_INTERESTED_ACTION } from '../../services/recommendation-engine.service'
 import { InteractionService } from '../../services/interaction.service'
 import { Neo4jSyncService } from '../../services/neo4j-sync.service'
 import { githubGetJson, githubTryGetRaw, githubGraphQL } from '../../lib/github/client'
+import { decryptToken } from '../../lib/crypto/token-cipher'
 import { asyncHandler } from '../../utils/async-handler'
 import { IGNORED_DIRS, IGNORED_FILES } from '../../lib/github/utils/constants'
-import type { Repository } from '@prisma/client'
+import type { Prisma, Repository } from '@prisma/client'
 
 const requireUserId = (req: RequestWithUser): string => {
   const userId = req.user?.id
@@ -70,7 +72,17 @@ const getRepository = asyncHandler(async (req: RequestWithUser, res: Response) =
     await assertRepositoryVisible(repository, userId)
   }
 
-  sendResponse(res, 200, true, 'Repository retrieved successfully', repository)
+  const userId = req.user?.id
+  const [likeCount, myLike] = await Promise.all([
+    prisma.repositoryLike.count({ where: { repositoryId: id } }),
+    userId ? prisma.repositoryLike.findUnique({ where: { userId_repositoryId: { userId, repositoryId: id } } }) : null
+  ])
+
+  sendResponse(res, 200, true, 'Repository retrieved successfully', {
+    ...repository,
+    likeCount,
+    likedByMe: !!myLike
+  })
 })
 
 const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: Response) => {
@@ -108,9 +120,10 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
   if (!account || !account.accessToken) {
     throw new AppError('GitHub account not connected', 400)
   }
+  const githubToken = decryptToken(account.accessToken)
 
   try {
-    const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, account.accessToken)
+    const ghRepo = await githubGetJson<any>(`/repos/${owner}/${repo}`, githubToken)
 
     let dependencies: any[] = []
     try {
@@ -133,7 +146,7 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
           }
         }
       `
-      const depRes = await githubGraphQL<any>(query, account.accessToken, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json')
+      const depRes = await githubGraphQL<any>(query, githubToken, { owner, repo }, 'application/vnd.github.hawkgirl-preview+json')
       dependencies = depRes.data?.repository?.dependencyGraphManifests?.nodes || []
     } catch (err) {
       console.error(`[RepoPreview] Dependency graph error:`, err)
@@ -141,7 +154,7 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
 
     if (dependencies.length === 0) {
       try {
-        const rawPkg = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/package.json`, account.accessToken)
+        const rawPkg = await githubTryGetRaw(`/repos/${owner}/${repo}/contents/package.json`, githubToken)
         if (rawPkg) {
           const pkgJson = typeof rawPkg === 'string' ? JSON.parse(rawPkg) : rawPkg
           const nodes = []
@@ -168,10 +181,10 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
       let treeRes: any
 
       try {
-        treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}?recursive=1`, account.accessToken)
+        treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}?recursive=1`, githubToken)
       } catch (err) {
         console.warn(`[RepoPreview] Recursive tree fetch failed for ${owner}/${repo}, falling back to shallow.`, err)
-        treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}`, account.accessToken)
+        treeRes = await githubGetJson<any>(`${repoPath}/git/trees/${branch}`, githubToken)
         isShallow = true
       }
 
@@ -241,14 +254,30 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
   }
 })
 
+// `?scope=imported` lists only what the requesting user imported, plus repos
+// they own on GitHub; the default lists the whole visible catalogue.
 const listRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const skip = req.pagination?.skip
   const take = req.pagination?.take
 
+  let where: Prisma.RepositoryWhereInput = { hidden: false }
+  if (req.query.scope === 'imported') {
+    const userId = requireUserId(req)
+    const accounts = await prisma.oAuthAccount.findMany({ where: { userId }, select: { username: true } })
+    const logins = accounts.map(a => a.username)
+    where = {
+      OR: [
+        { imports: { some: { userId } } },
+        ...(logins.length ? [{ owner: { in: logins, mode: 'insensitive' as const } }] : [])
+      ]
+    }
+  }
+
   const [total, repos] = await Promise.all([
-    prisma.repository.count({ where: { hidden: false } }),
+    prisma.repository.count({ where }),
     prisma.repository.findMany({
-      where: { hidden: false },
+      where,
+      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
       skip,
       take,
       omit: {
@@ -293,6 +322,90 @@ const deleteRepository = asyncHandler(async (req: RequestWithUser, res: Response
   sendResponse(res, 200, true, 'Repository deleted successfully')
 })
 
+// Adds an already-analyzed catalogue repo to the user's imports. No analysis
+// job is needed: the repo row, its graph data and signals already exist.
+const addRepositoryImport = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const repositoryId = String(req.params.id)
+  const repository = await prisma.repository.findUnique({ where: { id: repositoryId } })
+  if (!repository) {
+    throw new AppError('Repository not found', 404)
+  }
+  if (repository.hidden) await assertRepositoryVisible(repository, userId)
+
+  const existing = await prisma.repositoryImport.findUnique({
+    where: { userId_repositoryId: { userId, repositoryId } }
+  })
+  if (!existing) {
+    await prisma.repositoryImport.create({ data: { userId, repositoryId } })
+  }
+  sendResponse(res, existing ? 200 : 201, true, existing ? 'Repository already imported' : 'Repository imported', {
+    repositoryId,
+    alreadyImported: !!existing
+  })
+})
+
+// Removes the repo from the requesting user's imports only; the shared
+// repository row (and everyone else's imports) stay intact.
+const removeRepositoryImport = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const id = String(req.params.id)
+
+  const { count } = await prisma.repositoryImport.deleteMany({ where: { userId, repositoryId: id } })
+  if (count === 0) {
+    throw new AppError('Repository is not in your imports', 404)
+  }
+  sendResponse(res, 200, true, 'Repository removed from your imports')
+})
+
+// "Not interested": hides the repo from this user's feed. Recorded apart from
+// logInteraction, which would count it as interest in the repo's languages.
+const markNotInterested = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const repositoryId = String(req.params.id)
+  assertFound(await prisma.repository.findUnique({ where: { id: repositoryId }, select: { id: true } }), 'Repository not found')
+
+  const existing = await prisma.userInteraction.findFirst({ where: { userId, repositoryId, action: NOT_INTERESTED_ACTION } })
+  if (!existing) {
+    await prisma.userInteraction.create({ data: { userId, repositoryId, action: NOT_INTERESTED_ACTION, weight: 0 } })
+  }
+
+  const githubId = await getGithubIdForUser(userId)
+  if (githubId !== null) {
+    Neo4jSyncService.syncInteraction(githubId, repositoryId, NOT_INTERESTED_ACTION).catch((error) => {
+      console.error(`[Neo4jSync] Failed to sync not-interested for user ${userId}, repo ${repositoryId}:`, error)
+    })
+  }
+  sendResponse(res, 201, true, 'Repository hidden from your feed')
+})
+
+const clearNotInterested = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const repositoryId = String(req.params.id)
+
+  await prisma.userInteraction.deleteMany({ where: { userId, repositoryId, action: NOT_INTERESTED_ACTION } })
+  const githubId = await getGithubIdForUser(userId)
+  if (githubId !== null) {
+    Neo4jSyncService.removeInteraction(githubId, repositoryId, NOT_INTERESTED_ACTION).catch((error) => {
+      console.error(`[Neo4jSync] Failed to clear not-interested for user ${userId}, repo ${repositoryId}:`, error)
+    })
+  }
+  sendResponse(res, 200, true, 'Repository restored to your feed')
+})
+
+// Open good-first issues for a repository, for the newcomer panel.
+const listStarterIssues = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const userId = requireUserId(req)
+  const repository = await prisma.repository.findUnique({ where: { id: String(req.params.id) } })
+  if (!repository) {
+    throw new AppError('Repository not found', 404)
+  }
+  if (repository.hidden) await assertRepositoryVisible(repository, userId)
+
+  const issues = await RepositoryService.listStarterIssues(userId, repository.owner, repository.name)
+  sendResponse(res, 200, true, 'Starter issues retrieved successfully', issues)
+})
+
 const listGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
   const userId = requireUserId(req)
   const page = req.pagination?.page ?? 1
@@ -304,6 +417,23 @@ const listGithubRepositories = asyncHandler(async (req: RequestWithPaginationAnd
   const result = await RepositoryService.listGithubRepositories(userId, page, limit, affiliation, search)
 
   sendResponse(res, 200, true, 'User GitHub repositories retrieved successfully', result.repos, {
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalPages: result.totalPages
+  })
+})
+
+const searchGithubRepositories = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response) => {
+  const userId = requireUserId(req)
+  const page = req.pagination?.page ?? 1
+  const limit = req.pagination?.limit ?? 10
+  const search = typeof req.query.q === 'string' ? req.query.q : ''
+  const goodFirstOnly = req.query.goodFirst === 'true'
+
+  const result = await RepositoryService.searchGithubRepositories(userId, search, page, limit, goodFirstOnly)
+
+  sendResponse(res, 200, true, 'GitHub repositories found', result.repos, {
     page: result.page,
     limit: result.limit,
     total: result.total,
@@ -438,7 +568,13 @@ export const RepositoryController = {
   getRepositoryByFullName,
   listRepositories,
   deleteRepository,
+  addRepositoryImport,
+  removeRepositoryImport,
+  listStarterIssues,
+  markNotInterested,
+  clearNotInterested,
   listGithubRepositories,
+  searchGithubRepositories,
   listPersonalGithubRepositories,
   listOrganizationGithubRepositories,
   toggleRepositoryLike,

@@ -36,6 +36,13 @@ const enqueue = async (
         alreadyQueued: true
       }
     }
+
+    // A finished job keeps its ID until removeOnComplete/removeOnFail expires it,
+    // and BullMQ silently ignores add() for an ID it still holds. Clear it so
+    // re-analysis actually runs.
+    if (state === 'completed' || state === 'failed') {
+      await existingJob.remove()
+    }
   }
 
   const job = await queue.add(jobName, data, { jobId })
@@ -54,8 +61,8 @@ const enqueue = async (
 }
 
 export const JobEnqueueService = {
-  enqueueRepositoryAnalysis: (url: string, userId: string, force: boolean = false) => {
-    let jobKey = `${userId}:${url}`
+  enqueueRepositoryAnalysis: (url: string, userId?: string, force: boolean = false) => {
+    let jobKey = `${userId ?? 'system'}:${url}`
     if (force) jobKey += ':force'
     const jobId = deterministicJobId('repo-analysis', jobKey)
     return enqueue(QUEUE_NAMES.REPOSITORY_ANALYSIS, 'analyze-repository', { url, userId, force }, jobId)

@@ -26,7 +26,12 @@ export const detectPythonFrameworks = (requirementsTxt: string, frameworkSet: Se
 
 export const parsePackageJson = (data: unknown): { dependencies?: Record<string, string>; devDependencies?: Record<string, string> } => {
   if (typeof data === 'string') {
-    return JSON.parse(data)
+    // A malformed package.json in one repo must not fail the whole analysis
+    try {
+      return JSON.parse(data)
+    } catch {
+      return {}
+    }
   }
   return data as { dependencies?: Record<string, string>; devDependencies?: Record<string, string> }
 }

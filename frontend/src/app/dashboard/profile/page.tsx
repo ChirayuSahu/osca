@@ -2,23 +2,34 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
-import { 
-  Sparkles, 
-  BookOpen, 
-  RefreshCw, 
-  UserCheck, 
-  Shield, 
-  Network, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  FileCode, 
-  GitMerge, 
-  Code2,
-  Loader2
-} from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback, Badge, Button } from "@/components/ui";
-import { GitHubCalendar } from 'react-github-calendar';
+import { useTheme } from "next-themes";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import dynamic from "next/dynamic";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  Button,
+  PageContainer,
+  PageHeader,
+  Skeleton,
+  Spinner,
+} from "@/components/ui";
 import { ErrorState } from "@/components/ui/error-state";
+import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
+import { GithubIcon } from "@/components/icons";
+import { Dither } from "@/components/ui/dither";
+import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
+import { Eyebrow, SegmentedMeter, Tag, timeAgo } from "@/components/repo-ui";
+import { API_URL } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { ProfileSkeleton } from "@/components/skeletons";
+
+// The contributions calendar is heavy and below the fold; load it on demand
+const GitHubCalendar = dynamic(() => import("react-github-calendar").then((m) => m.GitHubCalendar), {
+  ssr: false,
+  loading: () => <div className="h-[140px] w-full animate-pulse rounded-md bg-muted" aria-hidden />,
+});
 
 interface ContributorProfile {
   id: string;
@@ -30,7 +41,31 @@ interface ContributorProfile {
   overallScore: number;
   contributionHistory?: unknown;
   repositoryExperience?: unknown;
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+interface ContributionHistory {
+  linesAdded?: number;
+  avgPrCycleTime?: number;
+  codeReviewScore?: number;
+  totalCommits?: number;
+}
+
+interface QueuedJob {
+  jobId: string;
+  queue: string;
+}
+
+interface JobStatus {
+  state: string;
+  progress?: { percent?: number; message?: string };
+  failedReason?: string | null;
+}
+
+const JOB_POLL_MS = 3000;
+// Contributor analysis walks the user's repos; give it a generous ceiling.
+const JOB_POLL_LIMIT = 100;
 
 interface FullUser {
   id: string;
@@ -38,25 +73,56 @@ interface FullUser {
   username: string;
   email: string;
   avatarUrl: string | null;
-  skills: string[];
+  skills?: string[];
   contributionScore: number;
   contributorProfile: ContributorProfile | null;
 }
 
-const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    {...props}
-  >
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" />
-    <path d="M9 18c-4.51 2-5-2-7-2" />
-  </svg>
-);
+// Emerald contribution ramp, one per colour scheme (level 0 matches bg-muted).
+const CALENDAR_THEME = {
+  light: ["#ebedf0", "#a7f3d0", "#6ee7b7", "#10b981", "#047857"],
+  dark: ["#1f1f1f", "#064e3b", "#047857", "#10b981", "#34d399"],
+};
+const CALENDAR_WEEKS = 53;
+const CALENDAR_MARGIN = 3;
+// Room for the weekday labels ("Mon", "Wed", "Fri") left of the grid
+const CALENDAR_LABELS = 36;
+
+// Contribution calendar that fills its container: the block size is derived
+// from the measured width so 53 weeks always span the card.
+function ActivityCalendar({ username }: { username: string }) {
+  const { resolvedTheme } = useTheme();
+  const ref = useRef<HTMLDivElement>(null);
+  const [blockSize, setBlockSize] = useState(11);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = (width: number) => {
+      const size = Math.floor((width - CALENDAR_LABELS) / CALENDAR_WEEKS) - CALENDAR_MARGIN;
+      setBlockSize(Math.max(8, Math.min(16, size)));
+    };
+    measure(el.clientWidth);
+    const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="w-full overflow-x-auto text-muted-foreground custom-scrollbar">
+      <GitHubCalendar
+        username={username}
+        colorScheme={resolvedTheme === "dark" ? "dark" : "light"}
+        theme={CALENDAR_THEME}
+        fontSize={11}
+        blockSize={blockSize}
+        blockMargin={CALENDAR_MARGIN}
+        blockRadius={2}
+        showWeekdayLabels={["mon", "wed", "fri"]}
+      />
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const { user: authUser, token } = useAuth();
@@ -65,9 +131,13 @@ export default function ProfilePage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
   const hasTriggeredSync = useRef(false);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
+  useEffect(() => () => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+  }, []);
 
   // Fetch full user details (including contributorProfile)
   const fetchProfile = useCallback(async (silent = false) => {
@@ -96,45 +166,70 @@ export default function ProfilePage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [authUser?.id, token, API_URL]);
+  }, [authUser?.id, token]);
 
   useEffect(() => {
     fetchProfile();
   }, [fetchProfile]);
 
-  // Handle triggering contributor profile analysis
+  // Queue a contributor analysis and follow the job until it finishes, so
+  // failures (e.g. an expired GitHub token) are reported instead of spinning.
   const handleAnalyzeProfile = useCallback(async () => {
     if (!authUser?.id || !token) return;
+    const finish = (message: string | null) => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+      pollTimer.current = null;
+      setAnalyzing(false);
+      setAnalysisStatus("");
+      setAnalysisError(message);
+    };
+
     try {
       setAnalyzing(true);
-      setAnalysisStatus("Analyzing GitHub history...");
+      setAnalysisError(null);
+      setAnalysisStatus("Queuing analysis...");
       const res = await fetch(`${API_URL}/users/${authUser.id}/analyze`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (res.ok) {
-        let attempts = 0;
-        const interval = setInterval(async () => {
-          attempts++;
-          await fetchProfile(true);
-          
-          if (attempts >= 12) {
-            clearInterval(interval);
-            setAnalyzing(false);
-            setAnalysisStatus("");
-          }
-        }, 5000);
-      } else {
-        setAnalyzing(false);
+      if (!res.ok) {
+        finish(res.status === 429 ? "Too many analysis requests. Try again in a few minutes." : "Couldn't start the analysis.");
+        return;
       }
+
+      const job: QueuedJob = (await res.json()).data;
+      let attempts = 0;
+      pollTimer.current = setInterval(async () => {
+        attempts++;
+        try {
+          const statusRes = await fetch(`${API_URL}/jobs/${job.queue}/${job.jobId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!statusRes.ok) return;
+          const status: JobStatus = (await statusRes.json()).data;
+          setAnalysisStatus(
+            status.progress?.message
+              ? `${status.progress.message}${status.progress.percent ? ` (${status.progress.percent}%)` : ""}`
+              : "Analyzing GitHub history..."
+          );
+
+          if (status.state === "completed") {
+            await fetchProfile(true);
+            finish(null);
+          } else if (status.state === "failed") {
+            finish(status.failedReason || "The analysis failed.");
+          } else if (attempts >= JOB_POLL_LIMIT) {
+            finish("The analysis is taking longer than expected. Check back in a few minutes.");
+          }
+        } catch (err) {
+          console.error("Error polling analysis status:", err);
+        }
+      }, JOB_POLL_MS);
     } catch (err) {
       console.error("Error starting profile analysis:", err);
-      setAnalyzing(false);
+      finish("Couldn't start the analysis.");
     }
-  }, [authUser?.id, token, API_URL, fetchProfile]);
+  }, [authUser?.id, token, fetchProfile]);
 
   // Auto-sync if profile is loaded but has no analytics scores
   useEffect(() => {
@@ -144,319 +239,199 @@ export default function ProfilePage() {
     }
   }, [profile, analyzing, handleAnalyzeProfile]);
 
+  const header = (
+    <PageHeader eyebrow="Account" title="Profile" description="Contribution metrics from your GitHub history." />
+  );
+
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-4" />
-        <p className="text-neutral-400">Loading developer profile...</p>
-      </div>
-    );
+    return <ProfileSkeleton header={header} />;
   }
 
   if (error) {
     return (
-      <div className="max-w-7xl mx-auto mt-12 w-full">
+      <PageContainer>
+        {header}
         <ErrorState message={error} onRetry={() => fetchProfile()} />
-      </div>
+      </PageContainer>
     );
   }
 
-  const hasAnalytics = !!profile?.contributorProfile;
-  const analytics = profile?.contributorProfile;
+  const analytics = profile?.contributorProfile ?? null;
+  const history = (analytics?.contributionHistory ?? null) as ContributionHistory | null;
+  const repoExperience = analytics?.repositoryExperience as { skills?: { name: string; proficiencyScore: number }[] } | undefined;
+  const topSkills = (repoExperience?.skills ?? []).slice(0, 5).map((s) => ({ name: s.name, val: Math.round(s.proficiencyScore) }));
+  const tagSkills = (profile?.skills?.length ? profile.skills : topSkills.map((s) => s.name)).slice(0, 4);
+  const analyzedAt = analytics?.updatedAt ?? analytics?.createdAt;
+  const tokenProblem = !!analysisError && /github token/i.test(analysisError);
+  const username = profile?.username;
+
+  const stats = [
+    { label: "Lines added", value: history?.linesAdded ? `${(history.linesAdded / 1000).toFixed(1)}k` : null },
+    { label: "Avg PR cycle", value: history?.avgPrCycleTime ? `${history.avgPrCycleTime.toFixed(1)} d` : null },
+    { label: "Review score", value: history?.codeReviewScore ? `${history.codeReviewScore.toFixed(1)} / 5` : null },
+    { label: "Commits this year", value: history?.totalCommits ? history.totalCommits.toLocaleString() : null },
+  ];
+
+  const metrics = analytics
+    ? [
+        { label: "Skill depth", value: analytics.skillScore },
+        { label: "Activity", value: analytics.activityScore },
+        { label: "Code quality", value: analytics.qualityScore },
+        { label: "Diversity", value: analytics.diversityScore },
+        { label: "Network reach", value: analytics.networkScore },
+      ]
+    : [];
+
+  const bannerFallback = <Dither cols={90} rows={34} cell={5} direction="radial" className="text-emerald-500/20" />;
 
   return (
-    <div className="max-w-7xl w-full mx-auto space-y-8 pb-16 pt-2 select-none relative">
-      {/* Ambient background glow */}
-      <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none blur-3xl -z-10" />
+    <PageContainer>
+      {header}
 
-      {/* Page Header matching Feed / Repositories pages */}
-      <div className="space-y-2 mb-8">
-        <h1 className="text-[40px] font-serif italic text-white font-medium tracking-wide">Developer Profile</h1>
-        <p className="text-xl font-bold text-white">Insights and contribution metrics for your open-source journey</p>
-      </div>
+      {analysisError && (tokenProblem ? (
+        <GithubReconnectNotice action="analyze your GitHub profile" />
+      ) : (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Profile analysis failed</AlertTitle>
+          <AlertDescription>{analysisError}</AlertDescription>
+        </Alert>
+      ))}
 
-      {/* Profile Header Banner Card */}
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/[0.05] hover:border-white/[0.1] p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start justify-between gap-6 transition-all duration-300 relative overflow-hidden shadow-xl">
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-
-        <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-          <Avatar className="w-20 h-20 border-2 border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
-            {profile?.avatarUrl && <AvatarImage src={profile.avatarUrl} alt={profile.name} />}
-            <AvatarFallback className="bg-emerald-500/10 text-emerald-400 text-2xl font-bold">
-              {profile?.name?.charAt(0) || "U"}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="text-center md:text-left space-y-3">
+      {/* Identity: avatar dithered into the background only */}
+      <div className="relative isolate overflow-hidden rounded-md border border-border bg-card">
+        <div className="pointer-events-none absolute -right-8 top-1/2 -z-10 -translate-y-1/2 [mask-image:radial-gradient(ellipse_at_right,black_30%,transparent_70%)]">
+          {username ? (
+            <DitheredImage
+              src={githubAvatarUrl(username, 200)}
+              cols={64}
+              cell={5}
+              className="text-emerald-500/25"
+              fallback={bannerFallback}
+            />
+          ) : (
+            bannerFallback
+          )}
+        </div>
+        <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-8">
+          <div className="min-w-0 space-y-3">
             <div>
-              <h2 className="text-2xl font-bold text-white tracking-tight">{profile?.name}</h2>
-              <a 
-                href={`https://github.com/${profile?.username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-neutral-400 hover:text-emerald-400 flex items-center justify-center md:justify-start gap-1.5 mt-1 transition-colors group"
-              >
-                <GithubIcon className="w-4 h-4 text-neutral-500 group-hover:text-emerald-400 transition-colors" />
-                <span>@{profile?.username}</span>
-              </a>
-            </div>
-            {profile?.skills && profile.skills.length > 0 && (
-              <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-1">
-                {profile.skills.map((skill) => (
-                  <Badge 
-                    key={skill}
-                    variant="secondary"
-                    className="text-xs rounded-full border-transparent bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30 font-medium py-1 px-3 transition-colors"
+              <h2 className="font-serif text-3xl font-medium italic tracking-tight md:text-4xl">{profile?.name || username}</h2>
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                {username && (
+                  <a
+                    href={`https://github.com/${username}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
                   >
-                    {skill}
-                  </Badge>
-                ))}
+                    <GithubIcon className="size-3.5" /> @{username}
+                  </a>
+                )}
+                {analyzedAt && (
+                  <>
+                    <span className="text-muted-foreground/50">·</span>
+                    <span>Analyzed {timeAgo(analyzedAt)}</span>
+                  </>
+                )}
+              </p>
+            </div>
+            {tagSkills.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {tagSkills.map((skill) => <Tag key={skill}>{skill}</Tag>)}
               </div>
             )}
           </div>
+          <div className="flex shrink-0 items-center gap-3 self-start sm:mt-1.5">
+            {analyzing && analysisStatus && (
+              <span className="max-w-xs truncate text-sm text-muted-foreground" aria-live="polite">
+                {analysisStatus}
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={handleAnalyzeProfile} disabled={analyzing}>
+              {analyzing ? <Spinner className="text-current" /> : <RefreshCw />}
+              {analyzing ? "Analyzing" : "Re-sync"}
+            </Button>
+          </div>
         </div>
+        <div className="relative grid grid-cols-2 border-t border-border bg-background sm:grid-cols-4">
+          {stats.map(({ label, value }, i) => (
+            <div
+              key={label}
+              className={cn(
+                "px-5 py-4 sm:px-6",
+                i % 2 === 1 && "border-l border-border",
+                i >= 2 && "border-t border-border sm:border-t-0",
+                i > 0 && "sm:border-l"
+              )}
+            >
+              <p className={cn("text-xl font-semibold tabular-nums", !value && "text-muted-foreground")}>{value ?? "—"}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        <div className="flex items-center gap-3">
-          {analyzing ? (
-            <div className="flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-4 py-2 rounded-full">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              <span>{analysisStatus}</span>
+      <div className="grid gap-5 lg:grid-cols-2">
+        {/* Contributor index */}
+        <div className="rounded-md border border-border bg-card p-5 sm:p-6">
+          <Eyebrow>Contributor index</Eyebrow>
+          {analytics ? (
+            <>
+              <p className="mt-2 font-serif text-6xl font-medium italic leading-none tabular-nums">
+                {Math.round(analytics.overallScore)}
+                <span className="ml-1 font-sans text-base not-italic text-muted-foreground">/ 100</span>
+              </p>
+              <SegmentedMeter value={analytics.overallScore} segments={32} className="mt-5" />
+              <div className="mt-6 space-y-3.5">
+                {metrics.map(({ label, value }) => (
+                  <div key={label} className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 text-sm">
+                    <span className="text-muted-foreground">{label}</span>
+                    <SegmentedMeter value={value} segments={20} />
+                    <span className="text-right font-medium tabular-nums">{Math.round(value)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : analyzing ? (
+            <div className="mt-4 space-y-4" aria-busy="true">
+              <Skeleton className="h-14 w-32" />
+              <Skeleton className="h-2 w-full" />
+              <p className="text-sm text-muted-foreground">
+                {analysisStatus || "Analyzing your GitHub contribution history..."} Results appear automatically.
+              </p>
             </div>
           ) : (
-            <Button
-              onClick={handleAnalyzeProfile}
-              size="sm"
-              className="bg-emerald-500 hover:bg-emerald-600 text-black font-semibold rounded-full px-5 py-2.5 text-xs transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]"
-            >
-              <RefreshCw className="w-3.5 h-3.5 mr-2" />
-              Re-sync Analytics
-            </Button>
+            <p className="mt-5 text-sm text-muted-foreground">No analysis yet. Re-sync to scan your GitHub contribution history.</p>
+          )}
+        </div>
+
+        {/* Top skills */}
+        <div className="rounded-md border border-border bg-card p-5 sm:p-6">
+          <Eyebrow>Top skills</Eyebrow>
+          {topSkills.length === 0 ? (
+            <p className="mt-5 text-sm text-muted-foreground">Skills appear here after your GitHub profile is analyzed.</p>
+          ) : (
+            <div className="mt-5 space-y-4">
+              {topSkills.map(({ name, val }) => (
+                <div key={name} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{name}</span>
+                    <span className="tabular-nums text-muted-foreground">{val}%</span>
+                  </div>
+                  <SegmentedMeter value={val} segments={32} />
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Deep Contributor Analytics */}
-      <div className="bg-[#0a0a0a] rounded-2xl border border-white/[0.05] hover:border-white/[0.1] p-6 md:p-8 space-y-8 transition-all duration-300 shadow-xl">
-        
-        <div className="flex items-center justify-between border-b border-white/[0.05] pb-4">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-emerald-400" />
-            Contributor Performance Index
-          </h2>
-        </div>
-
-        {!hasAnalytics && !analyzing ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-            <p className="text-neutral-400 text-sm font-medium">No deep analytics found for your developer profile.</p>
-            <p className="text-xs text-neutral-500 max-w-sm">
-              Click &quot;Re-sync Analytics&quot; to scan and process your GitHub contribution history.
-            </p>
-          </div>
-        ) : analytics ? (
-          <div className="space-y-6 relative">
-
-            {/* Overall Index Score Banner */}
-            <div className="relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 p-6 md:p-8 rounded-2xl border border-white/[0.05] bg-neutral-900/40 hover:border-emerald-500/20 transition-all duration-300">
-              
-              <div className="space-y-2.5 max-w-xl text-center md:text-left">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold uppercase tracking-wider">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Primary Metric
-                </div>
-                <h3 className="text-2xl font-bold text-white">Overall Code Index Rating</h3>
-                <p className="text-sm text-neutral-400 leading-relaxed">
-                  A comprehensive, weighted index derived from your algorithmic contributions, language diversity, commit velocity, and structural code quality.
-                </p>
-              </div>
-              
-              <div className="flex flex-col items-center justify-center shrink-0">
-                <div className="relative flex flex-col items-center justify-center w-32 h-32 rounded-full border-2 border-emerald-500/30 bg-black/90 shadow-[0_0_30px_rgba(16,185,129,0.15)]">
-                  <span className="text-4xl font-bold text-emerald-400 tracking-tight">
-                    {analytics.overallScore.toFixed(1)}
-                  </span>
-                  <span className="text-[10px] text-neutral-500 font-medium tracking-widest mt-0.5">/ 100</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Sub-Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { label: "Skill Depth", score: analytics.skillScore, desc: "Technical complexity & code variety", icon: BookOpen },
-                { label: "Activity Rate", score: analytics.activityScore, desc: "Commit frequency & PR velocity", icon: RefreshCw },
-                { label: "Code Quality", score: analytics.qualityScore, desc: "Best practices & documentation patterns", icon: UserCheck },
-                { label: "Diversity Scope", score: analytics.diversityScore, desc: "Cross-repo contributions & org involvement", icon: Shield },
-                { label: "Network Reach", score: analytics.networkScore, desc: "Collaborator overlap across contribution graph", icon: Network }
-              ].map((metric) => {
-                const Icon = metric.icon;
-                return (
-                  <div 
-                    key={metric.label} 
-                    className="bg-neutral-900/40 rounded-xl border border-white/[0.05] hover:border-emerald-500/30 p-5 flex flex-col justify-between space-y-4 transition-all duration-300 group"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white group-hover:text-emerald-300 transition-colors">{metric.label}</h4>
-                          <p className="text-[11px] text-neutral-400 mt-0.5 line-clamp-1">{metric.desc}</p>
-                        </div>
-                      </div>
-                      <span className="text-base font-bold text-white">
-                        {metric.score.toFixed(1)}<span className="text-emerald-400 text-xs ml-0.5">%</span>
-                      </span>
-                    </div>
-                    
-                    <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-700"
-                        style={{ width: `${metric.score}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-            <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-            <div className="space-y-1">
-              <p className="text-neutral-300 text-sm font-medium">Analyzing your GitHub contribution history...</p>
-              <p className="text-neutral-500 text-xs">This usually takes around 10-20 seconds. Results will show automatically.</p>
-            </div>
-          </div>
-        )}
-
-        {/* STAT SECTIONS (ALWAYS VISIBLE) */}
-        <div className="pt-6 space-y-6 border-t border-white/[0.05]">
-          {/* 3 Stat Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Lines of Code Added */}
-            <div className="bg-neutral-900/40 rounded-xl border border-white/[0.05] hover:border-white/[0.1] p-5 flex flex-col items-center justify-center space-y-2.5 transition-all duration-300 text-center">
-              <span className="text-xs text-neutral-400 font-medium flex items-center gap-1.5">
-                <FileCode className="w-4 h-4 text-emerald-400" />
-                Lines of code added
-              </span>
-              <div className="text-3xl font-bold text-white tracking-tight">
-                {/* @ts-expect-error fallback handling */}
-                {analytics?.contributionHistory?.linesAdded ? `${(analytics.contributionHistory.linesAdded / 1000).toFixed(1)}k` : "48.2k"}
-              </div>
-              <span className="text-[11px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3" />
-                +12% vs prev period
-              </span>
-            </div>
-
-            {/* Avg PR cycle time */}
-            <div className="bg-neutral-900/40 rounded-xl border border-white/[0.05] hover:border-white/[0.1] p-5 flex flex-col items-center justify-center space-y-2.5 transition-all duration-300 text-center">
-              <span className="text-xs text-neutral-400 font-medium flex items-center gap-1.5">
-                <GitMerge className="w-4 h-4 text-emerald-400" />
-                Avg PR cycle time
-              </span>
-              <div className="text-3xl font-bold text-white tracking-tight">
-                {/* @ts-expect-error fallback handling */}
-                {analytics?.contributionHistory?.avgPrCycleTime ? `${analytics.contributionHistory.avgPrCycleTime.toFixed(1)} d` : "1.4 d"}
-              </div>
-              <span className="text-[11px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <ArrowDownRight className="w-3 h-3" />
-                -0.3d faster
-              </span>
-            </div>
-
-            {/* Code review score */}
-            <div className="bg-neutral-900/40 rounded-xl border border-white/[0.05] hover:border-white/[0.1] p-5 flex flex-col items-center justify-center space-y-2.5 transition-all duration-300 text-center">
-              <span className="text-xs text-neutral-400 font-medium flex items-center gap-1.5">
-                <UserCheck className="w-4 h-4 text-emerald-400" />
-                Code review score
-              </span>
-              <div className="text-3xl font-bold text-white tracking-tight">
-                {/* @ts-expect-error fallback handling */}
-                {analytics?.contributionHistory?.codeReviewScore ? `${analytics.contributionHistory.codeReviewScore.toFixed(1)}/5` : "4.6/5"}
-              </div>
-              <span className="text-[11px] text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                <ArrowUpRight className="w-3 h-3" />
-                Top 5% Contributor
-              </span>
-            </div>
-          </div>
-
-          {/* Bottom 2-col layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            
-            {/* Skill Overview */}
-            <div className="lg:col-span-2 bg-neutral-900/40 rounded-xl border border-white/[0.05] hover:border-white/[0.1] p-6 space-y-5 transition-all duration-300">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Code2 className="w-4 h-4 text-emerald-400" />
-                Skill Overview
-              </h3>
-              <div className="space-y-4 pt-1">
-                {(() => {
-                  const repExp = analytics?.repositoryExperience as { skills?: { name: string, proficiencyScore: number }[] } | undefined;
-                  const dbSkills = repExp?.skills && repExp.skills.length > 0 
-                    ? repExp.skills.slice(0, 5).map(s => ({ name: s.name, val: Math.round(s.proficiencyScore) }))
-                    : [
-                        { name: "TypeScript / React", val: 91 },
-                        { name: "Node.js / Express", val: 78 },
-                        { name: "PostgreSQL", val: 64 },
-                        { name: "Testing (Vitest)", val: 55 },
-                        { name: "CI / DevOps", val: 42 }
-                      ];
-                  
-                  return dbSkills.map((s, i) => (
-                    <div key={i} className="space-y-1.5 group cursor-default">
-                      <div className="flex items-center justify-between text-xs font-medium">
-                        <span className="text-neutral-300 group-hover:text-white transition-colors">{s.name}</span>
-                        <span className="text-emerald-400 font-semibold">{s.val}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
-                          style={{ width: `${s.val}%` }}
-                        />
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </div>
-
-            {/* Contribution Heatmap */}
-            <div className="lg:col-span-3 bg-neutral-900/40 rounded-xl border border-white/[0.05] hover:border-white/[0.1] p-6 space-y-5 transition-all duration-300 flex flex-col">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <GithubIcon className="w-4 h-4 text-emerald-400" />
-                  GitHub Contribution Activity
-                </h3>
-                <span className="text-xs text-neutral-400 font-medium">Past Year</span>
-              </div>
-              
-              <div className="flex-1 flex items-center justify-center pt-2 overflow-x-auto custom-scrollbar">
-                <div className="min-w-max pb-2">
-                  {profile?.username ? (
-                    <GitHubCalendar 
-                      username={profile.username} 
-                      colorScheme="dark"
-                      theme={{
-                        dark: ['#0f0f0f', '#064e3b', '#059669', '#10b981', '#34d399']
-                      }}
-                      fontSize={10}
-                      blockSize={11}
-                      blockMargin={3}
-                    />
-                  ) : (
-                    <div className="text-xs text-neutral-500 py-8">Loading heatmap...</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      {/* Activity */}
+      <div className="min-w-0 rounded-md border border-border bg-card p-5 sm:p-6">
+        <Eyebrow className="mb-5">Contributions · past year</Eyebrow>
+        {username ? <ActivityCalendar username={username} /> : <Skeleton className="h-28 w-full" />}
       </div>
-    </div>
+    </PageContainer>
   );
 }

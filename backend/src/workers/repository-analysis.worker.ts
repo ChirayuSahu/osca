@@ -1,8 +1,10 @@
-import { Worker, Job } from 'bullmq'
+import { Worker, Job, UnrecoverableError } from 'bullmq'
+import { isPermanentJobError } from '../lib/errors'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { RepositoryAnalysisService } from '../services/repository-analysis.service'
 import { Neo4jSyncService } from '../services/neo4j-sync.service'
+import { prisma } from '../utils/prisma'
 import type { RepositoryAnalysisJobData, RepositoryAnalysisJobResult } from '../types/jobs'
 
 const processRepositoryAnalysis = async (
@@ -25,7 +27,12 @@ const processRepositoryAnalysis = async (
       name: repository.name,
       owner: repository.owner,
       description: repository.description,
-      stars: repository.stars
+      stars: repository.stars,
+      goodFirstIssueCount: repository.goodFirstIssueCount,
+      helpWantedCount: repository.helpWantedCount,
+      hasContributingGuide: repository.hasContributingGuide,
+      archived: repository.archived,
+      pushedAt: repository.pushedAt
     })
 
     await Neo4jSyncService.syncRepositoryTechStack(repository.id, {
@@ -36,6 +43,16 @@ const processRepositoryAnalysis = async (
     })
 
     await Neo4jSyncService.syncRepositoryTopics(repository.id, repository.topics)
+
+    // A user-initiated analysis is an import: list it under that user's
+    // Imported Repos. System (seed) jobs have no user and import nothing.
+    if (userId) {
+      await prisma.repositoryImport.upsert({
+        where: { userId_repositoryId: { userId, repositoryId: repository.id } },
+        create: { userId, repositoryId: repository.id },
+        update: {}
+      })
+    }
 
     console.log(`[RepositoryWorker:${job.id}] Job complete for ${repository.fullName}`)
     return {
@@ -48,6 +65,7 @@ const processRepositoryAnalysis = async (
   } catch (error: any) {
     const reason = error?.message || error
     console.error(`[RepositoryWorker:${job.id}] Job failed for ${url}. Reason:`, reason)
+    if (isPermanentJobError(error)) throw new UnrecoverableError(error.message)
     throw error
   }
 }

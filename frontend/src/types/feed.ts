@@ -12,6 +12,10 @@ export interface Repository {
   stars: number;
   forks: number;
   openIssuesCount: number;
+  goodFirstIssueCount?: number;
+  helpWantedCount?: number;
+  hasContributingGuide?: boolean;
+  pushedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -23,6 +27,7 @@ export interface ScoreInfo {
     contentScore: number;
     collabScore: number;
     topicScore: number;
+    approachabilityScore?: number;
     fallback?: boolean;
   };
 }

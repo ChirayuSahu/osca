@@ -3,6 +3,8 @@
 import React, { useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
+import { Spinner } from "@/components/ui/spinner";
+import { API_URL } from "@/lib/api";
 
 function AuthCallbackContent() {
   const searchParams = useSearchParams();
@@ -13,41 +15,39 @@ function AuthCallbackContent() {
 
   useEffect(() => {
     if (processed.current) return;
-    
-    const token = searchParams.get("token");
-    const userJson = searchParams.get("user");
+    processed.current = true;
 
-    if (token && userJson) {
-      try {
-        let parsedUser;
-        try {
-          parsedUser = JSON.parse(userJson);
-        } catch {
-          // If direct parsing fails, the string might be double-encoded
-          try {
-            parsedUser = JSON.parse(decodeURIComponent(userJson));
-          } catch {
-            // Try one more level of decoding if needed
-            parsedUser = JSON.parse(decodeURIComponent(decodeURIComponent(userJson)));
-          }
-        }
-        processed.current = true;
-        setAuth(token, parsedUser);
-        router.push("/dashboard");
-      } catch (err) {
-        console.error("Failed to parse user session. Raw value:", userJson, err);
-        router.push("/login?error=session_error");
-      }
-    } else {
-      processed.current = true;
-      router.push("/login?error=invalid_params");
+    // The backend redirects with a one-time code (never the session itself) that
+    // is valid for a minute and works once
+    const code = searchParams.get("code");
+    if (!code) {
+      router.replace("/login?error=invalid_params");
+      return;
     }
+
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/auth/exchange`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+        const body = await res.json().catch(() => null);
+        if (!res.ok || !body?.data?.token || !body?.data?.user) throw new Error(body?.message || "exchange failed");
+        setAuth(body.data.token, body.data.user);
+        // replace: the code shouldn't stay in history
+        router.replace("/dashboard");
+      } catch (err) {
+        console.error("Sign-in failed", err);
+        router.replace("/login?error=session_error");
+      }
+    })();
   }, [searchParams, setAuth, router]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white space-y-4">
-      <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-sm text-neutral-400 font-light">Completing authentication...</p>
+    <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-background">
+      <Spinner className="size-5" />
+      <p className="text-sm text-muted-foreground">Completing sign-in…</p>
     </div>
   );
 }
@@ -55,9 +55,9 @@ function AuthCallbackContent() {
 export default function AuthCallbackPage() {
   return (
     <Suspense fallback={
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white space-y-4">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm text-neutral-400 font-light">Loading...</p>
+      <div className="flex min-h-svh flex-col items-center justify-center gap-3 bg-background">
+        <Spinner className="size-5" />
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     }>
       <AuthCallbackContent />
