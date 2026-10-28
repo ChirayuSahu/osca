@@ -1,8 +1,7 @@
 "use client";
 
-// Shared building blocks for repository/contributor UI (see /dashboard/samples
-// and DESIGN.md): minimal cards, coloured tags, language dots, status
-// chips and the meter.
+// Shared building blocks for repository/contributor UI (see DESIGN.md):
+// minimal cards, coloured tags, language dots, status chips and the meter.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
