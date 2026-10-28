@@ -5,8 +5,9 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { CommentService } from "@/services/comment.service";
 import { isGithubTokenError } from "@/lib/api";
-import { ArrowUp, ChevronDown, MessageSquare, Trash2 } from "lucide-react";
-import { Markdown } from "@/components/markdown-lazy";
+import { ChevronDown, MessageSquare, Trash2 } from "lucide-react";
+import { GithubBody } from "@/components/markdown-lazy";
+import { Reactions, type ReactionRollup } from "@/components/reactions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,9 +29,11 @@ import { cn } from "@/lib/utils";
 interface Comment {
   id: string | number;
   body: string;
+  body_html?: string;
   created_at: string | number | Date;
   user?: { login: string; avatar_url: string };
-  reactions?: { '+1': number };
+  reactions?: ReactionRollup;
+  viewer_reactions?: string[];
 }
 
 export default function CommentSection({ owner, repo, threadId }: { owner: string; repo: string; threadId: string }) {
@@ -40,7 +43,6 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [upvotedComments, setUpvotedComments] = useState<Set<string | number>>(new Set());
   const [pendingDelete, setPendingDelete] = useState<string | number | null>(null);
   const [deleting, setDeleting] = useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -134,30 +136,12 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
         ) : (
           <ul className="divide-y divide-border">
             {comments.map((comment) => {
-              const upvoted = upvotedComments.has(comment.id);
               return (
                 <li key={comment.id} className="flex flex-col gap-2 px-5 py-4">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="font-medium">{comment.user?.login || "User"}</span>
                     <span className="text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
                     <div className="ml-auto flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-pressed={upvoted}
-                        className={cn("h-7 px-2 text-xs", upvoted ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}
-                        onClick={() => {
-                          setUpvotedComments(prev => {
-                            const next = new Set(prev);
-                            if (next.has(comment.id)) next.delete(comment.id);
-                            else next.add(comment.id);
-                            return next;
-                          });
-                        }}
-                      >
-                        <ArrowUp className="size-3.5" />
-                        <span className="tabular-nums">{(comment.reactions?.['+1'] || 0) + (upvoted ? 1 : 0)}</span>
-                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -183,7 +167,15 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
                     </div>
                   </div>
 
-                  <Markdown>{comment.body}</Markdown>
+                  <GithubBody html={comment.body_html} markdown={comment.body} />
+                  {token && (
+                    <Reactions
+                      className="pt-1"
+                      reactions={comment.reactions}
+                      viewerReactions={comment.viewer_reactions}
+                      onToggle={(content) => CommentService.toggleReaction(owner, repo, comment.id, content, token)}
+                    />
+                  )}
                 </li>
               );
             })}

@@ -30,16 +30,16 @@ export const ThreadService = {
     return res.json()
   },
 
-  // Toggles the caller's 👍 on an issue or PR (GitHub treats PRs as issues here)
-  async toggleThumbsUp(owner: string, repo: string, issueNumber: string | number, token: string): Promise<{ added: boolean }> {
+  // Toggles one of the caller's reactions on an issue or PR (GitHub treats PRs as issues here)
+  async toggleReaction(owner: string, repo: string, issueNumber: string | number, content: string, token: string): Promise<boolean> {
     const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/reactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ content: '+1' })
+      body: JSON.stringify({ content })
     })
     if (!res.ok) throw await readApiError(res, 'Failed to react')
     const body = await res.json()
-    return { added: body.data?.toggled === 'added' }
+    return body.data?.toggled === 'added'
   },
 
   async getPull(owner: string, repo: string, pullNumber: string | number, token: string) {

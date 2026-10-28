@@ -1,9 +1,73 @@
-import { getGithubAccessToken, fetchGithub, fetchGithubWithAccept } from '../../lib/github'
-import { VALID_REACTIONS, ReactionContent, isValidReaction } from '../../lib/github/utils/constants'
+import { getGithubAccessToken, fetchGithub, fetchGithubWithAccept, githubGraphQL } from '../../lib/github'
+import { ReactionContent, isValidReaction } from '../../lib/github/utils/constants'
 
 export { isValidReaction }
 
 const REACTIONS_ACCEPT = 'application/vnd.github.squirrel-girl-preview+json'
+// Adds `body_html`: the issue or comment exactly as GitHub renders it
+const FULL_ACCEPT = 'application/vnd.github.full+json'
+
+const GRAPHQL_REACTIONS: Record<string, ReactionContent> = {
+  THUMBS_UP: '+1',
+  THUMBS_DOWN: '-1',
+  LAUGH: 'laugh',
+  HOORAY: 'hooray',
+  CONFUSED: 'confused',
+  HEART: 'heart',
+  ROCKET: 'rocket',
+  EYES: 'eyes'
+}
+
+type ReactionGroupsResponse = {
+  data?: { nodes: ({ reactionGroups?: { content: string; viewerHasReacted: boolean }[] } | null)[] }
+}
+
+// REST payloads carry reaction counts but not which ones the caller left. One
+// GraphQL call fills that in as `viewer_reactions` on the issue or each comment.
+const withViewerReactions = async <T extends { node_id?: string }>(items: T[], token: string) => {
+  const ids = items.map((item) => item.node_id ?? '').slice(0, 100)
+  let viewer: ReactionContent[][] = []
+  if (ids.some(Boolean)) {
+    try {
+      const res = await githubGraphQL<ReactionGroupsResponse>(
+        'query($ids: [ID!]!) { nodes(ids: $ids) { ... on Reactable { reactionGroups { content viewerHasReacted } } } }',
+        token,
+        { ids: ids.filter(Boolean) }
+      )
+      // nodes come back in the order of the ids asked for
+      const nodes = res.data?.nodes ?? []
+      let next = 0
+      viewer = ids.map((id) => {
+        if (!id) return []
+        const groups = nodes[next++]?.reactionGroups ?? []
+        return groups.filter((g) => g.viewerHasReacted).map((g) => GRAPHQL_REACTIONS[g.content]).filter(Boolean)
+      })
+    } catch {
+      // Counts still show; the caller's own reactions just aren't highlighted
+    }
+  }
+  return items.map((item, i) => ({ ...item, viewer_reactions: viewer[i] ?? [] }))
+}
+
+// POST answers 201 when it adds the reaction and 200 when the caller already
+// had it; then that reaction is deleted, which makes this a toggle.
+const toggleReaction = async (token: string, subjectPath: string, content: ReactionContent) => {
+  const addRes = await fetchGithubWithAccept(`${subjectPath}/reactions`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ content }),
+    accept: REACTIONS_ACCEPT
+  })
+  const reaction = await addRes.json()
+  if (addRes.status === 201) return { toggled: 'added' as const, reaction }
+
+  await fetchGithubWithAccept(`${subjectPath}/reactions/${reaction.id}`, {
+    method: 'DELETE',
+    token,
+    accept: REACTIONS_ACCEPT
+  })
+  return { toggled: 'removed' as const, reactionId: reaction.id }
+}
 
 const listIssues = async (userId: string, owner: string, repo: string, page: number, limit: number) => {
   const token = await getGithubAccessToken(userId)
@@ -41,7 +105,7 @@ const listIssues = async (userId: string, owner: string, repo: string, page: num
 
 const getIssue = async (userId: string, owner: string, repo: string, issueNumber: number) => {
   const token = await getGithubAccessToken(userId)
-  const response = await fetchGithub(`/repos/${owner}/${repo}/issues/${issueNumber}`, { token })
+  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}`, { token, accept: FULL_ACCEPT })
   const issue = await response.json()
   
   if (response.ok && issue) {
@@ -57,14 +121,18 @@ const getIssue = async (userId: string, owner: string, repo: string, issueNumber
     }
   }
   
-  return issue
+  const [withReactions] = await withViewerReactions([issue], token)
+  return withReactions
 }
 
 const listIssueComments = async (userId: string, owner: string, repo: string, issueNumber: number, page: number, limit: number) => {
   const token = await getGithubAccessToken(userId)
   
-  const response = await fetchGithub(`/repos/${owner}/${repo}/issues/${issueNumber}/comments?page=${page}&per_page=${limit}`, { token })
-  const comments = await response.json()
+  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}/comments?page=${page}&per_page=${limit}`, {
+    token,
+    accept: FULL_ACCEPT
+  })
+  const comments = await withViewerReactions(await response.json(), token)
   
   const linkHeader = response.headers.get('Link') ?? response.headers.get('link')
   let totalPages = page
@@ -79,10 +147,11 @@ const listIssueComments = async (userId: string, owner: string, repo: string, is
 const createIssue = async (userId: string, owner: string, repo: string, title: string, body: string) => {
   const token = await getGithubAccessToken(userId)
   
-  const response = await fetchGithub(`/repos/${owner}/${repo}/issues`, {
+  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues`, {
     method: 'POST',
     token,
-    body: JSON.stringify({ title, body })
+    body: JSON.stringify({ title, body }),
+    accept: FULL_ACCEPT
   })
   return response.json()
 }
@@ -90,12 +159,13 @@ const createIssue = async (userId: string, owner: string, repo: string, title: s
 const createIssueComment = async (userId: string, owner: string, repo: string, issueNumber: number, body: string) => {
   const token = await getGithubAccessToken(userId)
   
-  const response = await fetchGithub(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
+  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
     method: 'POST',
     token,
-    body: JSON.stringify({ body })
+    body: JSON.stringify({ body }),
+    accept: FULL_ACCEPT
   })
-  return response.json()
+  return { ...(await response.json()), viewer_reactions: [] }
 }
 
 const deleteIssueComment = async (userId: string, owner: string, repo: string, commentId: number) => {
@@ -130,70 +200,12 @@ const listIssueCommentReactions = async (userId: string, owner: string, repo: st
 
 const toggleIssueReaction = async (userId: string, owner: string, repo: string, issueNumber: number, content: ReactionContent) => {
   const token = await getGithubAccessToken(userId)
-
-  // Fetch current reactions
-  const listRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}/reactions`, {
-    token,
-    accept: REACTIONS_ACCEPT
-  })
-  const reactions: any[] = await listRes.json()
-
-  // Find the authenticated user's existing reaction with the same content
-  const meRes = await fetchGithubWithAccept('/user', { token, accept: REACTIONS_ACCEPT })
-  const me: any = await meRes.json()
-  const existing = reactions.find((r) => r.content === content && r.user?.login === me.login)
-
-  if (existing) {
-    // Remove it
-    await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}/reactions/${existing.id}`, {
-      method: 'DELETE',
-      token,
-      accept: REACTIONS_ACCEPT
-    })
-    return { toggled: 'removed' as const, reactionId: existing.id }
-  }
-
-  // Add it
-  const addRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}/reactions`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ content }),
-    accept: REACTIONS_ACCEPT
-  })
-  const reaction = await addRes.json()
-  return { toggled: 'added' as const, reaction }
+  return toggleReaction(token, `/repos/${owner}/${repo}/issues/${issueNumber}`, content)
 }
 
 const toggleIssueCommentReaction = async (userId: string, owner: string, repo: string, commentId: number, content: ReactionContent) => {
   const token = await getGithubAccessToken(userId)
-
-  const listRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
-    token,
-    accept: REACTIONS_ACCEPT
-  })
-  const reactions: any[] = await listRes.json()
-
-  const meRes = await fetchGithubWithAccept('/user', { token, accept: REACTIONS_ACCEPT })
-  const me: any = await meRes.json()
-  const existing = reactions.find((r) => r.content === content && r.user?.login === me.login)
-
-  if (existing) {
-    await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions/${existing.id}`, {
-      method: 'DELETE',
-      token,
-      accept: REACTIONS_ACCEPT
-    })
-    return { toggled: 'removed' as const, reactionId: existing.id }
-  }
-
-  const addRes = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/comments/${commentId}/reactions`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ content }),
-    accept: REACTIONS_ACCEPT
-  })
-  const reaction = await addRes.json()
-  return { toggled: 'added' as const, reaction }
+  return toggleReaction(token, `/repos/${owner}/${repo}/issues/comments/${commentId}`, content)
 }
 
 export const IssuesService = {
