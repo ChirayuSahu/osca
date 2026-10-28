@@ -99,10 +99,12 @@ export default function PrivacyPage() {
 
       <LegalSection id="visible" title="5. What other OSCA users can see">
         <p>
-          The Community page shows people with overlapping skills. Other signed-in users can see your name, GitHub
-          username, avatar, the skills you share with them and a match percentage. They also see anonymous counts of
-          how many similar developers are active in a repository. Your email, activity history and scores are never
-          shown to other users.
+          The Community page shows people with overlapping skills: your name, GitHub username, avatar, the skills you
+          share and a match percentage. Other signed-in users can open your OSCA profile, which shows your skills,
+          contributor index and scores, contribution stats (such as commits, lines added and pull request turnaround)
+          and your public GitHub contributions calendar. All of it is computed from your public GitHub activity. They
+          also see anonymous counts of how many similar developers are active in a repository. Your email address and
+          linked accounts are never shown to other users.
         </p>
       </LegalSection>
 

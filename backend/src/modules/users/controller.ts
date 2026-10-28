@@ -18,13 +18,14 @@ const requireSelf = (req: RequestWithUser, userId: string): void => {
   }
 }
 
+// Your own record in full; anyone else's as the public profile (Community).
 const getUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
-  requireSelf(req, id)
+  const isSelf = req.user?.id === id
 
   const user = await prisma.user.findUnique({
     where: { id },
-    select: selfUserSelect
+    select: isSelf ? selfUserSelect : publicUserSelect
   })
 
   assertFound(user, 'User not found')

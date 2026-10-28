@@ -1,5 +1,5 @@
 $kind: http-request
-description: 'A user by id.'
+description: 'Your own record in full, or another user''s public profile (Community): name, username, avatar, skills, contributor scores and stats. Email and linked accounts are only returned for yourself.'
 url: '{{BASE_URL}}/api/v1/users/{{user_id}}'
 method: GET
 order: 1000

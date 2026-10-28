@@ -1,10 +1,13 @@
 import { Prisma } from '@prisma/client'
 
+// What other signed-in users see on someone's profile (Community): identity,
+// skills and the contributor scores and stats. Never email or linked accounts.
 export const publicUserSelect = {
   id: true,
   name: true,
   username: true,
   avatarUrl: true,
+  skills: true,
   contributionScore: true,
   createdAt: true,
   updatedAt: true,
