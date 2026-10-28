@@ -9,9 +9,23 @@ const buildHeaders = (token: string, accept = 'application/vnd.github.v3+json'):
   Authorization: `Bearer ${token}`
 })
 
+const GITHUB_TIMEOUT_MS = 15_000
+
+// Every GitHub call gets a timeout so a hung connection can't stall a request or a job.
+const fetch = (input: string, init: RequestInit = {}): Promise<Response> =>
+  globalThis.fetch(input, { ...init, signal: init.signal ?? AbortSignal.timeout(GITHUB_TIMEOUT_MS) })
+
 const parseGithubError = (status: number, context: string): AppError => {
+  // A GitHub 401 means the stored GitHub token is bad, not our session; surfacing
+  // it as 401 would make the frontend log the user out.
   if (status === 401) {
-    return new AppError('Invalid or expired GitHub token', 401)
+    return new AppError('GitHub token is invalid or expired. Please sign in with GitHub again.', 403)
+  }
+  if (status === 403 || status === 404 || status === 422) {
+    return new AppError(`GitHub API error (${context}): HTTP ${status}`, status)
+  }
+  if (status === 429) {
+    return new AppError('GitHub rate limit exceeded. Try again later.', 429)
   }
   return new AppError(`GitHub API error (${context}): HTTP ${status}`, 502)
 }

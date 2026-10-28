@@ -7,6 +7,11 @@ import { JobEnqueueService } from '../../services/job-enqueue.service'
 import { publicUserSelect, selfUserSelect } from '../../utils/user-response'
 import { asyncHandler } from '../../utils/async-handler'
 
+const MAX_NAME_LENGTH = 100
+const MAX_SKILLS = 50
+const MAX_SKILL_LENGTH = 50
+const AVATAR_URL = /^https:\/\/avatars\.githubusercontent\.com\/[^\s"'<>]+$/
+
 const requireSelf = (req: RequestWithUser, userId: string): void => {
   if (req.user?.id !== userId) {
     throw new AppError('Forbidden: You can only access your own user profile', 403)
@@ -32,13 +37,25 @@ const updateUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
 
   // #10: Whitelist only user-editable fields.
   // contributionScore is a computed metric and must never be user-writable.
-  const { name, email, avatarUrl, skills } = req.body
+  // email comes from GitHub and is not user-writable either (it is unverified).
+  const { name, avatarUrl, skills } = req.body
   const data: Record<string, unknown> = {}
 
-  if (typeof name === 'string') data.name = name
-  if (typeof email === 'string') data.email = email
-  if (typeof avatarUrl === 'string') data.avatarUrl = avatarUrl
-  if (Array.isArray(skills)) data.skills = skills.map(String)
+  if (typeof name === 'string') {
+    const trimmed = name.trim()
+    if (trimmed.length === 0 || trimmed.length > MAX_NAME_LENGTH) throw new AppError(`Name must be 1–${MAX_NAME_LENGTH} characters`, 400)
+    data.name = trimmed
+  }
+  // Shown to other users (Community), so only GitHub's avatar host: an arbitrary
+  // URL would let someone log the IP of everyone who views their card.
+  if (typeof avatarUrl === 'string') {
+    if (!AVATAR_URL.test(avatarUrl)) throw new AppError('avatarUrl must be a GitHub avatar URL', 400)
+    data.avatarUrl = avatarUrl
+  }
+  if (Array.isArray(skills)) {
+    data.skills = [...new Set(skills.map(s => String(s).trim()).filter(s => s.length > 0 && s.length <= MAX_SKILL_LENGTH))]
+      .slice(0, MAX_SKILLS)
+  }
 
   const user = await prisma.user.update({
     where: { id },

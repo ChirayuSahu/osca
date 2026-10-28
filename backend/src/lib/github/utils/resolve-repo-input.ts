@@ -1,5 +1,5 @@
 import { AppError } from '../../errors'
-import { parseGithubRepoUrl } from './parse-github-url'
+import { parseGithubRepoUrl, assertValidRepoRef } from './parse-github-url'
 
 interface RepoInput {
   url?: unknown
@@ -10,8 +10,9 @@ interface RepoInput {
 
 export const resolveRepositoryUrl = (input: RepoInput): string => {
   if (typeof input.url === 'string' && input.url.trim() !== '') {
-    parseGithubRepoUrl(input.url.trim())
-    return input.url.trim()
+    // Normalised, so the stored URL can't carry anything but owner/repo
+    const { owner, repo } = parseGithubRepoUrl(input.url.trim())
+    return `https://github.com/${owner}/${repo}`
   }
 
   let owner = typeof input.owner === 'string' ? input.owner.trim() : ''
@@ -29,5 +30,6 @@ export const resolveRepositoryUrl = (input: RepoInput): string => {
     throw new AppError('Provide url, or owner and repo, or fullName (owner/repo)', 400)
   }
 
+  assertValidRepoRef(owner, repo)
   return `https://github.com/${owner}/${repo}`
 }

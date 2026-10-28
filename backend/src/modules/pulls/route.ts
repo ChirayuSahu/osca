@@ -2,8 +2,10 @@ import { Router } from 'express'
 import { PullsController } from './controller'
 import { authMiddleware } from '../../middlewares/auth.middleware'
 import { paginationMiddleware } from '../../middlewares/pagination.middleware'
+import { registerGithubParamValidators } from '../../middlewares/github-params.middleware'
 
 const router = Router()
+registerGithubParamValidators(router)
 
 router.get('/:owner/:repo', authMiddleware, paginationMiddleware, PullsController.listPulls)
 router.get('/:owner/:repo/:pullNumber', authMiddleware, PullsController.getPull)

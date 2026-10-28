@@ -9,6 +9,8 @@ import { AppError } from '../../lib/errors'
 import { asyncHandler } from '../../utils/async-handler'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { selfUserSelect } from '../../utils/user-response'
+import { encryptToken } from '../../lib/crypto/token-cipher'
+import { redisClient } from '../../utils/redis-client'
 
 interface GithubTokenResponse {
   access_token?: string
@@ -48,7 +50,7 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
 
   if (error) {
     const errorMsg = error_description ? String(error_description) : 'Authentication failed'
-    res.redirect(`${config.frontendUrl}/login?error=${String(error)}&error_description=${encodeURIComponent(errorMsg)}`)
+    res.redirect(`${config.frontendUrl}/login?error=${encodeURIComponent(String(error))}&error_description=${encodeURIComponent(errorMsg)}`)
     return
   }
 
@@ -85,7 +87,9 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
   const username = String(githubUser.login)
   const name = githubUser.name ?? username
   const avatarUrl = githubUser.avatar_url
-  const email = githubUser.email ?? `${username}@github.com`
+  // GitHub's own noreply address is unique per account, unlike `login@github.com`
+  const noreplyEmail = `${providerId}+${username}@users.noreply.github.com`
+  const email = githubUser.email ?? noreplyEmail
 
   let userRecord = null
 
@@ -102,17 +106,25 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
   if (existingOauth !== null) {
     await prisma.oAuthAccount.update({
       where: { id: existingOauth.id },
-      data: { accessToken }
+      data: { accessToken: encryptToken(accessToken) }
     })
     userRecord = existingOauth.user
   } else {
-    userRecord = await prisma.user.findUnique({ where: { email } })
+    // Never link to an existing user by email: emails aren't verified on our
+    // side, so matching on them would let one account claim another's login.
+    const [emailTaken, usernameTaken] = await Promise.all([
+      prisma.user.findUnique({ where: { email }, select: { id: true } }),
+      prisma.user.findUnique({ where: { username }, select: { id: true } })
+    ])
 
-    if (userRecord === null) {
-      userRecord = await prisma.user.create({
-        data: { name, username, email, avatarUrl }
-      })
-    }
+    userRecord = await prisma.user.create({
+      data: {
+        name,
+        username: usernameTaken ? `${username}-${providerId}` : username,
+        email: emailTaken ? noreplyEmail : email,
+        avatarUrl
+      }
+    })
 
     await prisma.oAuthAccount.create({
       data: {
@@ -120,7 +132,7 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
         provider: 'github',
         providerId,
         username,
-        accessToken
+        accessToken: encryptToken(accessToken)
       }
     })
   }
@@ -130,18 +142,38 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
   const token = jwt.sign(
     { id: user.id, username: user.username, email: user.email },
     config.jwtSecret,
-    { expiresIn: '1d' }
+    { expiresIn: '1d', algorithm: 'HS256' }
   )
 
-  // NOTE: JWT is still in the URL here. Tracked in IMPROVEMENTS.md #2 for a
-  // future one-time-code exchange flow (requires frontend changes).
-  res.redirect(`${config.frontendUrl}/auth/callback?token=${token}&user=${encodeURIComponent(JSON.stringify({
-    id: user.id,
-    name: user.name,
-    username: user.username,
-    email: user.email,
-    avatarUrl: user.avatarUrl
-  }))}`)
+  // The session never goes in the URL (history, logs, Referer). The frontend gets
+  // a one-time code and swaps it for the session via POST /auth/exchange.
+  const exchangeCode = crypto.randomBytes(32).toString('hex')
+  await redisClient.set(
+    exchangeKey(exchangeCode),
+    JSON.stringify({
+      token,
+      user: { id: user.id, name: user.name, username: user.username, email: user.email, avatarUrl: user.avatarUrl }
+    }),
+    'EX',
+    EXCHANGE_TTL_SECONDS
+  )
+  res.redirect(`${config.frontendUrl}/auth/callback?code=${exchangeCode}`)
+})
+
+const EXCHANGE_TTL_SECONDS = 60
+const exchangeKey = (code: string) => `auth:exchange:${code}`
+
+// Single use: the code is deleted as it is read
+const exchangeCode = asyncHandler(async (req: Request, res: Response) => {
+  const code = typeof req.body?.code === 'string' ? req.body.code : ''
+  if (!/^[a-f0-9]{64}$/.test(code)) {
+    throw new AppError('Invalid sign-in code', 400)
+  }
+  const stored = await redisClient.getdel(exchangeKey(code))
+  if (!stored) {
+    throw new AppError('Sign-in code expired or already used', 400)
+  }
+  sendResponse(res, 200, true, 'Signed in', JSON.parse(stored))
 })
 
 const getCurrentUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
@@ -192,13 +224,14 @@ const getDevToken = asyncHandler(async (req: Request, res: Response) => {
   const token = jwt.sign(
     { id: user.id, username: user.username, email: user.email },
     config.jwtSecret,
-    { expiresIn: '1d' }
+    { expiresIn: '1d', algorithm: 'HS256' }
   )
 
   sendResponse(res, 200, true, 'Dev token generated successfully', { token, user })
 })
 
 export const AuthController = {
+  exchangeCode,
   redirectToGithub,
   handleGithubCallback,
   getCurrentUser,

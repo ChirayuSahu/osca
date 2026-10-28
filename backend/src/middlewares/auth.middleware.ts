@@ -22,7 +22,7 @@ export const authMiddleware = (req: RequestWithUser, res: Response, next: NextFu
   const token = authHeader.split(' ')[1]
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as { id: string, username: string, email: string }
+    const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as { id: string, username: string, email: string }
     req.user = decoded
     next()
   } catch (err: any) {

@@ -10,10 +10,15 @@ import { requestLogger } from './middlewares/logger.middleware'
 
 const app: Application = express()
 
-app.set('trust proxy', 1)
+// Only trust X-Forwarded-For behind a real reverse proxy (TRUST_PROXY=1). With the
+// API port reachable directly, trusting it lets clients fake their IP and dodge
+// the per-IP rate limits.
+app.set('trust proxy', config.trustProxy)
 app.use(helmet())
 app.use(cors({
-  origin: [config.frontendUrl, 'http://localhost:3000', 'http://localhost:3001'],
+  origin: config.nodeEnv === 'production'
+    ? [config.frontendUrl]
+    : [config.frontendUrl, 'http://localhost:3000', 'http://localhost:3001'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }))
