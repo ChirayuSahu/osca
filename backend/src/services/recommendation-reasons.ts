@@ -78,10 +78,12 @@ export const buildReasons = (input: ReasonInput): Reason[] => {
   }
 
   if (input.sharedKeywords?.length) {
-    candidates.push({ kind: 'keywords', text: `About ${list(input.sharedKeywords)}, like your work`, strength: 6.6 })
+    // Keywords come from the user's repos, their stars and the interests they picked
+    candidates.push({ kind: 'keywords', text: `About ${list(input.sharedKeywords)}, which you're into`, strength: 6.6 })
   }
   if (input.sharedTopics?.length) {
-    candidates.push({ kind: 'topics', text: `Shares topics with your repos: ${list(input.sharedTopics)}`, strength: 5.5 })
+    // Topics come from repos the user owns, starred, contributed to or liked here
+    candidates.push({ kind: 'topics', text: `Same topics as repos you like: ${list(input.sharedTopics)}`, strength: 5.5 })
   }
   if ((input.collabCount ?? 0) >= 1) {
     const n = input.collabCount as number

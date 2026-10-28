@@ -258,10 +258,10 @@ const MAX_HISTORY_CHARS = 16_000
 
 type RankedSkill = { name: string; proficiencyScore?: number }
 
-// Strongest skills from the profile analysis, split into languages and the rest
-const topSkills = (cp: unknown): { languages: string[]; tools: string[] } => {
+// Strongest skills from the profile analysis (minus `skip`), split into languages and the rest
+const topSkills = (cp: unknown, skip: (name: string) => boolean = () => false): { languages: string[]; tools: string[] } => {
   const skills = ((cp as { repositoryExperience?: { skills?: RankedSkill[] } } | null)?.repositoryExperience?.skills ?? [])
-    .filter((s): s is RankedSkill => typeof s?.name === 'string' && s.name.length > 0)
+    .filter((s): s is RankedSkill => typeof s?.name === 'string' && s.name.length > 0 && !skip(s.name))
     .sort((a, b) => (b.proficiencyScore ?? 0) - (a.proficiencyScore ?? 0))
   const isLanguage = (name: string) => KNOWN_LANGUAGES.has(name.toLowerCase())
   return {
@@ -276,15 +276,25 @@ const KNOWN_LANGUAGES = new Set([
   'objective-c', 'perl', 'clojure', 'erlang', 'ocaml', 'f#', 'solidity'
 ])
 
+const stringList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.length > 0) : []
+
 const buildUserContext = (user: any): string => {
   if (!user) return 'No authenticated user on this request.'
-  const { languages, tools } = topSkills(user.contributorProfile)
-  const manual = Array.isArray(user.skills) ? user.skills.filter((s: unknown) => typeof s === 'string').slice(0, 10) : []
+  // Settings: languages they want to work in lead; excluded ones aren't treated as skills at all,
+  // so the next strongest language takes their place (the feed ranking does the same)
+  const preferred = stringList(user.preferredLanguages)
+  const excluded = stringList(user.excludedLanguages)
+  const isExcluded = (name: string) => excluded.some(e => e.toLowerCase() === name.toLowerCase())
+  const { languages, tools } = topSkills(user.contributorProfile, isExcluded)
+  const manual = stringList(user.skills).filter(s => !isExcluded(s)).slice(0, 10)
   const lines = [
     `- Name: ${user.name || 'unknown'} (@${user.username || 'unknown'})`,
     `- Languages, strongest first: ${languages.length ? languages.join(', ') : 'unknown'}`,
     `- Frameworks and tools they use: ${tools.length ? tools.join(', ') : 'unknown'}`
   ]
+  if (preferred.length) lines.push(`- Languages they want to work in (favour these): ${preferred.join(', ')}`)
+  if (excluded.length) lines.push(`- Languages they don't want (never recommend projects mainly in these): ${excluded.join(', ')}`)
   if (manual.length) lines.push(`- Skills they listed: ${manual.join(', ')}`)
   const cp = user.contributorProfile
   if (cp && typeof cp.overallScore === 'number') lines.push(`- Overall contributor score: ${cp.overallScore.toFixed(0)}/100`)

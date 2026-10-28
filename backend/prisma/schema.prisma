@@ -218,7 +218,7 @@ model AnalysisRequest {
 model RecommendationEvent {
   id           String   @id @default(uuid())
   userId       String
-  type         String // impression | open | github | like | hide | skip | issue_open
+  type         String // impression | open | github | like | hide | unhide | skip | issue_open
   surface      String // feed | focus | issues | repository
   repositoryId String?
   issueUrl     String?

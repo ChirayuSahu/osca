@@ -5,7 +5,7 @@ import { clampBreakdown, learnFromSignals, type Breakdown } from './ranking-tuni
 // Records what people do with recommendations (see RecommendationEvent) and
 // feeds the learnable ones into the user's ranking multipliers.
 
-const TYPES = new Set(['impression', 'open', 'github', 'like', 'hide', 'skip', 'issue_open'])
+const TYPES = new Set(['impression', 'open', 'github', 'like', 'hide', 'unhide', 'skip', 'issue_open'])
 const SURFACES = new Set(['feed', 'focus', 'issues', 'repository'])
 const MAX_BATCH = 50
 

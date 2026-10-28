@@ -2,6 +2,7 @@ import { config } from '../config'
 import { githubGraphQL, getGithubAccessToken } from '../lib/github'
 import { GOOD_FIRST_ISSUE_LABELS } from '../lib/github/utils/constants'
 import { redisClient } from '../utils/redis-client'
+import { noteGithubTokenError } from './github-token-health.service'
 import { generateFeed } from './recommendation-engine.service'
 import type { Reason } from './recommendation-reasons'
 
@@ -79,11 +80,20 @@ const compute = async (userId: string): Promise<IssueRecommendation[]> => {
         }
       }
     }`).join('\n')
-  const res = await githubGraphQL<{ data?: Record<string, { issues?: { nodes?: IssueNode[] } } | null> }>(
-    `query($labels: [String!]) { ${fields} }`,
-    token,
-    { labels: GOOD_FIRST_ISSUE_LABELS }
-  )
+  type IssuesResponse = { data?: Record<string, { issues?: { nodes?: IssueNode[] } } | null> }
+  const query = `query($labels: [String!]) { ${fields} }`
+  const variables = { labels: GOOD_FIRST_ISSUE_LABELS }
+  let res: IssuesResponse
+  try {
+    res = await githubGraphQL<IssuesResponse>(query, token, variables)
+  } catch (error) {
+    // The user's token was revoked or ran out: note it (reconnect banner) and
+    // answer with the server's token rather than failing every visit
+    await noteGithubTokenError(userId, error).catch(() => false)
+    const fallback = config.githubServerToken
+    if (!fallback || fallback === token) throw error
+    res = await githubGraphQL<IssuesResponse>(query, fallback, variables)
+  }
 
   const perRepo: IssueRecommendation[][] = []
   feed.forEach(({ repository, scoreInfo }, i) => {

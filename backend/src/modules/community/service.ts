@@ -142,8 +142,14 @@ const listCollaborations = async (userId: string, limit: number): Promise<Collab
   const githubId = await getGithubIdForUser(userId)
   if (githubId === null) return []
 
+  // Settings apply here as in the feed: excluded languages never appear, preferred ones lead
+  const settings = await prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguages: true, excludedLanguages: true } })
+  const excluded = new Set((settings?.excludedLanguages ?? []).map(l => l.toLowerCase()))
+  const preferred = new Set((settings?.preferredLanguages ?? []).map(l => l.toLowerCase()))
+
+  // Ask for extra, since excluded languages are filtered out below
   const result = await withSession(session =>
-    session.run(COLLABORATIONS_CYPHER, { githubId, limit: neo4j.int(limit) })
+    session.run(COLLABORATIONS_CYPHER, { githubId, limit: neo4j.int(excluded.size > 0 ? limit * 2 : limit) })
   )
   const peersByRepo = new Map(result.records.map(record => [record.get('repositoryId') as string, toNum(record.get('peers'))]))
   if (peersByRepo.size === 0) return []
@@ -151,12 +157,14 @@ const listCollaborations = async (userId: string, limit: number): Promise<Collab
   const repositories = await prisma.repository.findMany({
     where: { id: { in: [...peersByRepo.keys()] }, hidden: false, archived: false },
     select: {
-      id: true, fullName: true, owner: true, name: true, description: true,
+      id: true, fullName: true, owner: true, name: true, description: true, primaryLanguage: true,
       languages: true, frameworks: true, goodFirstIssueCount: true, pushedAt: true
     }
   })
+  const isPreferred = (lang: string | null) => !!lang && preferred.has(lang.toLowerCase())
 
   return repositories
+    .filter(repo => !repo.primaryLanguage || !excluded.has(repo.primaryLanguage.toLowerCase()))
     .map(repo => {
       const languages = repo.languages && typeof repo.languages === 'object'
         ? Object.entries(repo.languages as Record<string, number>).sort(([, a], [, b]) => b - a).slice(0, 3).map(([lang]) => lang)
@@ -170,10 +178,13 @@ const listCollaborations = async (userId: string, limit: number): Promise<Collab
         stack: [...languages, ...repo.frameworks.slice(0, 2)],
         peers: peersByRepo.get(repo.id) ?? 0,
         goodFirstIssueCount: repo.goodFirstIssueCount,
-        pushedAt: repo.pushedAt
+        pushedAt: repo.pushedAt,
+        preferred: isPreferred(repo.primaryLanguage)
       }
     })
-    .sort((a, b) => b.peers - a.peers || b.goodFirstIssueCount - a.goodFirstIssueCount)
+    .sort((a, b) => b.peers - a.peers || Number(b.preferred) - Number(a.preferred) || b.goodFirstIssueCount - a.goodFirstIssueCount)
+    .slice(0, limit)
+    .map(({ preferred: _preferred, ...repo }) => repo)
 }
 
 export const CommunityService = {

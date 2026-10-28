@@ -22,6 +22,8 @@ const SIGNAL: Record<string, number> = {
   like: 1.5,
   issue_open: 1,
   hide: -1.5,
+  // Undoing "Not for me" takes back the hide's nudge (same size, other way)
+  unhide: 1.5,
   skip: -0.25
 }
 

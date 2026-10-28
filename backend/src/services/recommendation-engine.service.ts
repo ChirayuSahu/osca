@@ -137,7 +137,10 @@ const CANDIDATES_CYPHER = `
     MATCH (u:User {githubId: $githubId})
 
     // 1. Collect all user skills, flagging which are programming languages
+    // Languages the user excluded in settings don't count as skills, so matching
+    // and the "why this" reasons fall back to their next best skill
     OPTIONAL MATCH (u)-[hs:HAS_SKILL]->(s:Skill)
+    WHERE NOT toLower(s.name) IN $excludedLanguages
     WITH u, s, hs, EXISTS { MATCH (l:Language) WHERE toLower(l.name) = toLower(s.name) } AS isLang
     WITH u, collect(CASE WHEN s IS NULL THEN null
                          ELSE {name: toLower(s.name), score: coalesce(hs.score, 0.0), isLang: isLang} END) AS userSkills
@@ -273,7 +276,9 @@ const interleaveExploration = (items: RankedRepo[], seed: number): RankedRepo[] 
   return [...out, ...rest.filter(r => !picked.has(r.repositoryId))]
 }
 
-const RANKING_CACHE_SECONDS = 10 * 60
+// Kept alive while the visit keeps scrolling (each page read renews it), so a
+// re-rank can't shift items across page boundaries mid-visit
+const RANKING_CACHE_SECONDS = 30 * 60
 // Keyed on the visit and the user's settings, so changing a setting re-ranks at
 // once. Learned weights are left out on purpose: they shift with every event,
 // and re-ranking mid-visit would reorder pages the user is scrolling through
@@ -504,6 +509,7 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
   // scroll read it instead of re-scoring up to MAX_RANKED candidates each time
   const rankingKey = seed !== null ? rankingCacheKey(userId, seed, filters, settingsKey) : null
   const cachedRanking = rankingKey ? await redisClient.get(rankingKey).catch(() => null) : null
+  if (cachedRanking && rankingKey) void redisClient.expire(rankingKey, RANKING_CACHE_SECONDS).catch(() => {})
   const ranked: RankedRepo[] = cachedRanking ? JSON.parse(cachedRanking) : await (async () => {
     const result = await session.run(cypher, {
       githubId,
@@ -560,7 +566,21 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
     return fallbackFeed(userId, page, limit, filters)
   }
 
-  const recommendations = ranked.slice(skip, skip + limit)
+  let recommendations = ranked.slice(skip, skip + limit)
+  // A cached ranking predates anything hidden, liked or saved since; drop those
+  // here (the page just comes back shorter, the order of the rest is kept)
+  if (cachedRanking && recommendations.length > 0) {
+    const acted = await prisma.userInteraction.findMany({
+      where: {
+        userId,
+        repositoryId: { in: recommendations.map(r => r.repositoryId) },
+        action: { in: [NOT_INTERESTED_ACTION, ...ALREADY_ENGAGED_ACTIONS] }
+      },
+      select: { repositoryId: true }
+    })
+    const drop = new Set(acted.map(a => a.repositoryId))
+    if (drop.size > 0) recommendations = recommendations.filter(r => !drop.has(r.repositoryId))
+  }
   if (seed !== null) void recordShown(userId, recommendations.map(r => r.repositoryId))
   const repoIds = recommendations.map(r => r.repositoryId)
 
