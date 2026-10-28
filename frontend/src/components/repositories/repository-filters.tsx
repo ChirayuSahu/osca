@@ -1,21 +1,28 @@
 "use client";
 
 import React, { useState } from "react";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogFooter,
   DialogDescription
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface RepositoryFiltersProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (filters: { language: string; minStars: string }) => void;
 }
+
+// Select items can't use an empty-string value; "any" maps back to "" for onApply.
+const ANY_LANGUAGE = "any";
+const LANGUAGES = ["TypeScript", "JavaScript", "Python", "Go", "Rust"];
 
 export function RepositoryFilters({ isOpen, onClose, onApply }: RepositoryFiltersProps) {
   const [language, setLanguage] = useState("");
@@ -28,58 +35,57 @@ export function RepositoryFilters({ isOpen, onClose, onApply }: RepositoryFilter
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-neutral-950 border border-white/[0.05] text-white sm:max-w-md rounded-2xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-medium tracking-tight">Filter Repositories</DialogTitle>
-          <DialogDescription className="text-neutral-400">
-            Refine your repository recommendations based on your preferences.
+      <DialogContent className="gap-6 p-6 sm:max-w-md">
+        <DialogHeader className="gap-2">
+          <DialogTitle className="text-base font-semibold">Filter repositories</DialogTitle>
+          <DialogDescription className="text-sm">
+            Narrow the list by language and popularity.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">Language</label>
-            <select 
-              className="w-full bg-neutral-900 border border-white/[0.05] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="repo-filter-language">Language</Label>
+            <Select
+              value={language || ANY_LANGUAGE}
+              onValueChange={(value) => setLanguage(value === ANY_LANGUAGE ? "" : value)}
             >
-              <option value="">Any Language</option>
-              <option value="TypeScript">TypeScript</option>
-              <option value="JavaScript">JavaScript</option>
-              <option value="Python">Python</option>
-              <option value="Go">Go</option>
-              <option value="Rust">Rust</option>
-            </select>
+              <SelectTrigger id="repo-filter-language" className="w-full">
+                <SelectValue placeholder="Any language" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY_LANGUAGE}>Any language</SelectItem>
+                {LANGUAGES.map((lang) => (
+                  <SelectItem key={lang} value={lang}>
+                    {lang}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">Minimum Stars</label>
-            <input 
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="repo-filter-stars">Minimum stars</Label>
+            <Input
+              id="repo-filter-stars"
               type="number"
+              min={0}
               placeholder="e.g. 100"
-              className="w-full bg-neutral-900 border border-white/[0.05] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               value={minStars}
               onChange={(e) => setMinStars(e.target.value)}
             />
           </div>
         </div>
 
-        <DialogFooter className="mt-2 flex sm:justify-between w-full">
-          <Button 
-            variant="ghost" 
-            onClick={() => { setLanguage(""); setMinStars(""); }}
-            className="text-neutral-400 hover:text-white"
-          >
+        <DialogFooter className="sm:justify-between">
+          <Button variant="ghost" onClick={() => { setLanguage(""); setMinStars(""); }}>
             Reset
           </Button>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose} className="border-white/[0.05] bg-transparent hover:bg-white/[0.02]">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+            <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleApply} className="bg-emerald-500 hover:bg-emerald-600 text-black">
-              Apply Filters
-            </Button>
+            <Button onClick={handleApply}>Apply filters</Button>
           </div>
         </DialogFooter>
       </DialogContent>

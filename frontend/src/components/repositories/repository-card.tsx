@@ -1,29 +1,48 @@
 "use client";
 
 import React, { useState } from "react";
-import { Star, GitFork, ArrowRight, ExternalLink, Download, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Clock, Download, Star, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { DitherCard, LanguageDot, RepoTitle, StatusPill, compactNumber } from "@/components/repo-ui";
 
 export interface Repository {
   id: number | string;
+  /** Full name, "owner/name" */
   name: string;
   description: string;
   stars: number;
   forks: number;
   language?: string;
+  /** @deprecated Languages render as dots; kept for API compatibility. */
   languageColor?: string;
   matchScore?: number;
   issuesCount?: number;
   url?: string;
 }
 
+/** Import state of a GitHub repo in OSCA, shown on cards in import mode. */
+export type RepositoryImportStatus =
+  | { state: "imported"; internalId: string }
+  | { state: "queued" };
+
 interface RepositoryCardProps {
   repo: Repository;
   mode?: "import" | "view";
+  importStatus?: RepositoryImportStatus;
   onAction?: (repo: Repository) => void | Promise<void>;
   onDelete?: (repo: Repository) => void | Promise<void>;
 }
 
-export function RepositoryCard({ repo, mode = "view", onAction, onDelete }: RepositoryCardProps) {
+const splitName = (fullName: string): [string, string] => {
+  const i = fullName.indexOf("/");
+  return i === -1 ? ["", fullName] : [fullName.slice(0, i), fullName.slice(i + 1)];
+};
+
+export function RepositoryCard({ repo, mode = "view", importStatus, onAction, onDelete }: RepositoryCardProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAction = async (e: React.MouseEvent) => {
@@ -38,91 +57,107 @@ export function RepositoryCard({ repo, mode = "view", onAction, onDelete }: Repo
     }
   };
 
+  const [owner, name] = splitName(repo.name);
   const isImportMode = mode === "import";
+  const imported = isImportMode ? importStatus?.state === "imported" : true;
+  const detailsHref =
+    isImportMode && importStatus?.state === "imported"
+      ? `/dashboard/repository/${importStatus.internalId}`
+      : `/dashboard/repository/${repo.id}`;
+
+  let action: React.ReactNode;
+  if (!isImportMode) {
+    action = (
+      <>
+        {onDelete && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Remove from imported"
+                className="text-muted-foreground hover:text-destructive"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onDelete(repo);
+                }}
+              >
+                <Trash2 />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Remove from imported</TooltipContent>
+          </Tooltip>
+        )}
+        <Button variant="outline" size="sm" asChild>
+          <Link href={detailsHref}>
+            Open <ArrowRight />
+          </Link>
+        </Button>
+      </>
+    );
+  } else if (importStatus?.state === "imported") {
+    action = (
+      <Button variant="outline" size="sm" asChild>
+        <Link href={detailsHref}>
+          Open <ArrowRight />
+        </Link>
+      </Button>
+    );
+  } else if (importStatus?.state === "queued") {
+    action = (
+      <Button variant="outline" size="sm" disabled>
+        <Clock /> Queued
+      </Button>
+    );
+  } else {
+    action = (
+      <Button size="sm" onClick={handleAction} disabled={isLoading}>
+        {isLoading ? <Spinner className="text-current" /> : <Download />}
+        {isLoading ? "Importing…" : "Import"}
+      </Button>
+    );
+  }
 
   return (
-    <div className="relative overflow-hidden bg-neutral-900/50 backdrop-blur-xl border border-neutral-800/50 hover:border-emerald-500/30 transition-all duration-300 flex flex-col justify-between group p-6 rounded-2xl shadow-xl hover:shadow-emerald-900/20">
-      {/* Hover Gradient Edge Highlight */}
-      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/0 group-hover:via-emerald-500/40 to-transparent transition-all duration-500" />
-      
-      {/* Subtle Radial Card Glow */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/[0.03] rounded-full blur-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <a href={repo.url || `https://github.com/${repo.name}`} target="_blank" rel="noopener noreferrer" className="font-medium text-neutral-200 group-hover:text-emerald-400 text-lg flex items-start gap-2 transition-colors pr-2 break-all" title={repo.name}>
-            {repo.name}
-            <ExternalLink className="w-4 h-4 mt-1 opacity-0 group-hover:opacity-100 text-neutral-500 hover:text-emerald-400 transition-all flex-shrink-0" />
-          </a>
-          
-          {/* Glowing Match Badge */}
-          {repo.matchScore !== undefined && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/[0.08] border border-emerald-500/20 rounded-full whitespace-nowrap">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-medium text-emerald-400 tracking-wide">
-                {repo.matchScore}% Match
-              </span>
+    <DitherCard className="h-full" logo={owner || undefined}>
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <div className="flex items-center gap-3">
+          <RepoTitle owner={owner} name={name} />
+          {imported && (
+            <div className="ml-auto">
+              <StatusPill>Imported</StatusPill>
             </div>
           )}
         </div>
-
-        {/* Description */}
-        <p className="text-neutral-400 text-sm font-light leading-relaxed line-clamp-2 min-h-[40px]">
-          {repo.description || "No description provided."}
-        </p>
-      </div>
-
-      {/* Footer Metrics */}
-      <div className="flex flex-wrap items-center justify-between gap-y-4 pt-5 border-t border-neutral-800 mt-5">
-        <div className="flex items-center gap-4 text-xs text-neutral-400 font-light">
-          {/* Language */}
-          {repo.language && (
-            <div className="flex items-center gap-1.5">
-              <span className={`w-2 h-2 rounded-full ${repo.languageColor || 'bg-blue-400'}`} />
-              {repo.language}
-            </div>
-          )}
-          {/* Stars */}
-          <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 text-neutral-500" />
-            {repo.stars >= 1000 ? `${(repo.stars / 1000).toFixed(1)}k` : repo.stars}
-          </div>
-          {/* Forks */}
-          <div className="flex items-center gap-1.5">
-            <GitFork className="w-3.5 h-3.5 text-neutral-500" />
-            {repo.forks >= 1000 ? `${(repo.forks / 1000).toFixed(1)}k` : repo.forks}
-          </div>
-        </div>
-
-        {isImportMode ? (
-          <button
-            onClick={handleAction}
-            disabled={isLoading}
-            className="text-xs font-medium bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-neutral-950 px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed z-10 relative"
-          >
-            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            {isLoading ? "Importing..." : "Import Repo"}
-          </button>
-        ) : (
-          <div className="flex items-center gap-4">
-            {onDelete && (
-              <button
-                onClick={(e) => { e.preventDefault(); onDelete(repo); }}
-                className="text-xs font-medium text-red-400 hover:text-red-300 flex items-center gap-1 transition-all duration-300 z-10 relative"
-              >
-                Remove
-              </button>
-            )}
-            <a 
-              href={`/dashboard/repository/${repo.id}`}
-              className="text-xs font-medium text-neutral-300 hover:text-emerald-400 flex items-center gap-1 group-hover:translate-x-1 transition-all duration-300 z-10 relative"
-            >
-              View Issues
-              <ArrowRight className="w-3.5 h-3.5" />
-            </a>
-          </div>
+        {repo.description && (
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{repo.description}</p>
         )}
+      </div>
+      <div className="flex min-w-0 items-center gap-3 whitespace-nowrap px-5 pb-4 text-xs text-muted-foreground">
+        {repo.language && <LanguageDot language={repo.language} />}
+        <span className="inline-flex items-center gap-1 tabular-nums" title="Stars">
+          <Star className="size-3.5" aria-hidden />
+          <span className="sr-only">Stars</span>
+          {compactNumber(repo.stars)}
+        </span>
+        <div className="ml-auto flex shrink-0 items-center gap-1">{action}</div>
+      </div>
+    </DitherCard>
+  );
+}
+
+export function RepositoryCardSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-3 rounded-md border border-border bg-card p-5">
+      <div className="space-y-1.5">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <Skeleton className="h-3.5 w-full" />
+      <Skeleton className="h-3.5 w-3/4" />
+      <div className="mt-1 flex items-center justify-between">
+        <Skeleton className="h-3.5 w-28" />
+        <Skeleton className="h-8 w-20" />
       </div>
     </div>
   );
