@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, JetBrains_Mono, Playfair_Display } from "next/font/google";
+import { JetBrains_Mono, Manrope, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,8 +7,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/context/auth-context";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Primary sans for body text and UI
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -36,7 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={cn(geistSans.variable, jetbrainsMono.variable, playfairDisplay.variable, "min-h-svh font-sans antialiased")}>
+      <body className={cn(manrope.variable, jetbrainsMono.variable, playfairDisplay.variable, "min-h-svh font-sans antialiased")}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <TooltipProvider delayDuration={200}>

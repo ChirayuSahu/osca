@@ -1,14 +1,15 @@
 # OSCA UI guidelines
 
-OSCA's look: a dark-first, emerald-accented interface with italic display headings, soft
-emerald glows, gradient sheens on hover and gentle motion. Every screen keeps that
+OSCA's look: a dark-first, emerald-accented interface with italic display headings, a
+1-bit emerald dither that reacts to the pointer, and fluid, quiet motion (no glows,
+gradients or blur). Every screen keeps that
 language, built from the shared components in `src/components/ui`, and works in both
 light and dark mode (theme switcher in the top bar).
 
 ## Design language (keep it)
 
 - **Display type.** Page titles are Playfair Display italic (`PageHeader` does this:
-  `font-serif italic text-[40px]` + bold subtitle). Body is Geist Sans, code/numbers JetBrains Mono.
+  `font-serif italic text-[40px]` + bold subtitle). Body is Manrope, code/numbers JetBrains Mono.
 - **Emerald accent.** Primary actions are solid emerald buttons (`Button` default).
   Accents, active states, links and highlights use emerald.
 - **Dither, not glow.** Decoration is 1-bit ordered dither in emerald (`Dither`,
