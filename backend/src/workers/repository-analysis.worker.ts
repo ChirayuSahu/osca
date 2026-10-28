@@ -11,10 +11,15 @@ import { Neo4jSyncService } from '../services/neo4j-sync.service'
 import { prisma } from '../utils/prisma'
 import type { RepositoryAnalysisJobData, RepositoryAnalysisJobResult } from '../types/jobs'
 
-// What the Imported page shows when an analysis fails for good
+// What the Imported page shows when an analysis fails for good. A rate limit
+// isn't the token's fault, so it never asks the user to reconnect.
 const friendlyAnalysisError = (error: any): string => {
   const status = error?.statusCode
-  if (status === 404) return 'Repository not found, or it is private.'
+  if (error instanceof GithubRateLimitError || status === 429 || /rate limit/i.test(String(error?.message))) {
+    return 'GitHub rate limit reached. Try again in a few minutes.'
+  }
+  if (status === 404 || status === 451) return 'Repository not found, or it is private.'
+  if (status === 409) return 'The repository is empty.'
   if (status === 403) return 'GitHub refused access. Reconnect GitHub and try again.'
   if (status === 400) return String(error?.message || 'Invalid repository URL.')
   return 'The analysis failed. Try again in a few minutes.'
@@ -103,7 +108,8 @@ const processRepositoryAnalysis = async (
 export const createRepositoryWorker = (): Worker => {
   const worker: Worker<RepositoryAnalysisJobData, RepositoryAnalysisJobResult> = new Worker<RepositoryAnalysisJobData, RepositoryAnalysisJobResult>(
     QUEUE_NAMES.REPOSITORY_ANALYSIS,
-    waitOnGithubRateLimit('queue', () => worker, processRepositoryAnalysis),
+    // Per token: a user's job runs on their token, a system job on the server's
+    waitOnGithubRateLimit('job', () => worker, processRepositoryAnalysis, (job) => job.data.userId ? `user:${job.data.userId}` : 'server'),
     {
       connection: getRedisConnectionOptions(),
       concurrency: 2,
@@ -119,12 +125,12 @@ export const createRepositoryWorker = (): Worker => {
 
   worker.on('failed', (job, err) => {
     console.error(`[RepositoryWorker] Job ${job?.id} failed: ${err.message}`)
-    // Covers failures the processor never saw (e.g. stalled past BullMQ's limit),
-    // so a request can't sit at "analyzing" for good
-    if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      AnalysisRequestService.setStatus(job.data.userId, job.data.url, 'failed', {
-        error: friendlyAnalysisError(err)
-      }).catch(() => {})
+    // Covers failures the processor never saw (e.g. stalled past BullMQ's limit,
+    // failed on its next pickup), so a request can't sit at "analyzing" for good.
+    // finishedOn is only set once the job is in the failed set (no retry pending);
+    // a request the processor already marked failed keeps its reason.
+    if (job?.finishedOn) {
+      AnalysisRequestService.failIfOpen(job.data.userId, job.data.url, friendlyAnalysisError(err)).catch(() => {})
     }
   })
 

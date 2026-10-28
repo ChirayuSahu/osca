@@ -192,14 +192,19 @@ const trimHunk = (hunk: string | null | undefined, lines = 8) => {
   return all.length > lines + 1 ? all.slice(-lines).join('\n') : hunk
 }
 
-type ActivityResponse = { data?: { repository?: { issueOrPullRequest?: Node | null } | null }; errors?: { message: string }[] }
+type ActivityResponse = { data?: { repository?: { issueOrPullRequest?: Node | null } | null }; errors?: { message: string; type?: string }[] }
 
 const getActivity = async (userId: string, owner: string, repo: string, number: number) => {
   const token = await getGithubAccessToken(userId)
   const res = await githubGraphQL<ActivityResponse>(ACTIVITY_QUERY, token, { owner, name: repo, number })
   const item = res.data?.repository?.issueOrPullRequest
   if (!item) {
-    throw new AppError(res.errors?.[0]?.message ?? 'Issue or pull request not found', res.errors ? 502 : 404)
+    // RATE_LIMITED is raised by githubGraphQL itself; a missing repo or number is NOT_FOUND
+    const error = res.errors?.[0]
+    if (!error || res.errors?.some((e) => e.type === 'NOT_FOUND')) {
+      throw new AppError('Issue or pull request not found', 404)
+    }
+    throw new AppError(error.message, 502)
   }
 
   const events = ((item.timelineItems?.nodes ?? []) as Node[])

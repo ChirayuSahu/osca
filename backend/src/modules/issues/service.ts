@@ -1,3 +1,4 @@
+import { totalPagesFromLink } from '../../lib/github/utils/pagination'
 import { getGithubAccessToken, fetchGithub, fetchGithubWithAccept, githubGraphQL } from '../../lib/github'
 import { ReactionContent, isValidReaction } from '../../lib/github/utils/constants'
 
@@ -92,13 +93,7 @@ const listIssues = async (userId: string, owner: string, repo: string, page: num
     }))
   }
 
-  // Basic pagination header parsing
-  const linkHeader = response.headers.get('Link') ?? response.headers.get('link')
-  let totalPages = page
-  if (linkHeader && linkHeader.includes('rel="last"')) {
-    const match = linkHeader.match(/<[^>]+[?&]page=(\d+)[^>]*>;\s*rel="last"/)
-    if (match) totalPages = parseInt(match[1], 10)
-  }
+  const totalPages = totalPagesFromLink(response.headers.get('Link') ?? response.headers.get('link'), page)
   
   return { issues: issuesWithSubIssues, page, limit, totalPages }
 }
@@ -134,12 +129,7 @@ const listIssueComments = async (userId: string, owner: string, repo: string, is
   })
   const comments = await withViewerReactions(await response.json(), token)
   
-  const linkHeader = response.headers.get('Link') ?? response.headers.get('link')
-  let totalPages = page
-  if (linkHeader && linkHeader.includes('rel="last"')) {
-    const match = linkHeader.match(/<[^>]+[?&]page=(\d+)[^>]*>;\s*rel="last"/)
-    if (match) totalPages = parseInt(match[1], 10)
-  }
+  const totalPages = totalPagesFromLink(response.headers.get('Link') ?? response.headers.get('link'), page)
   
   return { comments, page, limit, totalPages }
 }

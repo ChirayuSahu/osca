@@ -139,6 +139,10 @@ const searchEasyContributionRepos = async (
   limit: number,
   language?: string
 ): Promise<PaginatedGithubRepos> => {
+  // Pages past the 1,000-result cap are rejected by GitHub (422)
+  if ((page - 1) * limit >= GITHUB_SEARCH_MAX_RESULTS) {
+    return { repos: [], page, limit, total: 0, totalPages: 0 }
+  }
   const token = await getGithubAccessToken(userId)
   
   let query = 'good-first-issues:>0 state:open'
@@ -161,7 +165,7 @@ const searchEasyContributionRepos = async (
 
   // Wait, GitHub search API also returns `total_count`. We can use it.
   const total = data.total_count ?? pagination.total
-  const totalPages = Math.ceil(total / limit)
+  const totalPages = Math.ceil(Math.min(total, GITHUB_SEARCH_MAX_RESULTS) / limit)
 
   return {
     repos,
@@ -330,7 +334,20 @@ const listStarterIssues = async (userId: string, owner: string, repo: string): P
   return issues
 }
 
+// Repos their owner deleted from OSCA, so weekly discovery doesn't add them back.
+// Kept in Redis (no schema change); losing the set only means a re-discovery.
+const OWNER_DELETED_KEY = 'catalogue:owner-deleted'
+
+const excludeFromDiscovery = async (fullName: string): Promise<void> => {
+  await redisClient.sadd(OWNER_DELETED_KEY, fullName.toLowerCase())
+}
+
+const discoveryExclusions = async (): Promise<Set<string>> =>
+  new Set(await redisClient.smembers(OWNER_DELETED_KEY).catch(() => [] as string[]))
+
 export const RepositoryService = {
+  excludeFromDiscovery,
+  discoveryExclusions,
   searchGithubRepositories,
   listGithubRepositories,
   searchEasyContributionRepos,

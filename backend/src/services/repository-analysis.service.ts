@@ -1,5 +1,7 @@
 import { prisma } from '../utils/prisma'
-import { AppError } from '../lib/errors'
+import { AppError, GithubRateLimitError } from '../lib/errors'
+import { isGithubTokenError } from './github-token-health.service'
+import { Neo4jSyncService } from './neo4j-sync.service'
 import {
   detectNpmFrameworks,
   detectPythonFrameworks,
@@ -19,9 +21,28 @@ import {
 import { IGNORED_DIRS, IGNORED_FILES, GOOD_FIRST_ISSUE_LABELS, HELP_WANTED_LABELS } from '../lib/github/utils/constants'
 import { extractKeywords } from '../lib/text/keywords'
 
-// What the project is about, from its topics, description and README (one call)
-const fetchKeywords = async (owner: string, repo: string, topics: string[], description: string | null, token: string): Promise<string[]> => {
-  const readme = await githubTryGetRaw(`/repos/${owner}/${repo}/readme`, token).catch(() => null)
+// A rate limit or a rejected token says nothing about the repo: rethrown so the
+// job waits or fails, instead of saving empty data in place of what's stored
+const rethrowRateLimitOrToken = (err: unknown): void => {
+  if (err instanceof GithubRateLimitError || isGithubTokenError(err)) throw err
+}
+
+// allSettled checks still have to stop on a rate limit or a rejected token
+const rethrowSettled = (results: PromiseSettledResult<unknown>[]): void => {
+  for (const result of results) if (result.status === 'rejected') rethrowRateLimitOrToken(result.reason)
+}
+
+// What the project is about, from its topics, description and README (one
+// call); null when the README couldn't be read, so stored keywords are kept
+const fetchKeywords = async (owner: string, repo: string, topics: string[], description: string | null, token: string): Promise<string[] | null> => {
+  let readme: string | null
+  try {
+    readme = await githubTryGetRaw(`/repos/${owner}/${repo}/readme`, token)
+  } catch (err) {
+    rethrowRateLimitOrToken(err)
+    console.error(`[RepoService] Failed to fetch README for ${owner}/${repo}:`, err)
+    return null
+  }
   return extractKeywords({ topics, description, readme })
 }
 
@@ -32,10 +53,11 @@ interface RepoAnalysis {
   description: string | null
   url: string
   githubId: number
-  languages: Record<string, number>
+  // null when the fetch failed (the stored value is kept)
+  languages: Record<string, number> | null
   frameworks: string[]
   techStack: string[]
-  topics: string[]
+  topics: string[] | null
   ciCd: string[]
   folderStructure: any
   dependencies: any
@@ -163,6 +185,7 @@ const fetchApproachability = async (owner: string, repo: string, token: string):
       ...newcomerSignals(repository as SignalNodes)
     }
   } catch (err) {
+    rethrowRateLimitOrToken(err)
     console.error(`[RepoService] Approachability fetch failed for ${owner}/${repo}:`, err)
     return null
   }
@@ -231,6 +254,7 @@ const fetchFullTree = async (
       token
     )
   } catch (err: any) {
+    rethrowRateLimitOrToken(err)
     console.warn(`[RepoService] Recursive tree fetch failed for ${owner}/${repo} (${err?.message}), falling back to subtree fetching.`)
   }
 
@@ -278,6 +302,8 @@ const fetchFullTree = async (
     })
   )
 
+  // A partial tree saved over a rate limit would look like a complete one
+  rethrowSettled(subtreeResults)
   for (const result of subtreeResults) {
     if (result.status === 'fulfilled') {
       allEntries.push(...result.value)
@@ -288,6 +314,17 @@ const fetchFullTree = async (
 
 
   return allEntries
+}
+
+// GitHub says the repo is gone (deleted, made private, or taken down): hide it
+// so it's neither recommended nor refreshed again, and drop it from the graph
+const hideIfGone = async (repositoryId: string | undefined, err: unknown): Promise<void> => {
+  if (!repositoryId || !(err instanceof AppError) || ![404, 451].includes(err.statusCode)) return
+  await prisma.repository.update({ where: { id: repositoryId }, data: { hidden: true } }).catch(() => {})
+  await Neo4jSyncService.removeRepository(repositoryId).catch((error) => {
+    console.error(`[RepoService] Failed to remove repository ${repositoryId} from Neo4j:`, error)
+  })
+  console.warn(`[RepoService] Repository ${repositoryId} is gone on GitHub (HTTP ${err.statusCode}); hidden`)
 }
 
 const analyzeRepository = async (
@@ -332,7 +369,10 @@ const analyzeRepository = async (
       existingRepo.keywords.length === 0
         ? fetchKeywords(owner, repo, existingRepo.topics, existingRepo.description, accessToken)
         : Promise.resolve(null)
-    ])
+    ]).catch(async (err) => {
+      await hideIfGone(existingRepo.id, err)
+      throw err
+    })
     const refreshed = await prisma.repository.update({
       where: { id: existingRepo.id },
       data: {
@@ -341,7 +381,10 @@ const analyzeRepository = async (
         openIssuesCount: Number(meta.open_issues_count) || 0,
         archived: !!meta.archived,
         pushedAt: meta.pushed_at ? new Date(meta.pushed_at) : null,
-        ...(approachability && { ...approachability, approachabilityUpdatedAt: new Date() }),
+        // Bumped even when the signals couldn't be read, so the nightly refresh
+        // (oldest first) moves on instead of retrying this repo forever
+        ...approachability,
+        approachabilityUpdatedAt: new Date(),
         ...(keywords && { keywords })
       }
     })
@@ -349,11 +392,14 @@ const analyzeRepository = async (
     return refreshed
   }
 
-  const analysis = await analyzeGithubRepo(owner, repo, accessToken, onProgress)
+  const analysis = await analyzeGithubRepo(owner, repo, accessToken, onProgress).catch(async (err) => {
+    await hideIfGone(existingRepo?.id, err)
+    throw err
+  })
   await onProgress(78, 'Checking contributor-friendliness...')
   const [approachability, keywords] = await Promise.all([
     fetchApproachability(owner, repo, accessToken),
-    fetchKeywords(owner, repo, analysis.topics, analysis.description, accessToken)
+    fetchKeywords(owner, repo, analysis.topics ?? existingRepo?.topics ?? [], analysis.description, accessToken)
   ])
   await onProgress(80, 'Saving repository data...')
 
@@ -374,19 +420,24 @@ const analyzeRepository = async (
     url: analysis.url,
     provider: 'github',
     githubId: analysis.githubId,
-    languages: analysis.languages,
-    primaryLanguage: Object.entries(analysis.languages).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null,
+    // A failed fetch keeps what's stored rather than saving it as empty
+    ...(analysis.languages && {
+      languages: analysis.languages,
+      primaryLanguage: Object.entries(analysis.languages).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null
+    }),
     frameworks: analysis.frameworks,
     techStack: analysis.techStack,
-    topics: analysis.topics,
-    keywords,
+    ...(analysis.topics && { topics: analysis.topics }),
+    ...(keywords && { keywords }),
     ciCd: analysis.ciCd,
     stars: analysis.stars,
     forks: analysis.forks,
     openIssuesCount: analysis.openIssuesCount,
     archived: analysis.archived,
     pushedAt: analysis.pushedAt,
-    ...(approachability && { ...approachability, approachabilityUpdatedAt: new Date() }),
+    // Bumped even without signals, as in the refresh above
+    ...approachability,
+    approachabilityUpdatedAt: new Date(),
     ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
     ...(persistDependencies !== undefined && { dependencies: persistDependencies })
   }
@@ -437,21 +488,21 @@ const analyzeGithubRepo = async (
   const repoData = await githubGetJson<GithubRepoResponse>(repoPath, token)
 
   await onProgress(18, 'Detecting languages...')
-  let languagesData: Record<string, number> = {}
+  let languagesData: Record<string, number> | null = null
   try {
     languagesData = await githubGetJson<Record<string, number>>(`${repoPath}/languages`, token)
   } catch (err) {
+    rethrowRateLimitOrToken(err)
     console.error(`[RepoService] Failed to fetch languages for ${owner}/${repo}:`, err)
-    languagesData = {}
   }
 
-  let topics: string[] = []
+  let topics: string[] | null = null
   try {
     const topicsRes = await githubGetJson<{ names: string[] }>(`${repoPath}/topics`, token)
     topics = topicsRes.names || []
   } catch (err) {
+    rethrowRateLimitOrToken(err)
     console.error(`[RepoService] Failed to fetch topics for ${owner}/${repo}:`, err)
-    topics = []
   }
 
   await onProgress(25, 'Fetching repository file tree for visual map...')
@@ -470,6 +521,7 @@ const analyzeGithubRepo = async (
       })
     }
   } catch (err) {
+    rethrowRateLimitOrToken(err)
     console.error(`[RepoService] Tree fetch error:`, err)
   }
 
@@ -559,6 +611,7 @@ const analyzeGithubRepo = async (
       })
     })
   } catch (err) {
+    rethrowRateLimitOrToken(err)
     console.error(`[RepoService] Dependency graph error:`, err)
   }
 
@@ -689,6 +742,7 @@ const detectStacksViaApi = async (
   )
 
   // Log any failures (non-critical)
+  rethrowSettled(checks)
   checks.forEach((result, i) => {
     if (result.status === 'rejected') {
       console.warn(`[RepoService] Stack detection check failed for ${STACK_FILE_INDICATORS[i].path}:`, result.reason)
@@ -727,6 +781,7 @@ const detectCiCdPipelines = async (
     })
   )
 
+  rethrowSettled(results)
   for (const result of results) {
     if (result.status === 'fulfilled' && result.value !== null && !seen.has(result.value)) {
       seen.add(result.value)

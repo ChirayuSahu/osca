@@ -11,6 +11,7 @@ import { rebuildProfileIfOwnRepository } from '../../services/profile-refresh.se
 import { RepositoryService } from './service'
 import { NOT_INTERESTED_ACTION } from '../../services/recommendation-engine.service'
 import { InteractionService } from '../../services/interaction.service'
+import { clearIssueRecommendations } from '../../services/issue-recommendation.service'
 import { Neo4jSyncService } from '../../services/neo4j-sync.service'
 import { githubGetJson, githubTryGetRaw, githubGraphQL } from '../../lib/github/client'
 import { decryptToken } from '../../lib/crypto/token-cipher'
@@ -256,7 +257,14 @@ const getRepositoryByFullName = asyncHandler(async (req: RequestWithUser, res: R
 
     sendResponse(res, 200, true, 'Repository preview retrieved from GitHub', previewRepo)
   } catch (ghError) {
-    throw new AppError('Repository not found on GitHub or unauthorized', 404)
+    // Only a real not-found is a 404; token problems (403, kept as the client
+    // raised them for the reconnect prompt) and rate limits (429) pass through
+    if (ghError instanceof AppError && ghError.statusCode === 404) {
+      throw new AppError('Repository not found on GitHub', 404)
+    }
+    if (ghError instanceof AppError) throw ghError
+    console.error(`[RepoPreview] GitHub request failed for ${fullName}:`, ghError)
+    throw new AppError('Could not reach GitHub. Try again in a moment.', 502)
   }
 })
 
@@ -325,6 +333,12 @@ const deleteRepository = asyncHandler(async (req: RequestWithUser, res: Response
   }
 
   await prisma.repository.delete({ where: { id } })
+  Neo4jSyncService.removeRepository(id).catch((error) => {
+    console.error(`[Neo4jSync] Failed to remove deleted repository ${id}:`, error)
+  })
+  RepositoryService.excludeFromDiscovery(repository.fullName).catch((error) => {
+    console.error(`[Repositories] Failed to exclude ${repository.fullName} from discovery:`, error)
+  })
   sendResponse(res, 200, true, 'Repository deleted successfully')
 })
 
@@ -385,6 +399,8 @@ const markNotInterested = asyncHandler(async (req: RequestWithUser, res: Respons
       console.error(`[Neo4jSync] Failed to sync not-interested for user ${userId}, repo ${repositoryId}:`, error)
     })
   }
+  // Next issues are drawn from the feed, so they're rebuilt without this repo
+  await clearIssueRecommendations(userId)
   sendResponse(res, 201, true, 'Repository hidden from your feed')
 })
 
@@ -399,6 +415,7 @@ const clearNotInterested = asyncHandler(async (req: RequestWithUser, res: Respon
       console.error(`[Neo4jSync] Failed to clear not-interested for user ${userId}, repo ${repositoryId}:`, error)
     })
   }
+  await clearIssueRecommendations(userId)
   sendResponse(res, 200, true, 'Repository restored to your feed')
 })
 
@@ -512,6 +529,7 @@ const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Resp
       })
     }
 
+    await clearIssueRecommendations(userId)
     sendResponse(res, 200, true, 'Repository unliked successfully')
     return
   }
@@ -522,6 +540,8 @@ const toggleRepositoryLike = asyncHandler(async (req: RequestWithUser, res: Resp
 
   // Automatically log interaction (also syncs an INTERACTED_WITH edge to Neo4j)
   await InteractionService.logInteraction(userId, repositoryId, 'REPOSITORY_LIKE')
+  // Likes shape the feed the next issues are drawn from
+  await clearIssueRecommendations(userId)
 
   sendResponse(res, 201, true, 'Repository liked successfully', like)
 })

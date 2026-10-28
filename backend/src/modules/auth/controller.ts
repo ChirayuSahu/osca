@@ -17,8 +17,10 @@ import { JobEnqueueService } from '../../services/job-enqueue.service'
 // reactions can be posted to public repositories as the user. No private repo access.
 const GITHUB_SCOPES = 'read:user,user:email,public_repo'
 
+// GitHub answers a failed code exchange with HTTP 200 and an `error` field
 interface GithubTokenResponse {
   access_token?: string
+  error?: string
 }
 
 interface GithubUserResponse {
@@ -48,8 +50,23 @@ const redirectToGithub = (req: Request, res: Response): void => {
   res.redirect(authorizeUrl)
 }
 
+// The callback is a browser navigation, so every failure goes back to the
+// login page with a short code (like GitHub's own ?error=) rather than JSON
+const redirectToLogin = (res: Response, error: string): void => {
+  res.redirect(`${config.frontendUrl}/login?error=${encodeURIComponent(error)}`)
+}
+
 // #4: Callback verifies `state` against cookie before exchanging code
 const handleGithubCallback = asyncHandler(async (req: Request, res: Response) => {
+  try {
+    await completeGithubSignIn(req, res)
+  } catch (error) {
+    console.error('[Auth] GitHub sign-in failed:', error)
+    if (!res.headersSent) redirectToLogin(res, 'sign_in_failed')
+  }
+})
+
+const completeGithubSignIn = async (req: Request, res: Response): Promise<void> => {
   const { code, state, error, error_description } = req.query
   const cookieState = req.cookies?.oauth_state as string | undefined
 
@@ -61,14 +78,16 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
 
   // Verify state to prevent CSRF / OAuth hijacking
   if (typeof state !== 'string' || !cookieState || state !== cookieState) {
-    throw new AppError('Invalid OAuth state — possible CSRF attack', 400)
+    redirectToLogin(res, 'invalid_state')
+    return
   }
 
   // Clear the state cookie immediately after verification
   res.clearCookie('oauth_state')
 
   if (typeof code !== 'string') {
-    throw new AppError('Authorization code is required', 400)
+    redirectToLogin(res, 'missing_code')
+    return
   }
 
   const tokenData = await githubPostJson<GithubTokenResponse>(
@@ -83,7 +102,9 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
 
   const accessToken = tokenData.access_token
   if (typeof accessToken !== 'string') {
-    throw new AppError('Invalid access token returned from GitHub', 502)
+    // e.g. bad_verification_code when the code expired or was already used
+    redirectToLogin(res, typeof tokenData.error === 'string' ? tokenData.error : 'token_exchange_failed')
+    return
   }
 
   const githubUser = await githubGetJson<GithubUserResponse>('/user', accessToken)
@@ -109,15 +130,23 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
   })
 
   if (existingOauth !== null) {
+    // The login is refreshed too: ownership checks compare it with repo owners,
+    // so a GitHub rename would otherwise lock them out of their own repos
     await prisma.oAuthAccount.update({
       where: { id: existingOauth.id },
-      data: { accessToken: encryptToken(accessToken) }
+      data: { accessToken: encryptToken(accessToken), username }
     })
+    const renamed = existingOauth.user.username !== username &&
+      !(await prisma.user.findUnique({ where: { username }, select: { id: true } }))
     // A fresh token: stop asking them to reconnect
-    if (existingOauth.user.githubTokenInvalidAt) {
-      await prisma.user.update({ where: { id: existingOauth.userId }, data: { githubTokenInvalidAt: null } })
+    if (existingOauth.user.githubTokenInvalidAt || renamed) {
+      userRecord = await prisma.user.update({
+        where: { id: existingOauth.userId },
+        data: { githubTokenInvalidAt: null, ...(renamed && { username }) }
+      })
+    } else {
+      userRecord = existingOauth.user
     }
-    userRecord = existingOauth.user
   } else {
     // Never link to an existing user by email: emails aren't verified on our
     // side, so matching on them would let one account claim another's login.
@@ -177,7 +206,7 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
     EXCHANGE_TTL_SECONDS
   )
   res.redirect(`${config.frontendUrl}/auth/callback?code=${exchangeCode}`)
-})
+}
 
 const EXCHANGE_TTL_SECONDS = 60
 const exchangeKey = (code: string) => `auth:exchange:${code}`

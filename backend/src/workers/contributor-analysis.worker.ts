@@ -83,7 +83,8 @@ const processContributorAnalysis = async (
 export const createContributorWorker = (): Worker => {
   const worker: Worker<ContributorAnalysisJobData, ContributorAnalysisJobResult> = new Worker<ContributorAnalysisJobData, ContributorAnalysisJobResult>(
     QUEUE_NAMES.CONTRIBUTOR_ANALYSIS,
-    waitOnGithubRateLimit('job', () => worker, processContributorAnalysis),
+    // Each job runs on that user's own token
+    waitOnGithubRateLimit('job', () => worker, processContributorAnalysis, (job) => `user:${job.data.userId}`),
     {
       connection: getRedisConnectionOptions(),
       concurrency: 3,

@@ -36,6 +36,13 @@ export const Neo4jSyncService = {
     )
   },
 
+  // Removes the repository and every edge to it (stars, likes, tech stack, topics)
+  async removeRepository(id: string) {
+    await withSession(session =>
+      session.run('MATCH (r:Repository {id: $id}) DETACH DELETE r', { id })
+    )
+  },
+
   async syncUser(user: { githubId?: number; username: string }) {
     if (!user.githubId) return
 

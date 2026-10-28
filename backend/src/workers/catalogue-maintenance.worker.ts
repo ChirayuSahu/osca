@@ -6,6 +6,7 @@ import { prisma } from '../utils/prisma'
 import { JobEnqueueService } from '../services/job-enqueue.service'
 import { DEFAULT_LANGUAGES, DEFAULT_TOPICS, discoverRepositories } from '../services/catalogue-discovery.service'
 import { syncContributions } from '../services/contribution-tracking.service'
+import { RepositoryService } from '../modules/repositories/service'
 
 // Keeps the catalogue fresh, on the server GITHUB_TOKEN:
 // - nightly, re-checks the repos with the oldest signals (newcomer signals,
@@ -56,7 +57,9 @@ const discover = async (): Promise<number> => {
     config.githubServerToken
   )
   const existing = new Set((await prisma.repository.findMany({ select: { fullName: true } })).map(r => r.fullName.toLowerCase()))
-  const fresh = [...found.keys()].filter(name => !existing.has(name))
+  // Repos their owner deleted stay out
+  const excluded = await RepositoryService.discoveryExclusions()
+  const fresh = [...found.keys()].filter(name => !existing.has(name) && !excluded.has(name))
   for (const fullName of fresh) await JobEnqueueService.enqueueRepositoryAnalysis(`https://github.com/${fullName}`)
   return fresh.length
 }

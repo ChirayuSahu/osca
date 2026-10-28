@@ -44,6 +44,16 @@ const setStatus = async (
   })
 }
 
+// For a job that failed outside the processor (e.g. stalled): marks the request
+// failed unless the worker already settled it, so its reason isn't overwritten
+const failIfOpen = async (userId: string | undefined, url: string, error: string): Promise<void> => {
+  if (!userId) return
+  await prisma.analysisRequest.updateMany({
+    where: { userId, fullName: fullNameOf(url), status: { in: ['queued', 'analyzing'] } },
+    data: { status: 'failed', error }
+  })
+}
+
 /** Your requests that haven't become imports yet, with live progress for running ones */
 const listOpen = async (userId: string) => {
   const requests = await prisma.analysisRequest.findMany({
@@ -69,6 +79,7 @@ export const AnalysisRequestService = {
   recordQueued,
   setJobId,
   setStatus,
+  failIfOpen,
   listOpen,
   dismiss
 }
