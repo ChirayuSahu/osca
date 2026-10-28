@@ -10,6 +10,9 @@ import { FeedFocus } from './FeedFocus'
 import { FeedFocusSkeleton } from '@/components/skeletons'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useAuth } from '@/context/auth-context'
+import { UserService } from '@/services/user.service'
+import { trackFeedItem } from '@/lib/recommendation-events'
+import { PREFERENCES_CHANGED } from '@/constants/interests'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -23,7 +26,7 @@ type FeedView = 'grid' | 'focus'
 const ALL_LANGUAGES = 'all'
 
 export function FeedList() {
-  const { token } = useAuth()
+  const { token, user, updateUser } = useAuth()
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,14 +40,18 @@ export function FeedList() {
   const [filters, setFilters] = useState<FeedFilters>({})
   const [view, setViewState] = useState<FeedView>('grid')
 
-  // Remember the last view for this browser
+  // Start in the view saved on your account (Settings), else the last one used in this browser
   useEffect(() => {
+    if (user?.feedView) {
+      setViewState(user.feedView)
+      return
+    }
     try {
       if (localStorage.getItem(VIEW_KEY) === 'focus') setViewState('focus')
     } catch {
       // storage unavailable: stay on the grid
     }
-  }, [])
+  }, [user?.feedView])
   const setView = useCallback((next: FeedView) => {
     setViewState(next)
     try {
@@ -52,7 +59,12 @@ export function FeedList() {
     } catch {
       // ignore
     }
-  }, [])
+    // Saved to your account so it follows you to other devices; local storage covers a failure
+    if (user?.id && token && user.feedView !== next) {
+      updateUser({ feedView: next })
+      UserService.updateSettings(user.id, { feedView: next }, token).catch((err) => console.error('Failed to save feed view', err))
+    }
+  }, [user?.id, user?.feedView, token, updateUser])
   const [languages, setLanguages] = useState<FeedLanguage[]>([])
 
   // Guards against an older request resolving after a newer one (fast filter changes)
@@ -95,6 +107,16 @@ export function FeedList() {
   useEffect(() => {
     setPage(1)
     fetchFeed(1, filters, true)
+  }, [fetchFeed, filters])
+
+  // Onboarding or Settings changed what you want recommended: start over
+  useEffect(() => {
+    const reload = () => {
+      setPage(1)
+      fetchFeed(1, filters, true)
+    }
+    window.addEventListener(PREFERENCES_CHANGED, reload)
+    return () => window.removeEventListener(PREFERENCES_CHANGED, reload)
   }, [fetchFeed, filters])
 
   useEffect(() => {
@@ -148,6 +170,7 @@ export function FeedList() {
   const handleNotInterested = async (item: FeedItem) => {
     if (!token) return
     const index = items.findIndex(i => i.repository.id === item.repository.id)
+    trackFeedItem(item, 'hide', view === 'focus' ? 'focus' : 'feed', index)
     setItems(prev => prev.filter(i => i.repository.id !== item.repository.id))
 
     const toastId = toast(`Hidden ${item.repository.fullName} from your feed`, {
@@ -267,8 +290,8 @@ export function FeedList() {
       ) : (
         <>
           <div className="stagger-in grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-busy={loadingMore}>
-            {items.map(item => (
-              <FeedCard key={item.repository.id} item={item} onNotInterested={handleNotInterested} />
+            {items.map((item, i) => (
+              <FeedCard key={item.repository.id} item={item} position={i} onNotInterested={handleNotInterested} />
             ))}
             {loadingMore && Array.from({ length: 3 }).map((_, i) => <FeedCardSkeleton key={`more-${i}`} />)}
           </div>

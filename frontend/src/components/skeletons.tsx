@@ -385,3 +385,27 @@ export function FeedFocusSkeleton() {
     </div>
   );
 }
+
+/** Settings: four sections of labelled rows */
+export function SettingsSkeleton() {
+  return (
+    <div className="flex flex-col gap-5" aria-busy="true">
+      {[3, 3, 1, 2].map((rows, i) => (
+        <div key={i} className="rounded-md border border-border bg-card">
+          <div className="border-b border-border px-5 py-4 sm:px-6">
+            <Skeleton className="h-3 w-28" />
+          </div>
+          {Array.from({ length: rows }).map((_, j) => (
+            <div key={j} className="flex items-center justify-between gap-4 border-b border-border px-5 py-4 last:border-0 sm:px-6">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3.5 w-64" />
+              </div>
+              <Skeleton className="h-5 w-9 rounded-full" />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}

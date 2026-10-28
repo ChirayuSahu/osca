@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { BookMarked } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryCard, RepositoryCardSkeleton, Repository } from "@/components/repositories/repository-card";
 import { RepositoryPagination } from "@/components/repositories/repository-pagination";
+import { AnalysisRequests } from "@/components/repositories/analysis-requests";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -115,6 +116,13 @@ function ImportedReposContent() {
     }
   };
 
+  // Stable handle for the In progress list, which refreshes this one when an analysis finishes
+  const fetchRef = useRef(fetchImported);
+  fetchRef.current = fetchImported;
+  const refreshImported = useCallback(() => {
+    void fetchRef.current();
+  }, []);
+
   useEffect(() => {
     fetchImported();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,6 +170,8 @@ function ImportedReposContent() {
           </Button>
         }
       />
+
+      {token && <AnalysisRequests token={token} onFinished={refreshImported} />}
 
       {loading ? (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading repositories">

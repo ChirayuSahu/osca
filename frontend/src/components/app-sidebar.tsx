@@ -4,6 +4,7 @@ import type React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  CircleDot,
   Compass,
   FolderGit2,
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   Sun,
   ChevronsUpDown,
   Search,
+  Settings,
   User,
   Users,
 } from "lucide-react";
@@ -42,6 +44,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 type NavItem = { name: string; href: string; icon: React.ComponentType<{ className?: string }> };
@@ -52,6 +55,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { name: "Assistant", href: ROUTES.DASHBOARD, icon: LayoutDashboard },
       { name: "For you", href: "/dashboard/feed", icon: Compass },
+      { name: "Next issues", href: "/dashboard/issues", icon: CircleDot },
       { name: "Community", href: "/dashboard/community", icon: Users },
     ],
   },
@@ -107,12 +111,20 @@ const NAV_ITEM_CLASS =
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  // On phones the sidebar is a sheet over the page: following any link in it
+  // (nav, logo, account menu) closes it. React events bubble through the menu's portal.
+  const closeOnNavigate = (event: React.MouseEvent) => {
+    if (isMobile && (event.target as HTMLElement).closest("a")) setOpenMobile(false);
+  };
 
   const isActive = (href: string) =>
     href === ROUTES.DASHBOARD ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      <div className="contents" onClick={closeOnNavigate}>
       <SidebarHeader className="px-2 pb-2 pt-4">
         {/* Wordmark centred in the header; the collapse button sits on the right edge */}
         <div className="relative flex h-9 items-center justify-center">
@@ -207,6 +219,11 @@ export function AppSidebar() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild className="h-9 gap-3 rounded-md px-2.5">
+                  <Link href={ROUTES.SETTINGS}>
+                    <Settings className="text-muted-foreground" /> Settings
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="h-9 gap-3 rounded-md px-2.5">
                   <a href={`https://github.com/${user?.username ?? ""}`} target="_blank" rel="noopener noreferrer">
                     <GithubIcon className="text-muted-foreground" /> View on GitHub
                   </a>
@@ -228,6 +245,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      </div>
       <SidebarRail />
     </Sidebar>
   );

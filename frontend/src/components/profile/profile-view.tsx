@@ -24,6 +24,8 @@ import { Eyebrow, SegmentedMeter, Tag, timeAgo } from "@/components/repo-ui";
 import { API_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProfileSkeleton } from "@/components/skeletons";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 
 // The contributions calendar is heavy and below the fold; load it on demand
@@ -78,6 +80,11 @@ interface FullUser {
   skills?: string[];
   contributionScore: number;
   contributorProfile: ContributorProfile | null;
+  // Only on your own profile
+  communityHidden?: boolean;
+  // What the person shows others; scores arrive as null when hidden
+  profileShowScores?: boolean;
+  profileShowCalendar?: boolean;
 }
 
 // Emerald contribution ramp, one per colour scheme (level 0 matches bg-muted).
@@ -251,6 +258,25 @@ export function ProfileView({ userId }: { userId?: string }) {
     }
   }, [isSelf, profile, analyzing, handleAnalyzeProfile]);
 
+  // Show or hide your profile in Community; saved straight away, reverted if it fails
+  const setCommunityVisible = async (visible: boolean) => {
+    if (!authUser?.id || !token || !profile) return;
+    setProfile({ ...profile, communityHidden: !visible });
+    try {
+      const res = await fetch(`${API_URL}/users/${authUser.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ communityHidden: !visible }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success(visible ? "Your profile shows in Community" : "Your profile is hidden from Community");
+    } catch (err) {
+      console.error("Error updating Community visibility:", err);
+      setProfile((p) => (p ? { ...p, communityHidden: visible } : p));
+      toast.error("Couldn't update your Community visibility.");
+    }
+  };
+
   const header = isSelf ? (
     <PageHeader eyebrow="Account" title="Profile" description="Contribution metrics from your GitHub history." />
   ) : (
@@ -271,6 +297,9 @@ export function ProfileView({ userId }: { userId?: string }) {
   }
 
   const analytics = profile?.contributorProfile ?? null;
+  const scoresPrivate = !isSelf && profile?.profileShowScores === false;
+  const calendarPrivate = !isSelf && profile?.profileShowCalendar === false;
+  const displayName = profile?.name || profile?.username;
   const history = (analytics?.contributionHistory ?? null) as ContributionHistory | null;
   const repoExperience = analytics?.repositoryExperience as { skills?: { name: string; proficiencyScore: number }[] } | undefined;
   const topSkills = (repoExperience?.skills ?? []).slice(0, 5).map((s) => ({ name: s.name, val: Math.round(s.proficiencyScore) }));
@@ -357,7 +386,18 @@ export function ProfileView({ userId }: { userId?: string }) {
             )}
           </div>
           {isSelf && (
-          <div className="flex shrink-0 items-center gap-3 self-start sm:mt-1.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-3 self-start sm:mt-1.5">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+              <Switch
+                checked={!profile?.communityHidden}
+                onCheckedChange={setCommunityVisible}
+                aria-describedby="community-visibility-hint"
+              />
+              Show in Community
+              <span id="community-visibility-hint" className="sr-only">
+                When off, you don&apos;t appear in Community and others can&apos;t open your profile.
+              </span>
+            </label>
             {analyzing && analysisStatus && (
               <span className="max-w-xs truncate text-sm text-muted-foreground" aria-live="polite">
                 {analysisStatus}
@@ -370,6 +410,7 @@ export function ProfileView({ userId }: { userId?: string }) {
           </div>
           )}
         </div>
+        {!scoresPrivate && (
         <div className="relative grid grid-cols-2 border-t border-border bg-background sm:grid-cols-4">
           {stats.map(({ label, value }, i) => (
             <div
@@ -386,13 +427,16 @@ export function ProfileView({ userId }: { userId?: string }) {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Contributor index */}
         <div className="rounded-md border border-border bg-card p-5 sm:p-6">
           <Eyebrow>Contributor index</Eyebrow>
-          {analytics ? (
+          {scoresPrivate ? (
+            <p className="mt-5 text-sm text-muted-foreground">{displayName} keeps their scores private.</p>
+          ) : analytics ? (
             <>
               <p className="mt-2 font-serif text-6xl font-medium italic leading-none tabular-nums">
                 {Math.round(analytics.overallScore)}
@@ -427,7 +471,9 @@ export function ProfileView({ userId }: { userId?: string }) {
         {/* Top skills */}
         <div className="rounded-md border border-border bg-card p-5 sm:p-6">
           <Eyebrow>Top skills</Eyebrow>
-          {topSkills.length === 0 ? (
+          {scoresPrivate ? (
+            <p className="mt-5 text-sm text-muted-foreground">{displayName} keeps their skill scores private.</p>
+          ) : topSkills.length === 0 ? (
             <p className="mt-5 text-sm text-muted-foreground">
               Skills appear here after {isSelf ? "your" : "their"} GitHub profile is analyzed.
             </p>
@@ -450,7 +496,13 @@ export function ProfileView({ userId }: { userId?: string }) {
       {/* Activity */}
       <div className="min-w-0 rounded-md border border-border bg-card p-5 sm:p-6">
         <Eyebrow className="mb-5">Contributions · past year</Eyebrow>
-        {username ? <ActivityCalendar username={username} /> : <Skeleton className="h-28 w-full" />}
+        {calendarPrivate ? (
+          <p className="text-sm text-muted-foreground">{displayName} keeps their contributions calendar private.</p>
+        ) : username ? (
+          <ActivityCalendar username={username} />
+        ) : (
+          <Skeleton className="h-28 w-full" />
+        )}
       </div>
     </PageContainer>
   );

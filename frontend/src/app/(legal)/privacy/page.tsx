@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           <li>It analyzes your public GitHub activity to work out your skills, then recommends repositories.</li>
           <li>Chats with OscaBot are not saved by OSCA, but they are sent to an AI provider to generate replies.</li>
           <li>There are no ads, no analytics trackers, and your data is never sold.</li>
-          <li>You can revoke OSCA&apos;s GitHub access at any time and ask for your data to be deleted.</li>
+          <li>You can delete your account and data yourself in Settings, which also revokes OSCA&apos;s GitHub access.</li>
         </ul>
       </LegalSection>
 
@@ -53,17 +53,18 @@ export default function PrivacyPage() {
 
       <LegalSection id="analysis" title="2. Profile analysis">
         <p>
-          When you analyze or re-sync your profile, OSCA reads public information from your GitHub account to build a
-          contributor profile:
+          When you first sign in, and whenever you re-sync your profile, OSCA reads public information from your GitHub
+          account to build a contributor profile:
         </p>
         <ul>
           <li>Repositories you own, their languages, and dependency files such as <code>package.json</code> and <code>requirements.txt</code></li>
-          <li>Repositories you have starred</li>
+          <li>Repositories you have starred, and the descriptions and topics of your own and starred repositories</li>
           <li>Contribution totals: commits, pull requests, reviews, lines added and average pull request turnaround</li>
         </ul>
         <p>
-          From this it stores a list of skills with proficiency levels, and scores for skill depth, activity, code
-          quality and diversity. These power your recommendations and the profile page.
+          From this it stores a list of skills with proficiency levels, scores for skill depth, activity, code quality
+          and diversity, and keywords describing the kinds of projects you work on. These power your recommendations and
+          the profile page.
         </p>
       </LegalSection>
 
@@ -74,6 +75,16 @@ export default function PrivacyPage() {
             Which repositories your feed has shown you, kept for 3 days so later visits can show you something new
           </li>
           <li>Any skills you add to your profile yourself</li>
+          <li>
+            Your settings and onboarding answers: the areas you want to work on, experience level, languages you want or
+            want to skip, default feed view, and what your profile shows to others
+          </li>
+          <li>
+            What you do with recommendations: which ones were shown to you, and which you opened, liked, hid, skipped or
+            followed to GitHub. This tunes how your recommendations are ranked and tells us, in aggregate, whether they
+            lead to contributions (by checking your public pull requests to recommended repositories)
+          </li>
+          <li>Repositories you asked OSCA to analyze, and whether each analysis is queued, running, finished or failed</li>
         </ul>
         <p>
           Comments, issues and reactions you post through OSCA are sent to GitHub using your account and are governed
@@ -106,6 +117,11 @@ export default function PrivacyPage() {
           also see anonymous counts of how many similar developers are active in a repository. Your email address and
           linked accounts are never shown to other users.
         </p>
+        <p>
+          In Settings you can turn off <strong>Show in Community</strong> at any time: you then no longer appear in
+          Community, and other users can&apos;t open your profile. Or stay listed and hide your scores and stats, or
+          your contributions calendar. Recommendations and your own profile work as before either way.
+        </p>
       </LegalSection>
 
       <LegalSection id="browser" title="6. What is stored in your browser">
@@ -130,7 +146,7 @@ export default function PrivacyPage() {
 
       <LegalSection id="retention" title="8. How long we keep it">
         <ul>
-          <li>Account, profile and activity data: until you ask us to delete your account</li>
+          <li>Account, profile, settings and activity data: until you delete your account</li>
           <li>Feed history: 3 days</li>
           <li>Cached GitHub results (searches, issue lists): 10 to 30 minutes</li>
           <li>Rate-limit counters: seconds to minutes</li>
@@ -157,11 +173,19 @@ export default function PrivacyPage() {
             . OSCA will no longer be able to read your GitHub data.
           </li>
           <li>
-            <strong>Delete your data, or get a copy:</strong> contact the maintainers through the{" "}
-            <a href={REPO_URL} target="_blank" rel="noreferrer">OSCA repository</a>. We&apos;ll remove your account,
-            profile and activity from our databases.
+            <strong>Delete your account:</strong> Settings → Delete account removes your account, profile, scores,
+            settings, likes, imports and history from our databases at once, and revokes OSCA&apos;s GitHub access.
+            Anything you posted on GitHub through OSCA stays on GitHub.
           </li>
-          <li><strong>Hide recommendations:</strong> mark repositories as &ldquo;not for me&rdquo; at any time.</li>
+          <li>
+            <strong>Get a copy of your data:</strong> contact the maintainers through the{" "}
+            <a href={REPO_URL} target="_blank" rel="noreferrer">OSCA repository</a>.
+          </li>
+          <li>
+            <strong>Shape recommendations:</strong> set your experience level and languages in Settings, mark
+            repositories as &ldquo;not for me&rdquo;, and restore them from Settings.
+          </li>
+          <li><strong>Control your profile:</strong> hide it from Community, or just your scores or calendar.</li>
         </ul>
       </LegalSection>
 

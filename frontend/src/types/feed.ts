@@ -27,9 +27,22 @@ export interface ScoreInfo {
     contentScore: number;
     collabScore: number;
     topicScore: number;
+    keywordScore?: number;
+    starsScore?: number;
     approachabilityScore?: number;
     fallback?: boolean;
   };
+  /** Why it was recommended, strongest first */
+  reasons?: Reason[];
+}
+
+export type ReasonKind =
+  | "preferred" | "language" | "keywords" | "topics" | "people"
+  | "starters" | "merges" | "responsive" | "active" | "explore";
+
+export interface Reason {
+  kind: ReasonKind;
+  text: string;
 }
 
 export interface FeedItem {

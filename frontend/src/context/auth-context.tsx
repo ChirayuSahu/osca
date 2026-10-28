@@ -11,6 +11,16 @@ export interface User {
   avatarUrl: string | null;
   skills?: string[];
   contributionScore?: number;
+  // Settings, present on /auth/me
+  communityHidden?: boolean;
+  profileShowScores?: boolean;
+  profileShowCalendar?: boolean;
+  experienceLevel?: "first" | "some" | "experienced";
+  preferredLanguages?: string[];
+  excludedLanguages?: string[];
+  feedView?: "grid" | "focus";
+  interestAreas?: string[];
+  onboardedAt?: string | null;
 }
 
 interface AuthContextType {
@@ -20,6 +30,8 @@ interface AuthContextType {
   loginWithGithub: () => void;
   logout: () => void;
   setAuth: (token: string, user: User) => void;
+  /** Merge saved changes (e.g. settings) into the signed-in user */
+  updateUser: (patch: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -88,8 +100,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(newUser);
   }, []);
 
+  const updateUser = useCallback((patch: Partial<User>) => {
+    setUser((current) => (current ? { ...current, ...patch } : current));
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, loginWithGithub, logout, setAuth }}>
+    <AuthContext.Provider value={{ user, token, loading, loginWithGithub, logout, setAuth, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

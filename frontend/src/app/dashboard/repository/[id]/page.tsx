@@ -38,6 +38,7 @@ import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { RepositoryInsights } from "@/components/repository-insights";
 import { NewcomerPanel } from "@/components/newcomer-panel";
 import { cn } from "@/lib/utils";
+import { trackRecommendation } from "@/lib/recommendation-events";
 
 interface Thread {
   id: string;
@@ -267,7 +268,7 @@ export default function RepositoryPage() {
           <div className="flex shrink-0 items-center gap-2">
             {repo.url && (
               <Button variant="outline" size="icon" asChild>
-                <a href={repo.url} target="_blank" rel="noreferrer" aria-label="Open on GitHub" title="Open on GitHub">
+                <a href={repo.url} target="_blank" rel="noreferrer" aria-label="Open on GitHub" title="Open on GitHub" onClick={() => trackRecommendation({ type: "github", surface: "repository", repositoryId: repo.id })}>
                   <GithubIcon />
                 </a>
               </Button>

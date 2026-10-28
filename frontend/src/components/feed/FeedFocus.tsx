@@ -17,6 +17,8 @@ import {
   Star,
 } from 'lucide-react'
 import { FeedItem } from '@/types/feed'
+import { Reasons } from './reasons'
+import { trackFeedItem } from '@/lib/recommendation-events'
 import { RepositoryService, type StarterIssue } from '@/services/repository.service'
 import { isGithubTokenError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -101,9 +103,23 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
     [items.length]
   )
 
+  // Each card counts as shown when it comes up
+  useEffect(() => {
+    if (item) trackFeedItem(item, 'impression', 'focus', index)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item?.repository.id])
+
+  // Moving on without liking is a (weak) "not this"
+  const next = useCallback(() => {
+    if (item && !liked[item.repository.id]) trackFeedItem(item, 'skip', 'focus', index)
+    go(1)
+  }, [item, liked, index, go])
+
   const open = useCallback(() => {
-    if (item) router.push(`/dashboard/repository/${item.repository.id}`)
-  }, [item, router])
+    if (!item) return
+    trackFeedItem(item, 'open', 'focus', index)
+    router.push(`/dashboard/repository/${item.repository.id}`)
+  }, [item, index, router])
 
   const hide = useCallback(() => {
     if (!item) return
@@ -116,6 +132,7 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
     const id = item.repository.id
     const wasLiked = !!liked[id]
     setLiked(prev => ({ ...prev, [id]: !wasLiked }))
+    if (!wasLiked) trackFeedItem(item, 'like', 'focus', index)
     // Liking moves on to the next card, like a swipe right
     if (!wasLiked) window.setTimeout(() => go(1), 220)
     try {
@@ -125,7 +142,7 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
       setLiked(prev => ({ ...prev, [id]: wasLiked }))
       toast.error(isGithubTokenError(err) ? 'Reconnect GitHub to like repositories.' : `Couldn't update your like.`)
     }
-  }, [item, token, liked, go])
+  }, [item, token, liked, go, index])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -136,7 +153,7 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
         case 'ArrowRight':
         case 'l':
           e.preventDefault()
-          go(1)
+          next()
           break
         case 'ArrowLeft':
         case 'h':
@@ -172,7 +189,7 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp, true)
     }
-  }, [go, toggleLike, hide, open, onExit])
+  }, [go, next, toggleLike, hide, open, onExit])
 
   // Touch / mouse swipe on the card
   const onPointerDown = (e: React.PointerEvent) => {
@@ -188,7 +205,7 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
     const dx = dragX
     dragStart.current = null
     setDragX(0)
-    if (dx <= -SWIPE_THRESHOLD) go(1)
+    if (dx <= -SWIPE_THRESHOLD) next()
     else if (dx >= SWIPE_THRESHOLD) go(-1)
   }
 
@@ -242,7 +259,7 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
               <SquareArrowOutUpRight /> <span className="hidden sm:inline">Open</span>
             </Button>
           </div>
-          <Button variant="outline" onClick={() => go(1)} disabled={atEnd}>
+          <Button variant="outline" onClick={next} disabled={atEnd}>
             <span className="hidden sm:inline">Next</span> <ArrowRight />
           </Button>
         </div>
@@ -393,18 +410,18 @@ function FocusCard({
       <div className="flex shrink-0 flex-col gap-4 p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           {breakdown.fallback ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-tint-emerald-500 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
               <Sprout className="size-3.5" /> Starter pick
             </span>
           ) : (
             match !== null && (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/10 px-2 py-1 text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-tint-emerald-500 px-2 py-1 text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
                 {match}% match
               </span>
             )
           )}
           {liked && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-card px-2 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
               <Heart className="size-3 fill-current" /> Liked
             </span>
           )}
@@ -430,6 +447,9 @@ function FocusCard({
             ))}
           </div>
         )}
+
+        {/* Why it was recommended */}
+        <Reasons reasons={item.scoreInfo.reasons} max={3} className="text-[13px]" />
 
         {/* Why it's a good first contribution */}
         <div className="grid gap-4 sm:grid-cols-2">

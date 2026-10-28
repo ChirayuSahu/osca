@@ -10,7 +10,33 @@ export interface StarterIssue {
   labels: { name: string; color: string }[]
 }
 
+/** A repository you asked OSCA to analyze that isn't an import yet */
+export interface AnalysisRequest {
+  id: string
+  url: string
+  fullName: string
+  status: 'queued' | 'analyzing' | 'failed'
+  error: string | null
+  progress: { percent?: number; message?: string } | null
+  createdAt: string
+  updatedAt: string
+}
+
 export const RepositoryService = {
+  async listAnalysisRequests(token: string): Promise<AnalysisRequest[]> {
+    const res = await fetch(`${API_URL}/repositories/requests`, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) throw await readApiError(res, 'Failed to load analysis requests')
+    return (await res.json()).data
+  },
+
+  async dismissAnalysisRequest(id: string, token: string): Promise<void> {
+    const res = await fetch(`${API_URL}/repositories/requests/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw await readApiError(res, 'Failed to dismiss')
+  },
+
   async analyzeRepository(url: string, token: string) {
     const res = await fetch(`${API_URL}/repositories/analyze`, {
       method: 'POST',

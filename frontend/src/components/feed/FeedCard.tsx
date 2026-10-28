@@ -1,9 +1,11 @@
 "use client"
 
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { EyeOff, Sparkles, Sprout, Star } from 'lucide-react'
 import { FeedItem } from '@/types/feed'
+import { Reasons } from './reasons'
+import { trackFeedItem } from '@/lib/recommendation-events'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DitherCard, RepoTitle, compactNumber } from '@/components/repo-ui'
@@ -11,9 +13,11 @@ import { DitherCard, RepoTitle, compactNumber } from '@/components/repo-ui'
 interface FeedCardProps {
   item: FeedItem
   onNotInterested?: (item: FeedItem) => void
+  /** Position in the feed, for tracking */
+  position?: number
 }
 
-export function FeedCard({ item, onNotInterested }: FeedCardProps) {
+export function FeedCard({ item, onNotInterested, position }: FeedCardProps) {
   const router = useRouter()
   const repo = item.repository
   const { breakdown } = item.scoreInfo
@@ -24,7 +28,16 @@ export function FeedCard({ item, onNotInterested }: FeedCardProps) {
   const match = Number.isFinite(item.scoreInfo.totalScore) ? Math.round(item.scoreInfo.totalScore * 100) : null
   const detailsHref = `/dashboard/repository/${repo.id}`
 
-  const openDetails = () => router.push(detailsHref)
+  // Each card counts as shown once
+  useEffect(() => {
+    trackFeedItem(item, 'impression', 'feed', position)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.repository.id])
+
+  const openDetails = () => {
+    trackFeedItem(item, 'open', 'feed', position)
+    router.push(detailsHref)
+  }
 
   return (
     <DitherCard
@@ -66,16 +79,17 @@ export function FeedCard({ item, onNotInterested }: FeedCardProps) {
         {repo.description && (
           <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{repo.description}</p>
         )}
+        <Reasons reasons={item.scoreInfo.reasons} max={2} className="mt-auto pt-1" />
       </div>
 
       <div className="flex items-center gap-3 whitespace-nowrap px-5 pb-4 text-xs text-muted-foreground">
         {breakdown.fallback ? (
-          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
+          <span className="inline-flex items-center gap-1 rounded-md bg-tint-emerald-500 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
             <Sprout className="size-3" /> Starter pick
           </span>
         ) : (
           match !== null && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-1 rounded-md bg-tint-emerald-500 px-2 py-0.5 font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
               <Sparkles className="size-3" /> {match}% match
             </span>
           )
