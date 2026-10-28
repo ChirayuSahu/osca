@@ -8,7 +8,6 @@ import {
   FolderGit2,
   LayoutDashboard,
   LogOut,
-  Monitor,
   Moon,
   Sun,
   ChevronsUpDown,
@@ -65,13 +64,13 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-// Light / Dark / System as a small segmented control
+// Light / Dark as a small segmented control. The highlight follows what is on
+// screen, so it's right even while the theme still follows the device (default).
 function ThemeSwitch() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const options = [
     { value: "light", label: "Light", icon: Sun },
     { value: "dark", label: "Dark", icon: Moon },
-    { value: "system", label: "System", icon: Monitor },
   ] as const;
   return (
     <div className="inline-flex rounded-md border border-border bg-muted/50 p-0.5">
@@ -80,14 +79,14 @@ function ThemeSwitch() {
           key={value}
           type="button"
           aria-label={label}
-          aria-pressed={(theme ?? "system") === value}
+          aria-pressed={resolvedTheme === value}
           onClick={(e) => {
             e.preventDefault();
             setTheme(value);
           }}
           className={cn(
             "flex size-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:text-foreground",
-            (theme ?? "system") === value && "bg-background text-foreground shadow-xs"
+            resolvedTheme === value && "bg-background text-foreground shadow-xs"
           )}
         >
           <Icon className="size-3.5" />
