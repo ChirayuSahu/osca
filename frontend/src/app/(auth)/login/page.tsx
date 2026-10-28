@@ -21,14 +21,12 @@ function LoginContent() {
 
   return (
     <AuthShell
-      eyebrow="Welcome back"
-      title="Sign in"
-      description="Pick up where you left off: your matches, saved repositories and conversations with OscaBot."
+      title="Sign in to your account"
       error={message}
       footer={
         <>
           New to OSCA?{" "}
-          <Link href="/register" className="font-medium text-foreground underline-offset-4 hover:underline">
+          <Link href="/register">
             Create an account
           </Link>
         </>

@@ -2,44 +2,23 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { CircleAlert, Compass, GitPullRequest, Lock, Sprout } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { AnimatedDither } from "@/components/ui/animated-dither";
-import { Dither } from "@/components/ui/dither";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { GithubIcon } from "@/components/icons";
-
-const POINTS = [
-  { icon: Compass, text: "Repositories matched to the languages you already write" },
-  { icon: Sprout, text: "Ranked by how friendly they are to first-time contributors" },
-  { icon: GitPullRequest, text: "Good first issues, ready to pick up" },
-];
-
-function Wordmark({ className }: { className?: string }) {
-  return (
-    <Link href="/" aria-label="osca home" className={`inline-flex items-baseline gap-1.5 ${className ?? ""}`}>
-      <span className="font-serif text-[26px] font-semibold italic leading-none tracking-tight">osca</span>
-      <span className="size-2 -translate-y-[3px] rounded-full bg-emerald-500" aria-hidden />
-    </Link>
-  );
-}
+import Navbar from "@/components/landing/navbar";
 
 /**
- * Split layout for sign-in and sign-up: a brand panel with the animated dither on
- * the left (desktop), the GitHub action on the right.
+ * Sign-in and sign-up: the landing page's deep green backdrop (glow on the
+ * right, dotted rails) under the landing navbar, the wordmark, one heading and
+ * the GitHub button. Always dark, whatever the app theme, like the landing page.
  */
 export function AuthShell({
-  eyebrow,
   title,
-  description,
   error,
   footer,
 }: {
-  eyebrow: string;
   title: string;
-  description: string;
   error?: string | null;
   footer: React.ReactNode;
 }) {
@@ -53,93 +32,53 @@ export function AuthShell({
   };
 
   return (
-    <div className="grid min-h-svh w-full bg-background lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-      {/* Brand panel */}
-      <aside className="relative isolate hidden overflow-hidden border-r border-border bg-card lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <AnimatedDither
-          cols={150}
-          rows={150}
-          cell={5}
-          falloff={1.1}
-          peak={0.7}
-          className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.14]"
-        />
-        <Wordmark />
-        <div className="max-w-md space-y-8">
-          <h2 className="font-serif text-5xl font-medium italic leading-[1.05] tracking-tight">
-            Find your first <span className="text-emerald-600 dark:text-emerald-400">contribution</span>.
-          </h2>
-          <ul className="space-y-4">
-            {POINTS.map(({ icon: Icon, text }) => (
-              <li key={text} className="flex items-start gap-3 text-muted-foreground">
-                <Icon className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span className="leading-relaxed">{text}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="text-xs text-muted-foreground">Open-source contributor matchmaking</p>
-      </aside>
+    <div
+      // Phones show the right side of the backdrop, so the glow stays in view
+      className="relative flex min-h-svh w-full flex-col bg-[#03130a] bg-cover bg-[position:78%_center] text-white sm:bg-center"
+      style={{ backgroundImage: "url('/auth-bg.webp')" }}
+    >
+      <Navbar />
 
-      {/* Action panel */}
-      <main className="relative flex flex-col px-4 py-6 sm:px-8">
-        <div className="flex items-center justify-between">
-          <Wordmark className="lg:invisible" />
-          <ThemeToggle />
-        </div>
+      {/* Top padding clears the fixed navbar (h-16) */}
+      <main className="flex flex-1 items-center justify-center px-4 pb-12 pt-28">
+        <div className="flex w-full max-w-[380px] flex-col items-center text-center">
+          <Link href="/" aria-label="osca home" className="font-serif text-[30px] font-semibold italic leading-none tracking-tight">
+            osca
+          </Link>
+          <h1 className="mt-6 text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-[26px]">{title}</h1>
 
-        <div className="flex flex-1 items-center justify-center py-10">
-          <div className="relative isolate w-full max-w-sm">
-            {/* Phones get a smaller, static dither behind the heading */}
-            <Dither
-              cols={90}
-              rows={34}
-              cell={5}
-              direction="radial"
-              peak={0.6}
-              className="pointer-events-none absolute -top-16 left-1/2 -z-10 -translate-x-1/2 text-emerald-500/[0.12] lg:hidden"
-            />
-            <div className="space-y-3">
-              <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
-                <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-                {eyebrow}
-              </p>
-              <h1 className="font-serif text-4xl font-medium italic tracking-tight">{title}</h1>
-              <p className="leading-relaxed text-muted-foreground">{description}</p>
+          {error && (
+            <div
+              role="alert"
+              className="mt-6 flex w-full items-start gap-2.5 rounded-md border border-red-400/30 bg-red-950/60 px-3 py-2.5 text-left text-sm text-red-100"
+            >
+              <CircleAlert className="mt-0.5 size-4 shrink-0 text-red-300" />
+              <span>{error}</span>
             </div>
+          )}
 
-            {error && (
-              <div role="alert" className="mt-6 flex items-start gap-2.5 rounded-md border border-destructive/30 bg-destructive/[0.06] px-3.5 py-3 text-sm">
-                <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
-                <span>{error}</span>
-              </div>
-            )}
+          <button
+            type="button"
+            onClick={start}
+            disabled={busy}
+            className="mt-8 flex h-11 w-full cursor-pointer items-center justify-center gap-2.5 rounded-md bg-[linear-gradient(100deg,#f4fbf6_0%,#eaf7ee_55%,#c2e8cd_100%)] px-4 text-sm font-medium text-[#0b1a10] shadow-sm transition-[filter] hover:brightness-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#03130a] disabled:cursor-wait disabled:opacity-80"
+          >
+            {busy ? <Spinner className="size-[18px] text-[#0b1a10]" /> : <GithubIcon className="size-[18px]" aria-hidden />}
+            {redirecting ? "Connecting to GitHub…" : authLoading ? "Checking session…" : "Continue with GitHub"}
+          </button>
 
-            <Button onClick={start} disabled={busy} size="lg" className="mt-8 h-11 w-full text-[15px]">
-              {busy ? <Spinner className="text-current" /> : <GithubIcon />}
-              {redirecting ? "Connecting to GitHub…" : authLoading ? "Checking session…" : "Continue with GitHub"}
-            </Button>
-
-            <div className="mt-6 flex items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
-              <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span>
-                OSCA reads your GitHub profile and email to match you with projects. GitHub also asks to let it post to
-                public repositories, which it does only when you comment, react or open an issue. It can&apos;t see
-                private code.
-              </span>
-            </div>
-
-            <div className="mt-8 h-px bg-border" />
-            <div className="mt-6 text-sm text-muted-foreground">{footer}</div>
+          <div className="mt-5 text-sm text-white/60 [&_a]:font-medium [&_a]:text-white [&_a]:underline-offset-4 hover:[&_a]:underline">
+            {footer}
           </div>
         </div>
-
-        <p className="text-center text-xs text-muted-foreground">
-          By continuing, you agree to the{" "}
-          <Link href="/terms" className="underline underline-offset-4 hover:text-foreground">Terms of Service</Link> and{" "}
-          <Link href="/privacy" className="underline underline-offset-4 hover:text-foreground">Privacy Policy</Link>.
-        </p>
       </main>
+
+      {/* One line from small tablets up; phones wrap it evenly */}
+      <p className="mx-auto text-balance px-4 pb-8 text-center text-xs leading-relaxed text-white/45 sm:whitespace-nowrap">
+        By continuing, you agree to the{" "}
+        <Link href="/terms" className="underline underline-offset-4 hover:text-white/80">Terms of Service</Link> and{" "}
+        <Link href="/privacy" className="underline underline-offset-4 hover:text-white/80">Privacy Policy</Link>.
+      </p>
     </div>
   );
 }
