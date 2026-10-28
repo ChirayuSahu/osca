@@ -3,15 +3,16 @@
  * Neo4j graph has enough Repository/Language/Framework/Topic nodes for the
  * recommendation engine's content and topic-similarity scoring to be meaningful.
  *
- * Usage: npx ts-node --transpile-only scripts/seed-repositories.ts [username]
- * Requires the target user to already exist with a connected GitHub OAuth
- * account (used to authenticate the GitHub API calls the worker will make).
+ * Usage: npm run seed:popular -- [username]
+ * With a username, the jobs use that user's GitHub OAuth token; without one they
+ * run as system jobs on the server GITHUB_TOKEN.
  * This only enqueues jobs — a running repository-analysis worker (`npm run dev`
  * or the deployed workers) must be up to actually process them.
  */
 import { prisma } from '../src/utils/prisma'
 import { JobEnqueueService } from '../src/services/job-enqueue.service'
 import { closeAllQueues } from '../src/config/queue'
+import { config } from '../src/config'
 
 const SEED_REPOS: string[] = [
   // JS/TS frameworks & tooling
@@ -141,14 +142,22 @@ const SEED_REPOS: string[] = [
 ]
 
 const main = async () => {
-  const username = process.argv[2] || 'ChirayuSahu'
+  // With a username, jobs run on that user's GitHub token; without one they run
+  // as system jobs on the server GITHUB_TOKEN.
+  const username = process.argv[2]
 
-  const user = await prisma.user.findUnique({ where: { username } })
-  if (!user) {
-    throw new Error(`No user found with username "${username}"`)
+  let userId: string | undefined
+  if (username) {
+    const user = await prisma.user.findUnique({ where: { username } })
+    if (!user) {
+      throw new Error(`No user found with username "${username}"`)
+    }
+    userId = user.id
+  } else if (!config.githubServerToken) {
+    throw new Error('Pass a username, or set GITHUB_TOKEN to run as system jobs')
   }
 
-  console.log(`[Seed] Enqueuing ${SEED_REPOS.length} repository-analysis jobs as user ${username} (${user.id})`)
+  console.log(`[Seed] Enqueuing ${SEED_REPOS.length} repository-analysis jobs ${username ? `as user ${username} (${userId})` : 'as system jobs'}`)
 
   let queued = 0
   let alreadyQueued = 0
@@ -156,7 +165,7 @@ const main = async () => {
   for (const fullName of SEED_REPOS) {
     const url = `https://github.com/${fullName}`
     try {
-      const result = await JobEnqueueService.enqueueRepositoryAnalysis(url, user.id)
+      const result = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId)
       if (result.alreadyQueued) {
         alreadyQueued++
         console.log(`[Seed] ${fullName} — already queued (${result.jobId})`)

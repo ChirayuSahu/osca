@@ -66,6 +66,24 @@ const syncStarredRepositories = async (userId: string, githubId: number, usernam
   return trackedRepos.length
 }
 
+// Syncs OWNS edges for tracked repos whose owner is this user, so the feed
+// stops recommending users their own repos and their own topics count as signal.
+const syncOwnedRepositories = async (githubId: number, username: string): Promise<number> => {
+  const ownedRepos = await prisma.repository.findMany({
+    where: { owner: { equals: username, mode: 'insensitive' } },
+    select: { id: true }
+  })
+
+  if (ownedRepos.length === 0) return 0
+
+  await Neo4jSyncService.syncUser({ githubId, username })
+  for (const repo of ownedRepos) {
+    await Neo4jSyncService.syncInteraction(githubId, repo.id, 'OWNS')
+  }
+
+  return ownedRepos.length
+}
+
 const toContributorExperience = (skills: Skill[]): Prisma.InputJsonValue => ({
   skills: skills.map((skill) => ({
     name: skill.name,
@@ -411,5 +429,6 @@ const analyzeGithubProfile = async (
 export const ContributorAnalysisService = {
   analyzeProfile,
   finalizeContributorProfile,
-  syncStarredRepositories
+  syncStarredRepositories,
+  syncOwnedRepositories
 }

@@ -5,7 +5,7 @@ import {
   detectPythonFrameworks,
   parsePackageJson,
   parseRawContent,
-  getGithubAccessToken,
+  getGithubTokenForJob,
   githubGetJson,
   githubPathExists,
   githubTryGetRaw,
@@ -16,7 +16,7 @@ import {
   type ProgressCallback,
   noopProgress
 } from '../lib/github'
-import { IGNORED_DIRS, IGNORED_FILES } from '../lib/github/utils/constants'
+import { IGNORED_DIRS, IGNORED_FILES, GOOD_FIRST_ISSUE_LABELS, HELP_WANTED_LABELS } from '../lib/github/utils/constants'
 
 interface RepoAnalysis {
   name: string
@@ -35,6 +35,8 @@ interface RepoAnalysis {
   stars: number
   forks: number
   openIssuesCount: number
+  archived: boolean
+  pushedAt: Date | null
 }
 
 interface GithubRepoResponse {
@@ -47,6 +49,50 @@ interface GithubRepoResponse {
   forks_count: number
   open_issues_count: number
   default_branch: string
+  archived?: boolean
+  pushed_at?: string | null
+}
+
+type Approachability = {
+  goodFirstIssueCount: number
+  helpWantedCount: number
+  hasContributingGuide: boolean
+}
+
+const CONTRIBUTING_PATHS = ['CONTRIBUTING.md', '.github/CONTRIBUTING.md', 'docs/CONTRIBUTING.md', 'CONTRIBUTING.rst', 'CONTRIBUTING']
+
+// Signals are cheap (one GraphQL call) but change over time, so they're
+// refreshed even for repos whose expensive structural analysis is cached.
+const APPROACHABILITY_TTL_MS = 24 * 60 * 60 * 1000
+
+const fetchApproachability = async (owner: string, repo: string, token: string): Promise<Approachability | null> => {
+  const contributingFields = CONTRIBUTING_PATHS
+    .map((path, i) => `c${i}: object(expression: ${JSON.stringify(`HEAD:${path}`)}) { id }`)
+    .join('\n')
+  const query = `
+    query approachability($owner: String!, $repo: String!, $gfi: [String!], $hw: [String!]) {
+      repository(owner: $owner, name: $repo) {
+        goodFirst: issues(states: OPEN, labels: $gfi) { totalCount }
+        helpWanted: issues(states: OPEN, labels: $hw) { totalCount }
+        ${contributingFields}
+      }
+    }
+  `
+  try {
+    const res = await githubGraphQL<{ data?: { repository?: Record<string, any> | null } }>(
+      query, token, { owner, repo, gfi: GOOD_FIRST_ISSUE_LABELS, hw: HELP_WANTED_LABELS }
+    )
+    const repository = res.data?.repository
+    if (!repository) return null
+    return {
+      goodFirstIssueCount: Number(repository.goodFirst?.totalCount) || 0,
+      helpWantedCount: Number(repository.helpWanted?.totalCount) || 0,
+      hasContributingGuide: CONTRIBUTING_PATHS.some((_path, i) => repository[`c${i}`] != null)
+    }
+  } catch (err) {
+    console.error(`[RepoService] Approachability fetch failed for ${owner}/${repo}:`, err)
+    return null
+  }
 }
 
 interface GithubDependencyGraphResponse {
@@ -173,7 +219,7 @@ const fetchFullTree = async (
 
 const analyzeRepository = async (
   url: string,
-  userId: string,
+  userId: string | undefined,
   onProgress: ProgressCallback = noopProgress,
   force: boolean = false
 ) => {
@@ -191,16 +237,43 @@ const analyzeRepository = async (
     }
   })
 
-  // If we already have the folderStructure and force isn't true, skip analysis
-  if (existingRepo && existingRepo.folderStructure && !force) {
+  await onProgress(8, 'Fetching credentials...')
+  const accessToken = await getGithubTokenForJob(userId)
 
-    await onProgress(100, 'Repository already analyzed.')
-    return existingRepo
+  // If we already have the folderStructure and force isn't true, skip the
+  // structural analysis — but keep the approachability signals fresh.
+  if (existingRepo && existingRepo.folderStructure && !force) {
+    const age = existingRepo.approachabilityUpdatedAt
+      ? Date.now() - existingRepo.approachabilityUpdatedAt.getTime()
+      : Infinity
+    if (age < APPROACHABILITY_TTL_MS) {
+      await onProgress(100, 'Repository already analyzed.')
+      return existingRepo
+    }
+
+    await onProgress(50, 'Refreshing contributor-friendliness signals...')
+    const [meta, approachability] = await Promise.all([
+      githubGetJson<GithubRepoResponse>(`/repos/${owner}/${repo}`, accessToken),
+      fetchApproachability(owner, repo, accessToken)
+    ])
+    const refreshed = await prisma.repository.update({
+      where: { id: existingRepo.id },
+      data: {
+        stars: Number(meta.stargazers_count) || 0,
+        forks: Number(meta.forks_count) || 0,
+        openIssuesCount: Number(meta.open_issues_count) || 0,
+        archived: !!meta.archived,
+        pushedAt: meta.pushed_at ? new Date(meta.pushed_at) : null,
+        ...(approachability && { ...approachability, approachabilityUpdatedAt: new Date() })
+      }
+    })
+    await onProgress(100, 'Repository already analyzed; signals refreshed.')
+    return refreshed
   }
 
-  await onProgress(8, 'Fetching user credentials...')
-  const accessToken = await getGithubAccessToken(userId)
   const analysis = await analyzeGithubRepo(owner, repo, accessToken, onProgress)
+  await onProgress(78, 'Checking contributor-friendliness...')
+  const approachability = await fetchApproachability(owner, repo, accessToken)
   await onProgress(80, 'Saving repository data...')
 
   // Only persist folderStructure and dependencies if they are actually populated
@@ -221,6 +294,7 @@ const analyzeRepository = async (
     provider: 'github',
     githubId: analysis.githubId,
     languages: analysis.languages,
+    primaryLanguage: Object.entries(analysis.languages).sort(([, a], [, b]) => b - a)[0]?.[0] ?? null,
     frameworks: analysis.frameworks,
     techStack: analysis.techStack,
     topics: analysis.topics,
@@ -228,6 +302,9 @@ const analyzeRepository = async (
     stars: analysis.stars,
     forks: analysis.forks,
     openIssuesCount: analysis.openIssuesCount,
+    archived: analysis.archived,
+    pushedAt: analysis.pushedAt,
+    ...(approachability && { ...approachability, approachabilityUpdatedAt: new Date() }),
     ...(persistFolderStructure !== undefined && { folderStructure: persistFolderStructure }),
     ...(persistDependencies !== undefined && { dependencies: persistDependencies })
   }
@@ -392,10 +469,11 @@ const analyzeGithubRepo = async (
     dependenciesData.forEach((manifest: any) => {
       manifest.dependencies?.nodes?.forEach((dep: any) => {
         const pkg = dep.packageName.toLowerCase()
-        if (pkg.includes('react')) frameworks.add('React')
+        // Exact names: substring matching tagged preact/@testing-library/react as React
+        if (pkg === 'react' || pkg === 'react-dom') frameworks.add('React')
         if (pkg === 'next') frameworks.add('Next.js')
         if (pkg === 'vue') frameworks.add('Vue')
-        if (pkg.includes('django')) frameworks.add('Django')
+        if (pkg === 'django') frameworks.add('Django')
       })
     })
   } catch (err) {
@@ -424,7 +502,9 @@ const analyzeGithubRepo = async (
     dependencies: dependenciesData,
     stars: Number(repoData.stargazers_count) || 0,
     forks: Number(repoData.forks_count) || 0,
-    openIssuesCount: Number(repoData.open_issues_count) || 0
+    openIssuesCount: Number(repoData.open_issues_count) || 0,
+    archived: !!repoData.archived,
+    pushedAt: repoData.pushed_at ? new Date(repoData.pushed_at) : null
   }
 }
 

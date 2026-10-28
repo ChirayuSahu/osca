@@ -21,6 +21,7 @@ model User {
   repositoryLikes    RepositoryLike[]
   interactions       UserInteraction[]
   interests          UserInterest[]
+  imports            RepositoryImport[]
 }
 
 model OAuthAccount {
@@ -63,10 +64,24 @@ model Repository {
   updatedAt       DateTime @updatedAt
   hidden          Boolean  @default(false)
 
+  // Language with the most bytes; drives the feed's language filter
+  primaryLanguage          String?
+
+  // Approachability signals for new contributors (refreshed on analysis)
+  goodFirstIssueCount      Int       @default(0)
+  helpWantedCount          Int       @default(0)
+  hasContributingGuide     Boolean   @default(false)
+  archived                 Boolean   @default(false)
+  pushedAt                 DateTime?
+  approachabilityUpdatedAt DateTime?
+
   likes           RepositoryLike[]
+  imports         RepositoryImport[]
   interactions    UserInteraction[]
 
   @@unique([provider, fullName])
+  @@index([goodFirstIssueCount])
+  @@index([primaryLanguage])
 }
 
 model ContributorProfile {
@@ -119,4 +134,20 @@ model UserInterest {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, tag])
+}
+
+// Repositories a user explicitly imported (as opposed to ones seeded into the
+// catalogue), so "Imported Repos" is per user and removing one doesn't delete
+// the shared repository row.
+model RepositoryImport {
+  id           String   @id @default(uuid())
+  userId       String
+  repositoryId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, repositoryId])
+  @@index([userId])
 }

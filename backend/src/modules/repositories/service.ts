@@ -1,4 +1,6 @@
-import { getGithubAccessToken, githubGetResponse, parseGithubRepoUrl } from '../../lib/github'
+import { getGithubAccessToken, githubGetResponse, githubGraphQL, parseGithubRepoUrl, GOOD_FIRST_ISSUE_LABELS } from '../../lib/github'
+import { config } from '../../config'
+import { redisClient } from '../../utils/redis-client'
 import { AppError } from '../../lib/errors'
 import { prisma } from '../../utils/prisma'
 
@@ -170,9 +172,169 @@ const searchEasyContributionRepos = async (
   }
 }
 
-export const RepositoryService = {
-  listGithubRepositories,
-  searchEasyContributionRepos
+// GitHub's search API returns at most 1,000 results per query
+const GITHUB_SEARCH_MAX_RESULTS = 1000
+
+// Search all public repositories on GitHub (best match first). Accepts GitHub
+// search qualifiers such as `language:rust` or `topic:cli`. A pasted GitHub URL
+// is reduced to `owner/name`. Public data, so the server token is a fallback
+// when the user's token is missing or rejected.
+const SEARCH_CACHE_SECONDS = 10 * 60
+
+const searchGithubRepositories = async (
+  userId: string,
+  search: string,
+  page: number,
+  limit: number,
+  goodFirstOnly = false
+): Promise<PaginatedGithubRepos> => {
+  const query = search
+    .trim()
+    .replace(/^https?:\/\/(www\.)?github\.com\//i, '')
+    .replace(/\.git$|\/$/g, '')
+  // Pages past the 1,000-result cap are rejected by GitHub (422)
+  if (query === '' || (page - 1) * limit >= GITHUB_SEARCH_MAX_RESULTS) {
+    return { repos: [], page, limit, total: 0, totalPages: 0 }
+  }
+
+  // Archived repos can't take contributions; skip them unless the user asked about archived ones
+  const qualifiers = [
+    /\barchived:/i.test(query) ? '' : 'archived:false',
+    goodFirstOnly ? 'good-first-issues:>0' : ''
+  ].filter(Boolean)
+  const fullQuery = [query, ...qualifiers].join(' ')
+
+  const cacheKey = `gh-search:${fullQuery}:${page}:${limit}`
+  try {
+    const cached = await redisClient.get(cacheKey)
+    if (cached) return JSON.parse(cached) as PaginatedGithubRepos
+  } catch {
+    // cache is best-effort
+  }
+
+  const path = `/search/repositories?q=${encodeURIComponent(fullQuery)}&page=${page}&per_page=${limit}`
+  let response: Response
+  try {
+    response = await githubGetResponse(path, await getGithubAccessToken(userId))
+  } catch (err) {
+    if (!config.githubServerToken) throw err
+    response = await githubGetResponse(path, config.githubServerToken)
+  }
+
+  const data = await response.json() as { total_count?: number; items?: GithubRepoSummary[] }
+  const repos = Array.isArray(data.items) ? data.items : []
+  const total = data.total_count ?? repos.length
+  const reachable = Math.min(total, GITHUB_SEARCH_MAX_RESULTS)
+
+  const result = { repos, page, limit, total, totalPages: Math.ceil(reachable / limit) }
+  try {
+    await redisClient.set(cacheKey, JSON.stringify(result), 'EX', SEARCH_CACHE_SECONDS)
+  } catch {
+    // cache is best-effort
+  }
+  return result
 }
 
-export type { PaginatedGithubRepos, GithubRepoSummary }
+type StarterIssue = {
+  number: number
+  title: string
+  url: string
+  createdAt: string
+  comments: number
+  assigned: boolean
+  labels: { name: string; color: string }[]
+}
+
+type StarterIssuesResponse = {
+  data?: {
+    repository?: {
+      issues?: {
+        nodes?: Array<{
+          number: number
+          title: string
+          url: string
+          createdAt: string
+          comments: { totalCount: number }
+          assignees: { totalCount: number }
+          labels: { nodes: { name: string; color: string }[] }
+        }>
+      }
+    } | null
+  }
+}
+
+const STARTER_ISSUES_LIMIT = 10
+const STARTER_ISSUES_CACHE_SECONDS = 15 * 60
+
+const STARTER_ISSUES_QUERY = `
+  query starterIssues($owner: String!, $repo: String!, $labels: [String!]) {
+    repository(owner: $owner, name: $repo) {
+      issues(states: OPEN, labels: $labels, first: 30, orderBy: { field: UPDATED_AT, direction: DESC }) {
+        nodes {
+          number
+          title
+          url
+          createdAt
+          comments { totalCount }
+          assignees { totalCount }
+          labels(first: 6) { nodes { name color } }
+        }
+      }
+    }
+  }
+`
+
+// Open good-first issues for a tracked repository, recently active and
+// unassigned ones first.
+// These are public reads, so when the user's GitHub token is missing or
+// rejected we fall back to the server token rather than show nothing.
+const listStarterIssues = async (userId: string, owner: string, repo: string): Promise<StarterIssue[]> => {
+  const cacheKey = `starter-issues:${owner.toLowerCase()}/${repo.toLowerCase()}`
+  try {
+    const cached = await redisClient.get(cacheKey)
+    if (cached) return JSON.parse(cached) as StarterIssue[]
+  } catch {
+    // cache is best-effort
+  }
+
+  const run = (token: string) =>
+    githubGraphQL<StarterIssuesResponse>(STARTER_ISSUES_QUERY, token, { owner, repo, labels: GOOD_FIRST_ISSUE_LABELS })
+
+  let response: StarterIssuesResponse
+  try {
+    response = await run(await getGithubAccessToken(userId))
+  } catch (err) {
+    if (!config.githubServerToken) throw err
+    response = await run(config.githubServerToken)
+  }
+
+  const issues = (response.data?.repository?.issues?.nodes ?? [])
+    .map((issue) => ({
+      number: issue.number,
+      title: issue.title,
+      url: issue.url,
+      createdAt: issue.createdAt,
+      comments: issue.comments.totalCount,
+      assigned: issue.assignees.totalCount > 0,
+      labels: issue.labels.nodes
+    }))
+    // Unassigned first: those are the ones a newcomer can actually pick up
+    .sort((a, b) => Number(a.assigned) - Number(b.assigned))
+    .slice(0, STARTER_ISSUES_LIMIT)
+
+  try {
+    await redisClient.set(cacheKey, JSON.stringify(issues), 'EX', STARTER_ISSUES_CACHE_SECONDS)
+  } catch {
+    // cache is best-effort
+  }
+  return issues
+}
+
+export const RepositoryService = {
+  searchGithubRepositories,
+  listGithubRepositories,
+  searchEasyContributionRepos,
+  listStarterIssues
+}
+
+export type { PaginatedGithubRepos, GithubRepoSummary, StarterIssue }
