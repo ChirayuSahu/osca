@@ -216,10 +216,11 @@ export default function RepositoryPage() {
     <PageContainer>
       {/* Repository header (D1) */}
       <div className="overflow-hidden rounded-md border border-border bg-card">
-        <div className="flex flex-col gap-6 p-5 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 items-start gap-5">
-          {owner && <OwnerAvatar owner={owner} className="size-14 md:size-16" />}
-          <div className="min-w-0 space-y-3">
+        <div className="flex flex-col gap-6 p-5 sm:p-8">
+          {/* Logo on the right, so the title and description start at the card's edge; actions sit underneath */}
+          <div className="flex min-w-0 flex-row-reverse items-start gap-4 sm:gap-6">
+          {owner && <OwnerAvatar owner={owner} className="size-12 sm:size-16 md:size-20" />}
+          <div className="min-w-0 flex-1 space-y-3">
             <div className="min-w-0">
               {owner && (
                 <p className="text-sm text-muted-foreground">
