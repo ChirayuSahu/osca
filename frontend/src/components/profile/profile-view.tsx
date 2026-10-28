@@ -18,7 +18,8 @@ import {
 import { ErrorState } from "@/components/ui/error-state";
 import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
 import { GithubIcon } from "@/components/icons";
-import { Eyebrow, Meter, Tag, githubAvatarUrl, timeAgo } from "@/components/repo-ui";
+import { Eyebrow, Meter, Tag, githubAvatarUrl, githubProfileUrl, timeAgo } from "@/components/repo-ui";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { API_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,10 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { ContributionsPanel } from "@/components/profile/contributions-panel";
+
+/** Their repositories on GitHub in this language */
+const skillUrl = (username: string, skill: string) =>
+  `${githubProfileUrl(username)}?tab=repositories&language=${encodeURIComponent(skill.toLowerCase())}`;
 
 // The contributions calendar is heavy and below the fold; load it on demand
 const GitHubCalendar = dynamic(() => import("react-github-calendar").then((m) => m.GitHubCalendar), {
@@ -343,12 +348,15 @@ export function ProfileView({ userId }: { userId?: string }) {
       <div className="overflow-hidden rounded-md border border-border bg-card">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-8">
           <div className="flex min-w-0 items-start gap-5">
-          <Avatar className="size-16 shrink-0 rounded-full border border-border md:size-20">
-            {(profile?.avatarUrl || username) && (
-              <AvatarImage src={profile?.avatarUrl || githubAvatarUrl(username!, 160)} alt="" />
-            )}
-            <AvatarFallback className="text-lg font-semibold">{(profile?.name || username || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
+          {/* Opens their GitHub profile, like the @username link */}
+          <a href={username ? githubProfileUrl(username) : undefined} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden className="shrink-0">
+            <Avatar className="size-16 rounded-full border border-border md:size-20">
+              {(profile?.avatarUrl || username) && (
+                <AvatarImage src={profile?.avatarUrl || githubAvatarUrl(username!, 160)} alt="" />
+              )}
+              <AvatarFallback className="text-lg font-semibold">{(profile?.name || username || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
+            </Avatar>
+          </a>
           <div className="min-w-0 space-y-3">
             <div>
               <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">{profile?.name || username}</h2>
@@ -373,7 +381,15 @@ export function ProfileView({ userId }: { userId?: string }) {
             </div>
             {tagSkills.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {tagSkills.map((skill) => <Tag key={skill}>{skill}</Tag>)}
+                {tagSkills.map((skill) =>
+                  username ? (
+                    <a key={skill} href={skillUrl(username, skill)} target="_blank" rel="noopener noreferrer" className="transition-opacity hover:opacity-80">
+                      <Tag>{skill}</Tag>
+                    </a>
+                  ) : (
+                    <Tag key={skill}>{skill}</Tag>
+                  )
+                )}
               </div>
             )}
           </div>
@@ -475,7 +491,13 @@ export function ProfileView({ userId }: { userId?: string }) {
               {topSkills.map(({ name, val }) => (
                 <div key={name} className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{name}</span>
+                    {username ? (
+                      <a href={skillUrl(username, name)} target="_blank" rel="noopener noreferrer" className="font-medium hover:underline">
+                        {name}
+                      </a>
+                    ) : (
+                      <span className="font-medium">{name}</span>
+                    )}
                     <span className="tabular-nums text-muted-foreground">{val}%</span>
                   </div>
                   <Meter value={val} />
@@ -488,7 +510,14 @@ export function ProfileView({ userId }: { userId?: string }) {
 
       {/* Activity */}
       <div className="min-w-0 rounded-md border border-border bg-card p-5 sm:p-6">
-        <Eyebrow className="mb-5">Contributions · past year</Eyebrow>
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <Eyebrow>Contributions · past year</Eyebrow>
+          {username && !calendarPrivate && (
+            <a href={githubProfileUrl(username)} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:text-foreground hover:underline">
+              View on GitHub
+            </a>
+          )}
+        </div>
         {calendarPrivate ? (
           <p className="text-sm text-muted-foreground">{displayName} keeps their contributions calendar private.</p>
         ) : username ? (

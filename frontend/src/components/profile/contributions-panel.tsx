@@ -57,7 +57,10 @@ function Row({ c }: { c: Contribution }) {
         </a>
         <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
           <span>
-            {c.repoFullName}#{c.prNumber}
+            <a href={`https://github.com/${c.repoFullName}`} target="_blank" rel="noreferrer" className="hover:text-foreground hover:underline">
+              {c.repoFullName}
+            </a>
+            #{c.prNumber}
           </span>
           <span>{c.state === "merged" && c.mergedAt ? `Merged ${timeAgo(c.mergedAt)}` : `Opened ${timeAgo(c.openedAt)}`}</span>
           {c.attributed && (

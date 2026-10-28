@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { ThreadSkeleton } from "@/components/skeletons";
 import { useStickyEnd } from "@/hooks/use-sticky-end";
-import { LabelChip, RefLink, type ThreadActivity } from "@/components/threads/thread-activity";
+import { GithubUserLink, LabelChip, RefLink, githubRepoUrl, type ThreadActivity } from "@/components/threads/thread-activity";
 
 interface ThreadDetail {
   id?: string | number;
@@ -158,14 +158,33 @@ export default function ThreadPage() {
   const htmlUrl = typeof thread.html_url === "string" ? thread.html_url : undefined;
   const assignees = Array.isArray(thread.assignees) ? (thread.assignees as { login: string }[]) : [];
   const milestone = (thread.milestone as { title?: string } | null)?.title;
+  const milestoneUrl = (thread.milestone as { html_url?: string } | null)?.html_url;
+  const repoFullName = `${repoDetails.owner}/${repoDetails.name}`;
+  // A fork's branch lives in the fork, so link it there
+  const headRepo: string = prData?.head?.repo?.full_name ?? repoFullName;
 
   const details: { label: string; value: React.ReactNode }[] = [
-    { label: "Author", value: authorLogin ?? "Unknown" },
+    { label: "Author", value: <GithubUserLink login={authorLogin} /> },
     { label: "Opened", value: timeAgo(thread.created_at) },
     ...(thread.updated_at ? [{ label: "Updated", value: timeAgo(thread.updated_at) }] : []),
     ...(commentCount !== null ? [{ label: "Comments", value: commentCount }] : []),
-    ...(assignees.length > 0 ? [{ label: "Assignees", value: assignees.map((a) => a.login).join(", ") }] : []),
-    ...(milestone ? [{ label: "Milestone", value: milestone }] : []),
+    ...(assignees.length > 0
+      ? [{
+          label: "Assignees",
+          value: assignees.map((a, i) => (
+            <React.Fragment key={a.login}>
+              {i > 0 && ", "}
+              <GithubUserLink login={a.login} />
+            </React.Fragment>
+          )),
+        }]
+      : []),
+    ...(milestone
+      ? [{
+          label: "Milestone",
+          value: milestoneUrl ? <a href={milestoneUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{milestone}</a> : milestone,
+        }]
+      : []),
     ...(isPR && typeof prData?.commits === "number" ? [{ label: "Commits", value: prData.commits }] : []),
     ...(isPR && typeof prData?.changed_files === "number"
       ? [{
@@ -212,7 +231,7 @@ export default function ThreadPage() {
               {authorLogin && (
                 <>
                   <UserAvatar login={authorLogin} avatarUrl={thread.user?.avatar_url} className="mr-0.5 size-5 text-[9px]" />
-                  <span className="font-medium text-foreground">{authorLogin}</span>
+                  <GithubUserLink login={authorLogin} />
                 </>
               )}
               <span>opened this {timeAgo(thread.created_at)}</span>
@@ -227,9 +246,9 @@ export default function ThreadPage() {
             {isPR && baseRef && headRef && (
               <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                 <GitBranch className="size-3.5" />
-                <code className="max-w-full truncate rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-foreground">{headRef}</code>
+                <a href={githubRepoUrl(headRepo, `/tree/${encodeURIComponent(headRef)}`)} target="_blank" rel="noopener noreferrer" className="max-w-full truncate rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-foreground transition-colors hover:border-foreground/30">{headRef}</a>
                 <ArrowRight className="size-3" />
-                <code className="max-w-full truncate rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-foreground">{baseRef}</code>
+                <a href={githubRepoUrl(repoFullName, `/tree/${encodeURIComponent(baseRef)}`)} target="_blank" rel="noopener noreferrer" className="max-w-full truncate rounded-md border border-border bg-background px-1.5 py-0.5 font-mono text-foreground transition-colors hover:border-foreground/30">{baseRef}</a>
               </p>
             )}
           </div>
@@ -259,7 +278,7 @@ export default function ThreadPage() {
           <article className="overflow-hidden rounded-md border border-border bg-card">
             <div className="flex min-w-0 items-center gap-2.5 border-b border-border px-5 py-3 text-sm sm:px-6">
               <UserAvatar login={authorLogin} avatarUrl={thread.user?.avatar_url} className="size-6 text-[10px]" />
-              <span className="truncate font-medium">{authorLogin ?? "Unknown"}</span>
+              <GithubUserLink login={authorLogin} className="truncate" />
               <span className="shrink-0 text-xs text-muted-foreground">wrote {timeAgo(thread.created_at)}</span>
               {typeof thread.author_association === "string" && thread.author_association !== "NONE" && (
                 <span className="ml-auto shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[11px] capitalize text-muted-foreground">
@@ -308,7 +327,7 @@ export default function ThreadPage() {
               <div className="flex flex-col gap-2 border-t border-border pt-4">
                 <span className="text-sm text-muted-foreground">Labels</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {thread.labels.map((label) => <LabelChip key={label.name} name={label.name} color={label.color} />)}
+                  {thread.labels.map((label) => <LabelChip key={label.name} name={label.name} color={label.color} repoFullName={repoFullName} />)}
                 </div>
               </div>
             )}
@@ -319,7 +338,7 @@ export default function ThreadPage() {
                 <ul className="flex flex-col gap-2 text-sm">
                   {activity.linked.map((ref) => (
                     <li key={`${ref.repo}#${ref.number}`}>
-                      <RefLink refItem={ref} repoFullName={`${repoDetails.owner}/${repoDetails.name}`} repositoryId={repositoryId} />
+                      <RefLink refItem={ref} repoFullName={repoFullName} repositoryId={repositoryId} />
                     </li>
                   ))}
                 </ul>

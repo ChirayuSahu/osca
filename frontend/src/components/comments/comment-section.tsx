@@ -23,11 +23,12 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { timeAgo } from "@/components/repo-ui";
+import { githubProfileUrl, timeAgo } from "@/components/repo-ui";
 import { cn } from "@/lib/utils";
 import {
   ActivityIcon,
   ActivityRow,
+  GithubUserLink,
   ReviewThreadCard,
   groupEvents,
   type ActivityEvent,
@@ -234,13 +235,19 @@ export default function CommentSection({
               return (
                 <li key={comment.id} className="group/comment flex gap-3">
                   <div className="flex flex-col items-center">
-                    <UserAvatar login={login} avatarUrl={comment.user?.avatar_url} />
+                    {login ? (
+                      <a href={githubProfileUrl(login)} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden>
+                        <UserAvatar login={login} avatarUrl={comment.user?.avatar_url} />
+                      </a>
+                    ) : (
+                      <UserAvatar login={login} avatarUrl={comment.user?.avatar_url} />
+                    )}
                     <span className="mt-2 w-px flex-1 bg-border group-last/comment:hidden" aria-hidden />
                   </div>
 
                   <div className="flex min-w-0 flex-1 flex-col gap-2 pb-6 group-last/comment:pb-0">
                     <div className="flex min-h-8 min-w-0 items-center gap-2 text-sm">
-                      <span className="truncate font-medium">{login || "User"}</span>
+                      <GithubUserLink login={login} className="truncate" />
                       <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
                       <div className="-mr-2 ml-auto flex shrink-0 items-center gap-1">
                         <Button

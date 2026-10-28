@@ -24,7 +24,7 @@ import { PageContainer } from "@/components/ui/page-container";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GithubIcon } from "@/components/icons";
-import { OwnerAvatar, StatStrip, Tag, compactNumber, timeAgo, topLanguages } from "@/components/repo-ui";
+import { OwnerAvatar, StatStrip, Tag, compactNumber, githubProfileUrl, timeAgo, topLanguages } from "@/components/repo-ui";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
 import { isGithubTokenError } from "@/lib/api";
@@ -45,6 +45,7 @@ interface Thread {
   content: string;
   createdAt: string | number | Date;
   isPR?: boolean;
+  user?: { login: string };
   [key: string]: unknown;
 }
 
@@ -193,14 +194,18 @@ export default function RepositoryPage() {
   const helpWanted = typeof repo.helpWantedCount === "number" ? repo.helpWantedCount : 0;
   const hasGuide = repo.hasContributingGuide === true;
 
+  // A page of this repository on GitHub
+  const repoUrl = typeof repo.url === "string" && repo.url ? repo.url : `https://github.com/${repo.owner}/${repo.name}`;
+  const gh = (path: string) => `${repoUrl}${path}`;
+
   const stats = [
-    ...(typeof repo.stars === "number" ? [{ label: "Stars", value: compactNumber(repo.stars), icon: Star }] : []),
-    ...(typeof repo.forks === "number" ? [{ label: "Forks", value: compactNumber(repo.forks), icon: GitFork }] : []),
+    ...(typeof repo.stars === "number" ? [{ label: "Stars", value: compactNumber(repo.stars), icon: Star, href: gh("/stargazers") }] : []),
+    ...(typeof repo.forks === "number" ? [{ label: "Forks", value: compactNumber(repo.forks), icon: GitFork, href: gh("/forks") }] : []),
     ...(typeof repo.openIssuesCount === "number"
-      ? [{ label: "Open issues", value: repo.openIssuesCount.toLocaleString(), icon: CircleDot }]
+      ? [{ label: "Open issues", value: repo.openIssuesCount.toLocaleString(), icon: CircleDot, href: gh("/issues") }]
       : []),
     ...(goodFirst !== null
-      ? [{ label: "Good first issues", value: goodFirst.toLocaleString(), icon: Sprout, accent: true }]
+      ? [{ label: "Good first issues", value: goodFirst.toLocaleString(), icon: Sprout, accent: true, href: gh("/contribute") }]
       : []),
   ];
 
@@ -218,7 +223,10 @@ export default function RepositoryPage() {
             <div className="min-w-0">
               {owner && (
                 <p className="text-sm text-muted-foreground">
-                  {owner} <span className="text-muted-foreground/50">/</span>
+                  <a href={githubProfileUrl(owner)} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+                    {owner}
+                  </a>{" "}
+                  <span className="text-muted-foreground/50">/</span>
                 </p>
               )}
               <h1 className="break-words text-3xl font-semibold tracking-tight md:text-4xl">{repo.name}</h1>
@@ -234,16 +242,23 @@ export default function RepositoryPage() {
             {(repo.pushedAt || hasGuide || helpWanted > 0) && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs text-muted-foreground">
                 {repo.pushedAt && (
-                  <span className="inline-flex items-center gap-1.5">
+                  <a href={gh("/commits")} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline">
                     <span className="size-2 rounded-full bg-emerald-500" />
                     Pushed {timeAgo(repo.pushedAt)}
-                  </span>
+                  </a>
                 )}
                 {hasGuide && (
                   <span className="inline-flex items-center gap-1.5"><BookOpen className="size-3.5" /> Contributing guide</span>
                 )}
                 {helpWanted > 0 && (
-                  <span className="inline-flex items-center gap-1.5"><HandHelping className="size-3.5" /> {helpWanted} help wanted</span>
+                  <a
+                    href={gh(`/issues?q=${encodeURIComponent('is:open label:"help wanted"')}`)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 hover:text-foreground hover:underline"
+                  >
+                    <HandHelping className="size-3.5" /> {helpWanted} help wanted
+                  </a>
                 )}
               </div>
             )}
@@ -339,20 +354,35 @@ export default function RepositoryPage() {
                 ) : (
                   <ul className={cn("divide-y divide-border transition-opacity", threadsLoading && "opacity-50")}>
                     {visibleThreads.map((thread) => (
-                      <li key={thread.id}>
-                        <Link
-                          href={`/dashboard/repository/${repositoryId}/threads/${thread.id}`}
-                          className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
-                        >
+                      // The whole row opens the thread (a stretched link on the title); the author links to GitHub above it
+                      <li key={thread.id} className="relative flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40">
                           {thread.isPR ? (
                             <GitPullRequest className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Pull request" />
                           ) : (
                             <CircleDot className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Issue" />
                           )}
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium">{thread.title}</p>
+                            <Link
+                              href={`/dashboard/repository/${repositoryId}/threads/${thread.id}`}
+                              className="block truncate text-sm font-medium outline-none after:absolute after:inset-0 after:content-['']"
+                            >
+                              {thread.title}
+                            </Link>
                             <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                               #{thread.id} · opened {timeAgo(thread.createdAt)}
+                              {thread.user?.login && (
+                                <>
+                                  {" "}by{" "}
+                                  <a
+                                    href={githubProfileUrl(thread.user.login)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="relative z-10 hover:text-foreground hover:underline"
+                                  >
+                                    {thread.user.login}
+                                  </a>
+                                </>
+                              )}
                             </p>
                           </div>
                           {typeof thread.comments === "number" && (
@@ -360,7 +390,6 @@ export default function RepositoryPage() {
                               <MessageSquare className="size-3.5" /> {thread.comments}
                             </span>
                           )}
-                        </Link>
                       </li>
                     ))}
                   </ul>

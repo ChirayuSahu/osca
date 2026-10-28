@@ -25,7 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { GithubBody } from "@/components/markdown-lazy";
-import { timeAgo } from "@/components/repo-ui";
+import { githubProfileUrl, timeAgo } from "@/components/repo-ui";
 import { cn } from "@/lib/utils";
 
 /* ─── Data from GET /issues/:owner/:repo/:number/activity ─────────────────── */
@@ -82,20 +82,46 @@ export interface ThreadActivity {
 
 /* ─── Small pieces ────────────────────────────────────────────────────────── */
 
+const EXTERNAL = { target: "_blank", rel: "noopener noreferrer" } as const;
+
+/** A GitHub username that opens their profile; deleted accounts show as "ghost", as on GitHub */
+export function GithubUserLink({ login, className, children }: { login?: string | null; className?: string; children?: React.ReactNode }) {
+  if (!login) return <span className={cn("font-medium text-foreground", className)}>{children ?? "ghost"}</span>;
+  return (
+    <a href={githubProfileUrl(login)} {...EXTERNAL} className={cn("font-medium text-foreground hover:underline", className)}>
+      {children ?? login}
+    </a>
+  );
+}
+
+/** A repository's page on GitHub, or a page inside it (`path`) */
+export function githubRepoUrl(fullName: string, path = "") {
+  return `https://github.com/${fullName}${path}`;
+}
+
 // GitHub label colours are 6-digit hex; anything else falls back to the theme border
 const labelHex = (color: string) => (/^[0-9a-f]{6}$/i.test(color) ? `#${color}` : null);
 
 /** A GitHub label tinted with its own colour */
-export function LabelChip({ name, color }: { name: string; color: string }) {
+export function LabelChip({ name, color, repoFullName }: { name: string; color: string; /** Links to the repo's issues with this label */ repoFullName?: string }) {
   const hex = labelHex(color);
-  return (
-    <span
-      className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium align-middle"
-      style={hex ? { backgroundColor: `${hex}1f`, borderColor: `${hex}59` } : undefined}
-    >
+  const className = cn(
+    "inline-flex max-w-full items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium text-foreground align-middle",
+    repoFullName && "transition-opacity hover:opacity-80"
+  );
+  const style = hex ? { backgroundColor: `${hex}1f`, borderColor: `${hex}59` } : undefined;
+  const content = (
+    <>
       <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground" style={hex ? { backgroundColor: hex } : undefined} aria-hidden />
       <span className="truncate">{name}</span>
-    </span>
+    </>
+  );
+  return repoFullName ? (
+    <a href={githubRepoUrl(repoFullName, `/labels/${encodeURIComponent(name)}`)} {...EXTERNAL} className={className} style={style}>
+      {content}
+    </a>
+  ) : (
+    <span className={className} style={style}>{content}</span>
   );
 }
 
@@ -141,13 +167,17 @@ export function RefLink({ refItem, repoFullName, repositoryId, className }: {
 }
 
 function ActorName({ actor }: { actor: ActivityActor }) {
-  return <span className="font-medium text-foreground">{actor?.login ?? "ghost"}</span>;
+  return <GithubUserLink login={actor?.login} />;
 }
 
 function TinyAvatar({ actor }: { actor: ActivityActor }) {
   if (!actor?.avatarUrl) return null;
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={actor.avatarUrl} alt="" className="inline-block size-5 shrink-0 rounded-full align-middle" />;
+  return (
+    <a href={githubProfileUrl(actor.login)} {...EXTERNAL} tabIndex={-1} aria-hidden className="shrink-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={actor.avatarUrl} alt="" className="inline-block size-5 rounded-full align-middle" />
+    </a>
+  );
 }
 
 /* ─── Grouping ────────────────────────────────────────────────────────────── */
@@ -225,7 +255,7 @@ function describe(group: ActivityEvent[], ctx: { repoFullName: string; repositor
       const added = group.filter((g) => g.kind === "labeled");
       const removed = group.filter((g) => g.kind === "unlabeled");
       const chips = (list: ActivityEvent[]) =>
-        list.map((g) => g.label && <LabelChip key={g.id} name={g.label.name} color={g.label.color} />);
+        list.map((g) => g.label && <LabelChip key={g.id} name={g.label.name} color={g.label.color} repoFullName={ctx.repoFullName} />);
       return (
         <>
           {added.length > 0 && <>added {chips(added)}</>}
@@ -235,13 +265,26 @@ function describe(group: ActivityEvent[], ctx: { repoFullName: string; repositor
       );
     }
     case "assigned":
-      return e.assignee && e.assignee === e.actor?.login ? "self-assigned this" : <>assigned <span className="font-medium text-foreground">{e.assignee}</span></>;
+      return e.assignee && e.assignee === e.actor?.login ? "self-assigned this" : <>assigned <GithubUserLink login={e.assignee} /></>;
     case "unassigned":
-      return e.assignee && e.assignee === e.actor?.login ? "removed their assignment" : <>unassigned <span className="font-medium text-foreground">{e.assignee}</span></>;
+      return e.assignee && e.assignee === e.actor?.login ? "removed their assignment" : <>unassigned <GithubUserLink login={e.assignee} /></>;
     case "closed": {
       const how = e.stateReason === "not_planned" ? "closed this as not planned" : e.stateReason === "duplicate" ? "closed this as a duplicate" : "closed this as completed";
-      if (e.closer?.kind === "pull") return <>{how} in <a className="font-medium text-foreground hover:underline" href={e.closer.url} target="_blank" rel="noopener noreferrer">#{e.closer.number}</a></>;
-      if (e.closer?.kind === "commit") return <>{how} in <a className="font-mono text-foreground hover:underline" href={e.closer.url} target="_blank" rel="noopener noreferrer">{e.closer.sha}</a></>;
+      if (e.closer?.kind === "pull") {
+        const pr = e.closer;
+        return (
+          <>
+            {how} in{" "}
+            {/* Pull requests in this repository open in the app */}
+            {ctx.repositoryId && pr.url.toLowerCase().includes(`github.com/${ctx.repoFullName.toLowerCase()}/`) ? (
+              <Link className="font-medium text-foreground hover:underline" href={`/dashboard/repository/${ctx.repositoryId}/threads/${pr.number}`}>#{pr.number}</Link>
+            ) : (
+              <a className="font-medium text-foreground hover:underline" href={pr.url} {...EXTERNAL}>#{pr.number}</a>
+            )}
+          </>
+        );
+      }
+      if (e.closer?.kind === "commit") return <>{how} in <a className="font-mono text-foreground hover:underline" href={e.closer.url} {...EXTERNAL}>{e.closer.sha}</a></>;
       return how;
     }
     case "reopened":
@@ -249,11 +292,16 @@ function describe(group: ActivityEvent[], ctx: { repoFullName: string; repositor
     case "renamed":
       return <>changed the title <span className="line-through">{e.from}</span> <span className="text-foreground">{e.to}</span></>;
     case "transferred":
-      return <>transferred this from <span className="font-medium text-foreground">{e.from}</span></>;
+      return e.from ? <>transferred this from <a href={githubRepoUrl(e.from)} {...EXTERNAL} className="font-medium text-foreground hover:underline">{e.from}</a></> : "transferred this";
     case "milestoned":
-      return <>added this to the <span className="font-medium text-foreground">{e.milestone}</span> milestone</>;
-    case "demilestoned":
-      return <>removed this from the <span className="font-medium text-foreground">{e.milestone}</span> milestone</>;
+    case "demilestoned": {
+      const name = (
+        <a href={githubRepoUrl(ctx.repoFullName, "/milestones")} {...EXTERNAL} className="font-medium text-foreground hover:underline">
+          {e.milestone}
+        </a>
+      );
+      return e.kind === "milestoned" ? <>added this to the {name} milestone</> : <>removed this from the {name} milestone</>;
+    }
     case "connected":
       return "linked a pull request that will close this";
     case "duplicate":
@@ -261,11 +309,17 @@ function describe(group: ActivityEvent[], ctx: { repoFullName: string; repositor
     case "reviewed":
       return e.state === "approved" ? "approved these changes" : e.state === "changes_requested" ? "requested changes" : e.state === "dismissed" ? "had a review dismissed" : "reviewed";
     case "merged":
-      return <>merged this{e.into ? <> into <span className="font-mono text-foreground">{e.into}</span></> : null}</>;
+      return (
+        <>
+          merged this
+          {e.into ? <> into <a href={githubRepoUrl(ctx.repoFullName, `/tree/${encodeURIComponent(e.into)}`)} {...EXTERNAL} className="font-mono text-foreground hover:underline">{e.into}</a></> : null}
+          {e.commit ? <> in <a href={e.commit.url} {...EXTERNAL} className="font-mono text-foreground hover:underline">{e.commit.sha}</a></> : null}
+        </>
+      );
     case "force_pushed":
       return "force-pushed the branch";
     case "review_requested":
-      return <>requested a review{e.reviewer ? <> from <span className="font-medium text-foreground">{e.reviewer}</span></> : null}</>;
+      return <>requested a review{e.reviewer ? <> from <GithubUserLink login={e.reviewer} /></> : null}</>;
     case "ready_for_review":
       return "marked this ready for review";
     case "converted_to_draft":
@@ -370,7 +424,8 @@ export function ReviewThreadCard({ thread }: { thread: ReviewThread }) {
       <div className="mt-2 overflow-hidden rounded-md border border-border">
         <div className="flex min-w-0 items-center gap-2 border-b border-border bg-muted/40 px-4 py-2 text-xs">
           <FileCode2 className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <span className="min-w-0 truncate font-mono" title={thread.path}>{thread.path}</span>
+          {/* Opens the comment on GitHub, where the file's full diff is */}
+          <a href={first?.url} {...EXTERNAL} className="min-w-0 truncate font-mono hover:underline" title={thread.path}>{thread.path}</a>
           {lines && <span className="shrink-0 text-muted-foreground">{lines}</span>}
           <span className="ml-auto flex shrink-0 gap-1.5">
             {thread.outdated && <span className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Outdated</span>}
@@ -394,14 +449,16 @@ function ReviewComment({ comment, nested = false }: { comment: ReviewThread["com
   return (
     <li className={cn("flex gap-3 px-4 py-3", nested && "pl-10")}>
       {comment.author?.avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={comment.author.avatarUrl} alt="" className="size-6 shrink-0 rounded-full" />
+        <a href={githubProfileUrl(comment.author.login)} {...EXTERNAL} tabIndex={-1} aria-hidden className="shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={comment.author.avatarUrl} alt="" className="size-6 rounded-full" />
+        </a>
       ) : (
         <span className="size-6 shrink-0 rounded-full bg-muted" aria-hidden />
       )}
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-2 text-sm">
-          <span className="font-medium">{comment.author?.login ?? "ghost"}</span>
+          <GithubUserLink login={comment.author?.login} />
           <a href={comment.url} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground hover:underline">
             {timeAgo(comment.createdAt)}
           </a>

@@ -94,6 +94,12 @@ export function RepoCard({ className, children, onClick, ...props }: React.Compo
 
 /* ─── Text bits ────────────────────────────────────────────────────────────── */
 
+/** A GitHub account's page; bots ("dependabot[bot]") live under /apps */
+export function githubProfileUrl(login: string): string {
+  const bot = login.match(/^(.+)\[bot\]$/);
+  return bot ? `https://github.com/apps/${encodeURIComponent(bot[1])}` : `https://github.com/${encodeURIComponent(login)}`;
+}
+
 /** A GitHub user's or organisation's picture, at `size` pixels */
 export function githubAvatarUrl(login: string, size = 80): string {
   return `https://github.com/${encodeURIComponent(login)}.png?size=${size}`;
@@ -150,6 +156,8 @@ export interface Stat {
   icon: React.ComponentType<{ className?: string }>;
   /** Emerald highlight (e.g. good first issues) */
   accent?: boolean;
+  /** Opens this (e.g. the stargazers page on GitHub) in a new tab */
+  href?: string;
 }
 
 // Static class names so Tailwind picks them up
@@ -165,11 +173,15 @@ export function StatStrip({ stats, className }: { stats: Stat[]; className?: str
   if (stats.length === 0) return null;
   return (
     <div className={cn("grid grid-cols-2 border-t border-border bg-background", STAT_COLS[stats.length], className)}>
-      {stats.map(({ label, value, icon: Icon, accent }, i) => (
-        <div
+      {stats.map(({ label, value, icon: Icon, accent, href }, i) => {
+        const Cell = href ? "a" : "div";
+        return (
+        <Cell
           key={label}
+          {...(href ? { href, target: "_blank", rel: "noopener noreferrer" } : {})}
           className={cn(
             "flex min-w-0 items-center gap-3 px-5 py-4 sm:px-6",
+            href && "transition-colors hover:bg-muted/40",
             i % 2 === 1 && "border-l border-border",
             i >= 2 && "border-t border-border sm:border-t-0",
             i > 0 && "sm:border-l"
@@ -190,8 +202,9 @@ export function StatStrip({ stats, className }: { stats: Stat[]; className?: str
             </p>
             <p className="truncate text-xs leading-none text-muted-foreground">{label}</p>
           </div>
-        </div>
-      ))}
+        </Cell>
+        );
+      })}
     </div>
   );
 }
