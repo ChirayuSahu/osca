@@ -3,14 +3,12 @@
 import React, { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Spinner } from "@/components/ui/spinner";
 import { AppSidebar } from "@/components/app-sidebar";
+import { AppBreadcrumbs, BreadcrumbProvider } from "@/components/breadcrumbs";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { token, loading } = useAuth();
   const router = useRouter();
 
@@ -22,8 +20,8 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen w-screen bg-black">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex min-h-svh items-center justify-center">
+        <Spinner />
       </div>
     );
   }
@@ -34,10 +32,19 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex bg-black min-h-screen w-screen text-white font-sans">
-        <AppSidebar />
-        <main className="flex-1 p-6 min-h-screen flex flex-col">{children}</main>
-      </div>
+      <AppSidebar />
+      <SidebarInset>
+        {/* Phones only: the sidebar is a drawer there, so it needs an opener */}
+        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center border-b bg-background px-4 md:hidden">
+          <SidebarTrigger className="-ml-1" />
+        </header>
+        <BreadcrumbProvider>
+          <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
+            <AppBreadcrumbs />
+          </div>
+          <div className="flex flex-1 flex-col overflow-x-clip">{children}</div>
+        </BreadcrumbProvider>
+      </SidebarInset>
     </SidebarProvider>
   );
 }
