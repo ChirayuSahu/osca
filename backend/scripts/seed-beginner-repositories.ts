@@ -12,12 +12,15 @@
  *
  * Options:
  *   --dry-run                     Print what would be enqueued; enqueue nothing
- *   --per-language=N              Search results per language (default 10, max 100)
+ *   --per-language=N              Top-starred search results per language (default 50, max 100)
+ *   --active-per-language=N       Extra recently-updated results per language (default 25, 0 to skip)
  *   --min-good-first-issues=N     Search threshold for open good first issues (default 5)
  *   --pushed-within-days=N        Only repos pushed within N days (default 90)
  *   --languages=a,b,c             Override the language list for search
  *   --no-curated                  Skip the curated list
  *   --no-search                   Skip GitHub search discovery
+ *   --include-existing            Re-analyze repositories already in the catalogue
+ *                                 (skipped by default to save the token's API budget)
  *   --if-empty                    Fresh-database mode: seed only when no repositories
  *                                 exist yet, and skip (exit 0) when GITHUB_TOKEN is unset
  */
@@ -43,6 +46,11 @@ const CURATED_REPOS: string[] = [
   'TheAlgorithms/Rust',
   'TheAlgorithms/C-Plus-Plus',
   'rust-lang/rustlings',
+  'tldr-pages/tldr',
+  'exercism/go',
+  'exercism/rust',
+  'TheAlgorithms/C-Sharp',
+  'TheAlgorithms/TypeScript',
 
   // JavaScript / TypeScript
   'processing/p5.js',
@@ -53,6 +61,35 @@ const CURATED_REPOS: string[] = [
   'appwrite/appwrite',
   'calcom/cal.com',
   'nodejs/node',
+  'tldraw/tldraw',
+  'documenso/documenso',
+  'twentyhq/twenty',
+  'formbricks/formbricks',
+  'novuhq/novu',
+  'nocodb/nocodb',
+  'n8n-io/n8n',
+  'directus/directus',
+  'strapi/strapi',
+  'medusajs/medusa',
+  'ueberdosis/tiptap',
+  'react-hook-form/react-hook-form',
+  'date-fns/date-fns',
+  'eslint/eslint',
+  'prettier/prettier',
+  'jestjs/jest',
+  'storybookjs/storybook',
+  'mermaid-js/mermaid',
+  'chartjs/Chart.js',
+  'mattermost/mattermost',
+  'RocketChat/Rocket.Chat',
+  'jitsi/jitsi-meet',
+  'supabase/supabase',
+  'immich-app/immich',
+  'bitwarden/clients',
+  'WordPress/gutenberg',
+  'vuejs/core',
+  'sveltejs/svelte',
+  'nuxt/nuxt',
 
   // Python
   'oppia/oppia',
@@ -68,6 +105,23 @@ const CURATED_REPOS: string[] = [
   'astropy/astropy',
   'home-assistant/core',
   'python-poetry/poetry',
+  'fastapi/fastapi',
+  'pydantic/pydantic',
+  'encode/httpx',
+  'psf/black',
+  'pytest-dev/pytest',
+  'networkx/networkx',
+  'scipy/scipy',
+  'numpy/numpy',
+  'streamlit/streamlit',
+  'gradio-app/gradio',
+  'apache/airflow',
+  'apache/superset',
+  'internetarchive/openlibrary',
+  'projectmesa/mesa',
+  'mne-tools/mne-python',
+  'qutip/qutip',
+  'OWASP/Nettacker',
 
   // Go
   'cli/cli',
@@ -76,6 +130,20 @@ const CURATED_REPOS: string[] = [
   'spf13/cobra',
   'gohugoio/hugo',
   'kubernetes/website',
+  'go-gitea/gitea',
+  'prometheus/prometheus',
+  'grafana/k6',
+  'traefik/traefik',
+  'caddyserver/caddy',
+  'golangci/golangci-lint',
+  'charmbracelet/glow',
+  'charmbracelet/gum',
+  'junegunn/fzf',
+  'derailed/k9s',
+  'open-telemetry/opentelemetry-go',
+  'kubernetes/minikube',
+  'helm/helm',
+  'kubernetes-sigs/kind',
 
   // Rust
   'nushell/nushell',
@@ -83,25 +151,102 @@ const CURATED_REPOS: string[] = [
   'astral-sh/ruff',
   'rust-lang/rust-clippy',
   'servo/servo',
+  'tauri-apps/tauri',
+  'bevyengine/bevy',
+  'helix-editor/helix',
+  'starship/starship',
+  'sharkdp/bat',
+  'sharkdp/fd',
+  'denoland/deno',
+  'biomejs/biome',
+  'rust-lang/rust-analyzer',
+  'tokio-rs/tokio',
+  'ratatui/ratatui',
+  'eza-community/eza',
+  'alacritty/alacritty',
 
   // Ruby
   'rubyforgood/human-essentials',
   'rubyforgood/casa',
   'publiclab/plots2',
+  'mastodon/mastodon',
+  'discourse/discourse',
+  'forem/forem',
+  'rubocop/rubocop',
+  'jekyll/jekyll',
+  'Homebrew/brew',
+  'opf/openproject',
 
   // Java / Kotlin / Android
   'JabRef/jabref',
   'ankidroid/Anki-Android',
   'thunderbird/thunderbird-android',
+  'checkstyle/checkstyle',
+  'zaproxy/zaproxy',
+  'TeamNewPipe/NewPipe',
+  'AntennaPod/AntennaPod',
+  'wordpress-mobile/WordPress-Android',
+  'detekt/detekt',
+  'pinterest/ktlint',
+  'oss-review-toolkit/ort',
 
   // C# / .NET
   'files-community/Files',
   'ShareX/ShareX',
   'microsoft/PowerToys',
   'PowerShell/PowerShell',
+  'jellyfin/jellyfin',
+  'AvaloniaUI/Avalonia',
+  'ppy/osu',
+  'Radarr/Radarr',
+  'Sonarr/Sonarr',
+  'MaterialDesignInXAML/MaterialDesignInXamlToolkit',
 
   // Dart / Flutter
   'openfoodfacts/smooth-app',
+  'AppFlowy-IO/AppFlowy',
+  'localsend/localsend',
+  'fluttercommunity/plus_plugins',
+
+  // C / C++
+  'godotengine/godot',
+  'organicmaps/organicmaps',
+  'FreeCAD/FreeCAD',
+  'musescore/MuseScore',
+  'mixxxdj/mixxx',
+  'obsproject/obs-studio',
+  'OpenRCT2/OpenRCT2',
+  'duckdb/duckdb',
+  'neovim/neovim',
+
+  // Swift
+  'realm/SwiftLint',
+  'nicklockwood/SwiftFormat',
+  'wordpress-mobile/WordPress-iOS',
+  'kickstarter/ios-oss',
+
+  // PHP
+  'nextcloud/server',
+  'matomo-org/matomo',
+  'phpmyadmin/phpmyadmin',
+  'mautic/mautic',
+  'filamentphp/filament',
+  'PrestaShop/PrestaShop',
+  'joomla/joomla-cms',
+
+  // Elixir
+  'phoenixframework/phoenix',
+  'plausible/analytics',
+  'livebook-dev/livebook',
+  'hexpm/hexpm',
+
+  // Shell / dotfiles
+  'ohmyzsh/ohmyzsh',
+  'nvm-sh/nvm',
+
+  // Data / science
+  'JuliaLang/julia',
+  'quarto-dev/quarto-cli',
 
   // Infra / cloud native
   'meshery/meshery',
@@ -110,13 +255,16 @@ const CURATED_REPOS: string[] = [
 
 const DEFAULT_LANGUAGES = [
   'TypeScript', 'JavaScript', 'Python', 'Go', 'Rust', 'Java', 'Kotlin',
-  'Ruby', 'PHP', 'C#', 'C++', 'Swift', 'Dart'
+  'Ruby', 'PHP', 'C#', 'C++', 'C', 'Swift', 'Dart', 'Shell', 'Elixir',
+  'Scala', 'Haskell', 'Lua', 'Zig', 'R', 'Julia', 'Vue', 'Svelte', 'Clojure'
 ]
 
 type Options = {
   dryRun: boolean
   ifEmpty: boolean
   perLanguage: number
+  activePerLanguage: number
+  includeExisting: boolean
   minGoodFirstIssues: number
   pushedWithinDays: number
   languages: string[]
@@ -135,7 +283,9 @@ const parseOptions = (argv: string[]): Options => {
   return {
     dryRun: argv.includes('--dry-run'),
     ifEmpty: argv.includes('--if-empty'),
-    perLanguage: int('per-language', 10, 100),
+    perLanguage: int('per-language', 50, 100),
+    activePerLanguage: value('active-per-language') === '0' ? 0 : int('active-per-language', 25, 100),
+    includeExisting: argv.includes('--include-existing'),
     minGoodFirstIssues: int('min-good-first-issues', 5),
     pushedWithinDays: int('pushed-within-days', 90),
     languages: value('languages')?.split(',').map((l) => l.trim()).filter(Boolean) ?? DEFAULT_LANGUAGES,
@@ -150,7 +300,13 @@ type SearchResponse = { items?: Array<{ full_name: string; stargazers_count: num
 
 // Plain fetch so --dry-run also works without a token (at GitHub's lower
 // unauthenticated search limit).
-const searchLanguage = async (language: string, options: Options, token: string): Promise<string[]> => {
+const searchLanguage = async (
+  language: string,
+  options: Options,
+  token: string,
+  sort: 'stars' | 'updated',
+  count: number
+): Promise<string[]> => {
   const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   const q = [
     `good-first-issues:>=${options.minGoodFirstIssues}`,
@@ -166,8 +322,9 @@ const searchLanguage = async (language: string, options: Options, token: string)
     // Skip toy repos and the very largest projects, which are hard to land a first PR in
     'stars:200..50000'
   ].join(' ')
-  // Sorting by help-wanted count rewards label farming; stars within the band is a steadier proxy
-  const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=stars&order=desc&per_page=${options.perLanguage}`
+  // Sorting by help-wanted count rewards label farming. Stars within the band is a
+  // steady proxy; a second pass by last update adds active mid-size projects.
+  const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=${sort}&order=desc&per_page=${count}`
 
   const response = await fetch(url, {
     headers: {
@@ -221,17 +378,28 @@ const main = async () => {
   if (options.search) {
     // Search API: 30 req/min authenticated, 10 unauthenticated.
     const delayMs = token ? 2_500 : 7_000
-    for (const [i, language] of options.languages.entries()) {
-      if (i > 0) await sleep(delayMs)
-      try {
-        const found = await searchLanguage(language, options, token)
-        console.log(`[SeedBeginner] ${language}: ${found.length} found`)
-        for (const fullName of found) {
-          if (!selected.has(fullName.toLowerCase())) selected.set(fullName.toLowerCase(), `search:${language}`)
+    const passes: Array<{ sort: 'stars' | 'updated'; count: number }> = [
+      { sort: 'stars', count: options.perLanguage },
+      ...(options.activePerLanguage > 0 ? [{ sort: 'updated' as const, count: options.activePerLanguage }] : [])
+    ]
+    let first = true
+    for (const language of options.languages) {
+      let added = 0
+      for (const pass of passes) {
+        if (!first) await sleep(delayMs)
+        first = false
+        try {
+          for (const fullName of await searchLanguage(language, options, token, pass.sort, pass.count)) {
+            if (!selected.has(fullName.toLowerCase())) {
+              selected.set(fullName.toLowerCase(), `search:${language}`)
+              added++
+            }
+          }
+        } catch (err) {
+          console.error(`[SeedBeginner] ${(err as Error).message}`)
         }
-      } catch (err) {
-        console.error(`[SeedBeginner] ${(err as Error).message}`)
       }
+      console.log(`[SeedBeginner] ${language}: ${added} new`)
     }
   }
 
@@ -239,7 +407,23 @@ const main = async () => {
   const canonical = new Map<string, string>()
   for (const fullName of CURATED_REPOS) canonical.set(fullName.toLowerCase(), fullName)
 
-  const repos = [...selected.entries()].map(([key, source]) => ({ fullName: canonical.get(key) ?? key, source }))
+  let repos = [...selected.entries()].map(([key, source]) => ({ fullName: canonical.get(key) ?? key, source }))
+
+  // Each analysis costs dozens of API calls on the server token, so repos already
+  // in the catalogue are skipped unless asked (they re-sync on their own schedule).
+  if (!options.includeExisting) {
+    try {
+      const existing = new Set(
+        (await prisma.repository.findMany({ select: { fullName: true } })).map((r) => r.fullName.toLowerCase())
+      )
+      const before = repos.length
+      repos = repos.filter((r) => !existing.has(r.fullName.toLowerCase()))
+      if (before !== repos.length) console.log(`[SeedBeginner] ${before - repos.length} already in the catalogue — skipped (use --include-existing to re-analyze)`)
+    } catch (err) {
+      // Only a dry run gets here without a database; a real run fails at enqueue anyway
+      console.warn(`[SeedBeginner] Couldn't read the catalogue, so nothing is skipped: ${(err as Error).message.split('\n')[0]}`)
+    }
+  }
   console.log(`[SeedBeginner] ${repos.length} repositories selected (${repos.filter((r) => r.source === 'curated').length} curated, ${repos.filter((r) => r.source !== 'curated').length} discovered)`)
 
   if (options.dryRun) {
