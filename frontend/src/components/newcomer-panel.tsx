@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { RepositoryService, StarterIssue } from "@/services/repository.service";
 import { Button } from "@/components/ui/button";
@@ -110,10 +111,9 @@ export function NewcomerPanel({ repositoryId, token, repo }: NewcomerPanelProps)
         <ul className="mt-1 px-2 pb-3">
           {issues.map((issue) => (
             <li key={issue.number}>
-              <a
-                href={issue.url}
-                target="_blank"
-                rel="noopener noreferrer"
+              {/* Opens the issue's thread page here, not on GitHub */}
+              <Link
+                href={`/dashboard/repository/${repositoryId}/threads/${issue.number}`}
                 className="flex items-start gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/50"
               >
                 <span
@@ -127,7 +127,7 @@ export function NewcomerPanel({ repositoryId, token, repo }: NewcomerPanelProps)
                     {issue.assigned ? " · assigned" : ""}
                   </p>
                 </div>
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

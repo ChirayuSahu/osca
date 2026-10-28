@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
@@ -533,10 +534,9 @@ function StarterIssues({ repositoryId, token }: { repositoryId: string; token: s
         <ul className="custom-scrollbar min-h-0 flex-1 overflow-y-auto pb-2">
           {issues.map(issue => (
             <li key={issue.number}>
-              <a
-                href={issue.url}
-                target="_blank"
-                rel="noreferrer"
+              {/* Opens the issue's thread page here, not on GitHub */}
+              <Link
+                href={`/dashboard/repository/${repositoryId}/threads/${issue.number}`}
                 onPointerDown={e => e.stopPropagation()}
                 className="flex items-center gap-3 px-5 py-2 text-sm transition-colors hover:bg-muted/40 sm:px-6"
               >
@@ -544,7 +544,7 @@ function StarterIssues({ repositoryId, token }: { repositoryId: string; token: s
                 <span className="min-w-0 flex-1 truncate">{issue.title}</span>
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">#{issue.number}</span>
                 {issue.assigned && <span className="shrink-0 text-[11px] text-muted-foreground">assigned</span>}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
