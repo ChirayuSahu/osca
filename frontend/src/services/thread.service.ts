@@ -1,8 +1,8 @@
-import { API_URL, readApiError } from '@/lib/api'
+import { API_URL, apiFetch, readApiError } from '@/lib/api'
 
 export const ThreadService = {
   async createThread(data: { owner: string; repo: string; title: string; body: string }, token: string) {
-    const res = await fetch(`${API_URL}/issues/${data.owner}/${data.repo}`, {
+    const res = await apiFetch(`${API_URL}/issues/${data.owner}/${data.repo}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -15,7 +15,7 @@ export const ThreadService = {
   },
 
   async listThreads(owner: string, repo: string, token: string, page = 1) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}?page=${page}`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}?page=${page}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to list threads')
@@ -23,7 +23,7 @@ export const ThreadService = {
   },
 
   async getThread(owner: string, repo: string, issueNumber: string | number, token: string) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch thread')
@@ -32,7 +32,7 @@ export const ThreadService = {
 
   // Toggles one of the caller's reactions on an issue or PR (GitHub treats PRs as issues here)
   async toggleReaction(owner: string, repo: string, issueNumber: string | number, content: string, token: string): Promise<boolean> {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/reactions`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/reactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ content })
@@ -44,7 +44,7 @@ export const ThreadService = {
 
   // Timeline events, linked PRs or issues, and PR review threads (one GitHub call)
   async getActivity(owner: string, repo: string, issueNumber: string | number, token: string) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/activity`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/activity`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch activity')
@@ -52,7 +52,7 @@ export const ThreadService = {
   },
 
   async getPull(owner: string, repo: string, pullNumber: string | number, token: string) {
-    const res = await fetch(`${API_URL}/pulls/${owner}/${repo}/${pullNumber}`, {
+    const res = await apiFetch(`${API_URL}/pulls/${owner}/${repo}/${pullNumber}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch pull request')

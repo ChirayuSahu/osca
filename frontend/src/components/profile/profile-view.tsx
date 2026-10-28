@@ -21,7 +21,7 @@ import { GithubIcon } from "@/components/icons";
 import { Eyebrow, Meter, Tag, githubAvatarUrl, githubProfileUrl, timeAgo } from "@/components/repo-ui";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { API_URL } from "@/lib/api";
+import { API_URL, apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProfileSkeleton } from "@/components/skeletons";
 import { Switch } from "@/components/ui/switch";
@@ -166,7 +166,7 @@ export function ProfileView({ userId }: { userId?: string }) {
     try {
       if (!silent) setLoading(true);
       setError(null);
-      const res = await fetch(`${API_URL}/users/${targetId}`, {
+      const res = await apiFetch(`${API_URL}/users/${targetId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -212,7 +212,7 @@ export function ProfileView({ userId }: { userId?: string }) {
       setAnalyzing(true);
       setAnalysisError(null);
       setAnalysisStatus("Queuing analysis...");
-      const res = await fetch(`${API_URL}/users/${authUser.id}/analyze`, {
+      const res = await apiFetch(`${API_URL}/users/${authUser.id}/analyze`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -226,7 +226,7 @@ export function ProfileView({ userId }: { userId?: string }) {
       pollTimer.current = setInterval(async () => {
         attempts++;
         try {
-          const statusRes = await fetch(`${API_URL}/jobs/${job.queue}/${job.jobId}`, {
+          const statusRes = await apiFetch(`${API_URL}/jobs/${job.queue}/${job.jobId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
           if (!statusRes.ok) return;
@@ -268,7 +268,7 @@ export function ProfileView({ userId }: { userId?: string }) {
     if (!authUser?.id || !token || !profile) return;
     setProfile({ ...profile, communityHidden: !visible });
     try {
-      const res = await fetch(`${API_URL}/users/${authUser.id}`, {
+      const res = await apiFetch(`${API_URL}/users/${authUser.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ communityHidden: !visible }),

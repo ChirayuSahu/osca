@@ -23,21 +23,26 @@ function ImportContent() {
     if (!url || !token) return;
 
     let pollingInterval: NodeJS.Timeout;
+    // Set on unmount, so a poll that starts after the await below never runs
+    let cancelled = false;
 
     const startImport = async () => {
       try {
         setStatus("Starting analysis...");
         const response = await RepositoryService.analyzeRepository(url, token);
+        if (cancelled) return;
         const jobId = response.data.jobId;
+        const queue = response.data.queue;
 
-        if (!jobId) {
+        if (!jobId || !queue) {
           throw new Error("Failed to receive Job ID from server");
         }
 
         // Poll job status
         pollingInterval = setInterval(async () => {
           try {
-            const jobRes = await JobService.getJob('dev-repository-analysis', jobId, token);
+            const jobRes = await JobService.getJob(queue, jobId, token);
+            if (cancelled) return;
             const job = jobRes.data;
 
             if (job.progress && typeof job.progress === 'object') {
@@ -66,13 +71,14 @@ function ImportContent() {
         }, 2000);
 
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "Failed to start import");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to start import");
       }
     };
 
     startImport();
 
     return () => {
+      cancelled = true;
       if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [url, token, router]);

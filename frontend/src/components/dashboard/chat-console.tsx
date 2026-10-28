@@ -33,7 +33,7 @@ import {
 import { RepositoryService } from "@/services/repository.service";
 import { RepoCard, RepoTitle } from "@/components/repo-ui";
 import { GithubIcon as GithubMarkIcon } from "@/components/icons";
-import { isGithubTokenError } from "@/lib/api";
+import { apiFetch, isGithubTokenError } from "@/lib/api";
 import { useAuth } from "@/context/auth-context";
 import { Markdown, preloadMarkdown } from "@/components/markdown-lazy";
 
@@ -63,26 +63,44 @@ function headingsFor(hour: number): Heading[] {
 
 const NO_SKILLS: string[] = [];
 
-// Top skills per user, fetched once per session
+// Top skills per user and language settings, fetched once per session
 const skillsCache = new Map<string, string[]>();
 
-async function loadTopSkills(userId: string, token: string): Promise<string[]> {
-  const hit = skillsCache.get(userId);
+type LanguageSettings = { preferredLanguages?: string[]; excludedLanguages?: string[] };
+const skillsKey = (userId: string, settings: LanguageSettings) =>
+  JSON.stringify([userId, settings.preferredLanguages ?? [], settings.excludedLanguages ?? []]);
+
+/**
+ * The three skills the thinking steps mention: languages the user wants to work
+ * in first, then their strongest skills, leaving out languages they excluded.
+ */
+async function loadTopSkills(userId: string, token: string, settings: LanguageSettings): Promise<string[]> {
+  const key = skillsKey(userId, settings);
+  const hit = skillsCache.get(key);
   if (hit) return hit;
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-  const res = await fetch(`${apiUrl}/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await apiFetch(`${apiUrl}/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw new Error(`Failed to load profile (${res.status})`);
   const body = await res.json();
   const ranked = (body?.data?.contributorProfile?.repositoryExperience?.skills ?? []) as {
     name?: string;
     proficiencyScore?: number;
   }[];
-  const skills = ranked
+  const excluded = new Set((settings.excludedLanguages ?? []).map((l) => l.toLowerCase()));
+  const strongest = ranked
     .filter((s): s is { name: string; proficiencyScore?: number } => typeof s?.name === "string" && s.name.length > 0)
     .sort((x, y) => (y.proficiencyScore ?? 0) - (x.proficiencyScore ?? 0))
-    .map((s) => s.name)
+    .map((s) => s.name);
+  const seen = new Set<string>();
+  const skills = [...(settings.preferredLanguages ?? []), ...strongest]
+    .filter((name) => {
+      const k = name.toLowerCase();
+      if (excluded.has(k) || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
     .slice(0, 3);
-  skillsCache.set(userId, skills);
+  skillsCache.set(key, skills);
   return skills;
 }
 
@@ -672,7 +690,7 @@ export function ChatConsole() {
 
   // Warm the skills cache, so the thinking steps can mention the user's skills
   useEffect(() => {
-    if (user && token) loadTopSkills(user.id, token).catch(() => {});
+    if (user && token) loadTopSkills(user.id, token, user).catch(() => {});
   }, [user, token]);
 
   // True while keys are being pressed; settles shortly after the last keystroke
@@ -756,26 +774,33 @@ export function ChatConsole() {
   }, []);
 
   const sendPrompt = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, { regenerate = false }: { regenerate?: boolean } = {}) => {
       const trimmed = prompt.trim();
       if (!trimmed || streamingMessage !== null || pending) return;
 
       preloadMarkdown();
-      const userMessage: UserMessage = { role: "user", content: trimmed };
-      setMessages((prev) => [...prev, userMessage]);
-      setSearchQuery("");
+      // Regenerate drops the last reply and resends the user turn already in the list
+      let conversation: Message[];
+      if (regenerate) {
+        conversation = messages[messages.length - 1]?.role === "assistant" ? messages.slice(0, -1) : messages;
+        if (conversation[conversation.length - 1]?.role !== "user") return;
+      } else {
+        conversation = [...messages, { role: "user", content: trimmed } satisfies UserMessage];
+        setSearchQuery("");
+      }
+      setMessages(conversation);
       setLastUserPrompt(trimmed);
       setPending(true);
 
       try {
         const apiUrl =
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-        const history = [...messages, userMessage].map((m) => ({
+        const history = conversation.map((m) => ({
           role: m.role,
           content: m.role === "user" ? m.content : m.markdown,
         }));
 
-        const response = await fetch(`${apiUrl}/recommendations/chat`, {
+        const response = await apiFetch(`${apiUrl}/recommendations/chat`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -851,18 +876,8 @@ export function ChatConsole() {
   }, [streamingMessage]);
 
   const handleRegenerate = useCallback(() => {
-    if (lastUserPrompt) {
-      // Drop the last assistant turn so the regenerated reply replaces it cleanly
-      setMessages((prev) => {
-        if (prev.length === 0) return prev;
-        const next = prev.slice();
-        if (next[next.length - 1]?.role === "assistant") {
-          next.pop();
-        }
-        return next;
-      });
-      void sendPrompt(lastUserPrompt);
-    }
+    // The regenerated reply replaces the last one
+    if (lastUserPrompt) void sendPrompt(lastUserPrompt, { regenerate: true });
   }, [lastUserPrompt, sendPrompt]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -950,7 +965,7 @@ export function ChatConsole() {
               <AssistantShell>
                 <ThinkingIndicator
                   prompt={lastUserPrompt ?? ""}
-                  skills={(user && skillsCache.get(user.id)) || NO_SKILLS}
+                  skills={(user && skillsCache.get(skillsKey(user.id, user))) || NO_SKILLS}
                 />
               </AssistantShell>
             )}

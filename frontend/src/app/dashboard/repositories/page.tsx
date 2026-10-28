@@ -18,7 +18,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PageContainer } from "@/components/ui/page-container";
 import { Spinner } from "@/components/ui/spinner";
 import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
-import { isGithubTokenError, readApiError } from "@/lib/api";
+import { apiFetch, isGithubTokenError, readApiError } from "@/lib/api";
 
 interface ExtendedRepository extends Repository {
   ownerType?: string;
@@ -70,7 +70,7 @@ const toRepository = (repo: GitHubRepo): ExtendedRepository => ({
 });
 
 async function getRepos(url: string, token: string): Promise<{ repos: ExtendedRepository[]; pagination?: PaginationMeta }> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await apiFetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) throw await readApiError(res, "Request failed");
   const data = await res.json().catch(() => null);
   if (!data?.success || !Array.isArray(data.data)) throw new Error("Unexpected response");
@@ -157,6 +157,14 @@ function GitHubReposContent() {
   // Repos queued for import in this session (lower-cased URLs), until the import list catches up
   const [queuedUrls, setQueuedUrls] = useState<Set<string>>(new Set());
 
+  // The last `q` this page wrote; any other change to it came from outside (e.g. the sidebar link)
+  const writtenQuery = useRef(queryParam);
+  useEffect(() => {
+    if (queryParam === writtenQuery.current) return;
+    writtenQuery.current = queryParam;
+    setSearchQuery(queryParam);
+  }, [queryParam]);
+
   // Debounced search sync to URL
   useEffect(() => {
     if (searchQuery.trim() === queryParam) return;
@@ -169,6 +177,7 @@ function GitHubReposContent() {
         params.delete("q");
       }
       params.delete("page");
+      writtenQuery.current = searchQuery.trim();
       router.replace(`${pathname}?${params.toString()}`);
     }, 400);
 
@@ -281,7 +290,7 @@ function GitHubReposContent() {
   // Already-imported repos, to show "Open" instead of "Import"
   useEffect(() => {
     if (!token) return;
-    fetch(`${API_URL}/repositories?scope=imported&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API_URL}/repositories?scope=imported&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.success || !Array.isArray(data.data)) return;
@@ -323,7 +332,7 @@ function GitHubReposContent() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/repositories`, {
+      const res = await apiFetch(`${API_URL}/repositories`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ url: targetUrl })

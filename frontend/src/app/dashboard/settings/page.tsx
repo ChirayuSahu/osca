@@ -109,10 +109,13 @@ function LanguagePicker({
   tone: "prefer" | "exclude";
   onToggle: (language: string) => void;
 }) {
-  if (languages.length === 0) return <p className="text-sm text-muted-foreground">No languages in the catalogue yet.</p>;
+  // Saved languages outside the catalogue's top list still get a chip, so they can be turned off
+  const listed = languages.map((l) => l.language);
+  const names = [...listed, ...[...selected, ...blocked].filter((l, i, all) => !listed.includes(l) && all.indexOf(l) === i)];
+  if (names.length === 0) return <p className="text-sm text-muted-foreground">No languages in the catalogue yet.</p>;
   return (
     <div className="flex flex-wrap gap-1.5">
-      {languages.map(({ language }) => {
+      {names.map((language) => {
         const on = selected.includes(language);
         const unavailable = !on && blocked.includes(language);
         return (
@@ -183,7 +186,15 @@ export default function SettingsPage() {
       setSettings((current) => (current ? { ...current, ...pick(saved, patch) } : current));
       updateUser(patch);
     } catch (err) {
-      setSettings(before);
+      // Revert only the keys that still hold what this save set; a later save may have changed them since
+      setSettings((current) => {
+        if (!current) return current;
+        const next = { ...current };
+        for (const key of Object.keys(patch) as (keyof typeof patch)[]) {
+          if (current[key] === patch[key]) (next as Record<string, unknown>)[key] = before[key];
+        }
+        return next;
+      });
       toast.error(err instanceof Error ? err.message : "Couldn't save that setting.");
     }
   };

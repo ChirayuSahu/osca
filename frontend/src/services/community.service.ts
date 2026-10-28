@@ -1,4 +1,4 @@
-import { API_URL, readApiError } from '@/lib/api'
+import { API_URL, apiFetch, readApiError } from '@/lib/api'
 
 export interface CommunityContributor {
   id: string
@@ -24,7 +24,7 @@ export interface CollaborationOpportunity {
 }
 
 const get = async <T>(path: string, token: string, fallback: string): Promise<T> => {
-  const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  const res = await apiFetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } })
   if (!res.ok) throw await readApiError(res, fallback)
   return (await res.json()).data ?? []
 }

@@ -1,4 +1,4 @@
-import { API_URL, readApiError } from '@/lib/api'
+import { API_URL, apiFetch, readApiError } from '@/lib/api'
 
 export interface StarterIssue {
   number: number
@@ -24,13 +24,13 @@ export interface AnalysisRequest {
 
 export const RepositoryService = {
   async listAnalysisRequests(token: string): Promise<AnalysisRequest[]> {
-    const res = await fetch(`${API_URL}/repositories/requests`, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await apiFetch(`${API_URL}/repositories/requests`, { headers: { Authorization: `Bearer ${token}` } })
     if (!res.ok) throw await readApiError(res, 'Failed to load analysis requests')
     return (await res.json()).data
   },
 
   async dismissAnalysisRequest(id: string, token: string): Promise<void> {
-    const res = await fetch(`${API_URL}/repositories/requests/${id}`, {
+    const res = await apiFetch(`${API_URL}/repositories/requests/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -38,7 +38,7 @@ export const RepositoryService = {
   },
 
   async analyzeRepository(url: string, token: string) {
-    const res = await fetch(`${API_URL}/repositories/analyze`, {
+    const res = await apiFetch(`${API_URL}/repositories/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -51,7 +51,7 @@ export const RepositoryService = {
   },
 
   async getRepository(id: string, token: string) {
-    const res = await fetch(`${API_URL}/repositories/${id}`, {
+    const res = await apiFetch(`${API_URL}/repositories/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch repository')
@@ -60,7 +60,7 @@ export const RepositoryService = {
 
   // Adds a catalogue repo (already analyzed) to the user's imports
   async importRepository(id: string, token: string): Promise<{ alreadyImported: boolean }> {
-    const res = await fetch(`${API_URL}/repositories/${id}/import`, {
+    const res = await apiFetch(`${API_URL}/repositories/${id}/import`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -69,7 +69,7 @@ export const RepositoryService = {
   },
 
   async getStarterIssues(id: string, token: string): Promise<StarterIssue[]> {
-    const res = await fetch(`${API_URL}/repositories/${id}/starter-issues`, {
+    const res = await apiFetch(`${API_URL}/repositories/${id}/starter-issues`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch starter issues')
@@ -77,7 +77,7 @@ export const RepositoryService = {
   },
 
   async toggleLike(id: string, token: string) {
-    const res = await fetch(`${API_URL}/repositories/${id}/like`, {
+    const res = await apiFetch(`${API_URL}/repositories/${id}/like`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` }
     })

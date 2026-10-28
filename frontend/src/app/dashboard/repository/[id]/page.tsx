@@ -126,7 +126,7 @@ export default function RepositoryPage() {
           isPR: !!issue.pull_request
         }));
         setThreads(mappedThreads);
-        setTotalPages(threadsRes.meta?.totalPages || 1);
+        setTotalPages(threadsRes.pagination?.totalPages || 1);
       } catch (e) {
         // An expired GitHub token is expected and shown as a reconnect notice
         if (!isGithubTokenError(e)) console.error("Failed to load threads", e);
@@ -405,9 +405,8 @@ export default function RepositoryPage() {
                     >
                       <ChevronLeft /> Prev
                     </Button>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      Page {page} of {totalPages}
-                    </span>
+                    {/* GitHub pages a repo's issues by cursor, so the total isn't known; Next shows when there's more */}
+                    <span className="text-xs text-muted-foreground tabular-nums">Page {page}</span>
                     <Button
                       variant="outline"
                       size="sm"

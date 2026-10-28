@@ -5,7 +5,7 @@ import type { FeedItem } from "@/types/feed";
 // It's how the ranking learns each person's taste and how we measure whether
 // recommendations lead anywhere. Fire-and-forget: tracking never blocks the UI.
 
-export type RecommendationEventType = "impression" | "open" | "github" | "like" | "hide" | "skip" | "issue_open";
+export type RecommendationEventType = "impression" | "open" | "github" | "like" | "hide" | "unhide" | "skip" | "issue_open";
 export type RecommendationSurface = "feed" | "focus" | "issues" | "repository";
 
 type TrackedEvent = {

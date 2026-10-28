@@ -1,8 +1,8 @@
-import { API_URL, readApiError } from '@/lib/api'
+import { API_URL, apiFetch, readApiError } from '@/lib/api'
 
 export const CommentService = {
-  async getComments(owner: string, repo: string, issueNumber: string | number, token: string, page = 1) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/comments?page=${page}`, {
+  async getComments(owner: string, repo: string, issueNumber: string | number, token: string, page = 1, limit = 10) {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/comments?page=${page}&limit=${limit}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch comments')
@@ -10,7 +10,7 @@ export const CommentService = {
   },
 
   async createComment(owner: string, repo: string, issueNumber: string | number, data: { body: string }, token: string) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/comments`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/comments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -23,7 +23,7 @@ export const CommentService = {
   },
 
   async deleteComment(owner: string, repo: string, commentId: string | number, token: string) {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/comments/${commentId}`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/comments/${commentId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -33,7 +33,7 @@ export const CommentService = {
 
   // Toggles one of the caller's reactions on a comment; resolves to whether it was added
   async toggleReaction(owner: string, repo: string, commentId: string | number, content: string, token: string): Promise<boolean> {
-    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/comments/${commentId}/reactions`, {
+    const res = await apiFetch(`${API_URL}/issues/${owner}/${repo}/comments/${commentId}/reactions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ content })

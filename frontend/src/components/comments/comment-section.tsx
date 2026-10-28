@@ -23,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { ErrorState } from "@/components/ui/error-state";
 import { githubProfileUrl, timeAgo } from "@/components/repo-ui";
 import { cn } from "@/lib/utils";
 import {
@@ -99,6 +100,8 @@ export default function CommentSection({
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<string | number | null>(null);
@@ -107,20 +110,36 @@ export default function CommentSection({
 
   useEffect(() => {
     if (!token || !owner || !repo || !threadId) return;
+    let cancelled = false;
 
+    // The API pages comments (at most 100 a page), so fetch every page
     const loadComments = async () => {
+      setLoading(true);
+      setLoadError(false);
       try {
-        const res = await CommentService.getComments(owner, repo, threadId, token);
-        setComments(res.data || []);
+        const all: Comment[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const res = await CommentService.getComments(owner, repo, threadId, token, page, 100);
+          all.push(...(res.data || []));
+          totalPages = res.pagination?.totalPages || 1;
+          page++;
+        } while (page <= totalPages && !cancelled);
+        if (!cancelled) setComments(all);
       } catch (err) {
         console.error(err);
+        if (!cancelled) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadComments();
-  }, [owner, repo, threadId, token]);
+    return () => {
+      cancelled = true;
+    };
+  }, [owner, repo, threadId, token, reloadKey]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,6 +217,10 @@ export default function CommentSection({
               </div>
             ))}
           </div>
+        ) : loadError ? (
+          <div className="p-5 sm:p-6">
+            <ErrorState message="Couldn't load the comments." onRetry={() => setReloadKey((k) => k + 1)} />
+          </div>
         ) : entries.length === 0 ? (
           <div className="flex items-center justify-center px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">No comments yet.</p>
@@ -255,7 +278,11 @@ export default function CommentSection({
                           size="sm"
                           className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
                           onClick={() => {
-                            setNewComment(`@${login || 'User'} `);
+                            // Mention the author at the start, keeping any draft
+                            if (login) {
+                              const mention = `@${login} `;
+                              setNewComment((draft) => (draft.startsWith(mention) ? draft : mention + draft));
+                            }
                             textareaRef.current?.focus();
                           }}
                         >

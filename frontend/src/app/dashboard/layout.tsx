@@ -15,14 +15,15 @@ import { GithubReconnectBanner } from "@/components/github-reconnect-banner";
 const OnboardingDialog = dynamic(() => import("@/components/onboarding-dialog").then((m) => m.OnboardingDialog), { ssr: false });
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { token, loading, user } = useAuth();
+  const { token, loading, loggingOut, user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !token) {
+    // Logging out heads to the landing page instead
+    if (!loading && !token && !loggingOut) {
       router.push("/login");
     }
-  }, [token, loading, router]);
+  }, [token, loading, loggingOut, router]);
 
   if (loading) {
     return (

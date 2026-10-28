@@ -11,7 +11,7 @@ import { FeedFocusSkeleton } from '@/components/skeletons'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useAuth } from '@/context/auth-context'
 import { UserService } from '@/services/user.service'
-import { trackFeedItem } from '@/lib/recommendation-events'
+import { trackFeedItem, type RecommendationSurface } from '@/lib/recommendation-events'
 import { PREFERENCES_CHANGED } from '@/constants/interests'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -35,6 +35,8 @@ export function FeedList() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  // A failed next page: the loaded items stay and that page gets a retry
+  const [moreError, setMoreError] = useState(false)
 
   // Filters
   const [filters, setFilters] = useState<FeedFilters>({})
@@ -71,6 +73,8 @@ export function FeedList() {
   const requestId = useRef(0)
   // One seed per visit: a fresh order each time the page is opened, stable while scrolling
   const [seed] = useState(() => Date.now())
+  // Repos marked "Not for me" during this visit, kept out of pages fetched later
+  const hiddenIds = useRef(new Set<string>())
 
   const fetchFeed = useCallback(async (pageToFetch: number, activeFilters: FeedFilters, isInitial = false) => {
     if (!token) return
@@ -83,19 +87,24 @@ export function FeedList() {
       } else {
         setLoadingMore(true)
       }
+      setMoreError(false)
 
       const response = await FeedService.getFeed(token, pageToFetch, PAGE_SIZE, activeFilters, seed)
       if (id !== requestId.current) return
 
+      const fresh = response.data.filter(i => !hiddenIds.current.has(i.repository.id))
       setItems(prev => {
-        if (isInitial) return response.data
+        if (isInitial) return fresh
         const known = new Set(prev.map(i => i.repository.id))
-        return [...prev, ...response.data.filter(i => !known.has(i.repository.id))]
+        return [...prev, ...fresh.filter(i => !known.has(i.repository.id))]
       })
+      // Only advance once the page arrived, so a retry asks for the same page
+      setPage(pageToFetch)
       setHasMore(response.pagination.page < response.pagination.totalPages)
     } catch (err) {
       if (id !== requestId.current) return
-      setError(err instanceof Error ? err.message : 'Failed to load feed')
+      if (isInitial) setError(err instanceof Error ? err.message : 'Failed to load feed')
+      else setMoreError(true)
     } finally {
       if (id === requestId.current) {
         setLoading(false)
@@ -105,16 +114,12 @@ export function FeedList() {
   }, [token, seed])
 
   useEffect(() => {
-    setPage(1)
     fetchFeed(1, filters, true)
   }, [fetchFeed, filters])
 
   // Onboarding or Settings changed what you want recommended: start over
   useEffect(() => {
-    const reload = () => {
-      setPage(1)
-      fetchFeed(1, filters, true)
-    }
+    const reload = () => fetchFeed(1, filters, true)
     window.addEventListener(PREFERENCES_CHANGED, reload)
     return () => window.removeEventListener(PREFERENCES_CHANGED, reload)
   }, [fetchFeed, filters])
@@ -127,16 +132,15 @@ export function FeedList() {
   }, [token])
 
   const loadNextPage = useCallback(() => {
-    if (loading || loadingMore || !hasMore || error) return
-    const nextPage = page + 1
-    setPage(nextPage)
-    fetchFeed(nextPage, filters)
-  }, [loading, loadingMore, hasMore, error, page, filters, fetchFeed])
+    if (loading || loadingMore || !hasMore || error || moreError) return
+    fetchFeed(page + 1, filters)
+  }, [loading, loadingMore, hasMore, error, moreError, page, filters, fetchFeed])
 
-  // Infinite scroll: load the next page as the marker below the grid nears the viewport
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  // Infinite scroll: load the next page as the marker below the grid nears the viewport.
+  // A callback ref, so the observer attaches whenever the marker mounts (e.g. back to Grid).
+  const [sentinel, setSentinel] = useState<HTMLDivElement | null>(null)
   useEffect(() => {
-    const el = sentinelRef.current
+    const el = sentinel
     if (!el || !hasMore) return
     const observer = new IntersectionObserver(
       entries => {
@@ -146,7 +150,7 @@ export function FeedList() {
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [hasMore, loadNextPage])
+  }, [sentinel, hasMore, loadNextPage])
 
   const restoreItem = (item: FeedItem, index: number) => {
     setItems(prev => {
@@ -157,9 +161,12 @@ export function FeedList() {
     })
   }
 
-  const handleUndo = async (item: FeedItem, index: number) => {
+  const handleUndo = async (item: FeedItem, index: number, surface: RecommendationSurface) => {
     if (!token) return
+    hiddenIds.current.delete(item.repository.id)
     restoreItem(item, index)
+    // Reverses the ranking penalty the hide applied
+    trackFeedItem(item, 'unhide', surface, index)
     try {
       await FeedService.clearNotInterested(token, item.repository.id)
     } catch (err) {
@@ -170,12 +177,14 @@ export function FeedList() {
   const handleNotInterested = async (item: FeedItem) => {
     if (!token) return
     const index = items.findIndex(i => i.repository.id === item.repository.id)
-    trackFeedItem(item, 'hide', view === 'focus' ? 'focus' : 'feed', index)
+    const surface: RecommendationSurface = view === 'focus' ? 'focus' : 'feed'
+    trackFeedItem(item, 'hide', surface, index)
+    hiddenIds.current.add(item.repository.id)
     setItems(prev => prev.filter(i => i.repository.id !== item.repository.id))
 
     const toastId = toast(`Hidden ${item.repository.fullName} from your feed`, {
       duration: 8000,
-      action: { label: 'Undo', onClick: () => handleUndo(item, index) },
+      action: { label: 'Undo', onClick: () => handleUndo(item, index, surface) },
     })
 
     try {
@@ -183,6 +192,7 @@ export function FeedList() {
     } catch (err) {
       console.error(err)
       // Put it back: the server didn't record the preference
+      hiddenIds.current.delete(item.repository.id)
       restoreItem(item, index)
       toast.dismiss(toastId)
       toast.error(`Couldn't hide ${item.repository.fullName}. Try again.`)
@@ -296,12 +306,21 @@ export function FeedList() {
             {loadingMore && Array.from({ length: 3 }).map((_, i) => <FeedCardSkeleton key={`more-${i}`} />)}
           </div>
 
-          {hasMore ? (
-            <div ref={sentinelRef} aria-hidden className="h-px" />
+          {moreError ? null : hasMore ? (
+            <div ref={setSentinel} aria-hidden className="h-px" />
           ) : (
             <p className="py-2 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
           )}
         </>
+      )}
+
+      {!loading && !error && moreError && (
+        <div className="flex items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
+          Couldn&apos;t load more recommendations.
+          <Button variant="outline" size="sm" onClick={() => fetchFeed(page + 1, filters)}>
+            Retry
+          </Button>
+        </div>
       )}
     </div>
   )

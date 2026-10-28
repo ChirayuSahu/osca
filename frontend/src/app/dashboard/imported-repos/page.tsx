@@ -24,6 +24,7 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PageContainer } from "@/components/ui/page-container";
 import { PageHeader } from "@/components/ui/page-header";
 import { Spinner } from "@/components/ui/spinner";
+import { apiFetch } from "@/lib/api";
 
 interface ExtendedRepository extends Repository {
   ownerType?: string;
@@ -72,7 +73,7 @@ function ImportedReposContent() {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch(`${API_URL}/repositories?scope=imported&page=${pageParam}&limit=8`, {
+      const res = await apiFetch(`${API_URL}/repositories?scope=imported&page=${pageParam}&limit=8`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -139,13 +140,20 @@ function ImportedReposContent() {
     setDeleting(true);
     try {
       // Removes only your import; the repository stays in the shared catalogue
-      const res = await fetch(`${API_URL}/repositories/${repo.id}/import`, {
+      const res = await apiFetch(`${API_URL}/repositories/${repo.id}/import`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        setRepos(prev => prev.filter(r => r.id !== repo.id));
+        const remaining = repos.filter(r => r.id !== repo.id);
+        setRepos(remaining);
         toast.success(`Removed ${repo.name}`);
+        // That was the last one on this page: step back rather than show the empty state
+        if (remaining.length === 0 && pageParam > 1) {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("page", String(pageParam - 1));
+          router.replace(`${pathname}?${params.toString()}`);
+        }
       } else {
         toast.error("Failed to remove repository");
       }

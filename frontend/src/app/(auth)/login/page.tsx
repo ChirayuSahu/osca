@@ -12,6 +12,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   access_denied: "GitHub sign-in was cancelled. Try again whenever you're ready.",
   session_error: "We couldn't finish signing you in. Please try again.",
   invalid_params: "That sign-in link was incomplete or expired. Please try again.",
+  // From the backend's GitHub callback
+  invalid_state: "That sign-in took too long or was started in another tab. Please try again.",
+  missing_code: "GitHub didn't finish the sign-in. Please try again.",
+  bad_verification_code: "That sign-in link was already used or expired. Please try again.",
+  token_exchange_failed: "We couldn't reach GitHub to finish signing in. Please try again.",
+  sign_in_failed: "We couldn't finish signing you in. Please try again.",
 };
 const FALLBACK_ERROR = "Something went wrong while signing in. Please try again.";
 

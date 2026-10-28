@@ -1,4 +1,4 @@
-import { API_URL, readApiError } from '@/lib/api'
+import { API_URL, apiFetch, readApiError } from '@/lib/api'
 
 export type ExperienceLevel = 'first' | 'some' | 'experienced'
 export type FeedView = 'grid' | 'focus'
@@ -53,13 +53,13 @@ export interface ContributionSummary {
 
 export const UserService = {
   async getSettings(userId: string, token: string): Promise<UserSettings> {
-    const res = await fetch(`${API_URL}/users/${userId}`, { headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/users/${userId}`, { headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to load your settings')
     return (await res.json()).data
   },
 
   async updateSettings(userId: string, patch: SettingsPatch, token: string): Promise<UserSettings> {
-    const res = await fetch(`${API_URL}/users/${userId}`, {
+    const res = await apiFetch(`${API_URL}/users/${userId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
       body: JSON.stringify(patch)
@@ -69,19 +69,19 @@ export const UserService = {
   },
 
   async getContributions(userId: string, token: string): Promise<ContributionSummary> {
-    const res = await fetch(`${API_URL}/users/${userId}/contributions`, { headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/users/${userId}/contributions`, { headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to load contributions')
     return (await res.json()).data
   },
 
   async listHiddenRepositories(userId: string, token: string): Promise<HiddenRepository[]> {
-    const res = await fetch(`${API_URL}/users/${userId}/not-interested`, { headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/users/${userId}/not-interested`, { headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to load hidden repositories')
     return (await res.json()).data
   },
 
   async deleteAccount(userId: string, token: string): Promise<void> {
-    const res = await fetch(`${API_URL}/users/${userId}`, { method: 'DELETE', headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/users/${userId}`, { method: 'DELETE', headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to delete your account')
   }
 }

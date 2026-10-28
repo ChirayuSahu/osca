@@ -1,5 +1,5 @@
 import { FeedResponse, Reason } from '../types/feed'
-import { API_URL, readApiError } from '@/lib/api'
+import { API_URL, apiFetch, readApiError } from '@/lib/api'
 
 export interface FeedFilters {
   language?: string
@@ -33,25 +33,25 @@ export const FeedService = {
     if (filters.language) params.set('language', filters.language)
     if (filters.beginnerOnly) params.set('beginner', 'true')
 
-    const res = await fetch(`${API_URL}/feed?${params}`, { headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/feed?${params}`, { headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch feed')
     return res.json()
   },
 
   async getIssueRecommendations(token: string): Promise<IssueRecommendation[]> {
-    const res = await fetch(`${API_URL}/recommendations/issues`, { headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/recommendations/issues`, { headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to load issue recommendations')
     return (await res.json()).data
   },
 
   async getLanguages(token: string): Promise<FeedLanguage[]> {
-    const res = await fetch(`${API_URL}/feed/languages`, { headers: authHeaders(token) })
+    const res = await apiFetch(`${API_URL}/feed/languages`, { headers: authHeaders(token) })
     if (!res.ok) throw await readApiError(res, 'Failed to fetch feed languages')
     return (await res.json()).data ?? []
   },
 
   async markNotInterested(token: string, repositoryId: string): Promise<void> {
-    const res = await fetch(`${API_URL}/repositories/${repositoryId}/not-interested`, {
+    const res = await apiFetch(`${API_URL}/repositories/${repositoryId}/not-interested`, {
       method: 'POST',
       headers: authHeaders(token)
     })
@@ -59,7 +59,7 @@ export const FeedService = {
   },
 
   async clearNotInterested(token: string, repositoryId: string): Promise<void> {
-    const res = await fetch(`${API_URL}/repositories/${repositoryId}/not-interested`, {
+    const res = await apiFetch(`${API_URL}/repositories/${repositoryId}/not-interested`, {
       method: 'DELETE',
       headers: authHeaders(token)
     })
