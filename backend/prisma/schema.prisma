@@ -14,6 +14,24 @@ model User {
   avatarUrl          String?
   skills             String[]
   contributionScore  Float               @default(0.0)
+  // Leaves the user out of Community and makes their profile private
+  communityHidden    Boolean             @default(false)
+  // What others see on the profile while it's visible
+  profileShowScores   Boolean            @default(true)
+  profileShowCalendar Boolean            @default(true)
+  // Feed preferences: "first" | "some" | "experienced" tunes newcomer-friendliness
+  // against popularity; preferred languages are boosted, excluded ones dropped
+  experienceLevel    String              @default("first")
+  preferredLanguages String[]            @default([])
+  excludedLanguages  String[]            @default([])
+  // Default For you layout: "grid" | "focus"
+  feedView           String              @default("grid")
+  // Onboarding: what the user wants to work on (web, ml, devtools, ...)
+  interestAreas      String[]            @default([])
+  onboardedAt        DateTime?
+  // Per-user multipliers on the ranking weights, learned from what they open,
+  // like and hide: { content, collab, topic, keyword, stars, approachability }
+  rankingTuning      Json?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   oauthAccounts      OAuthAccount[]
@@ -22,6 +40,8 @@ model User {
   interactions       UserInteraction[]
   interests          UserInterest[]
   imports            RepositoryImport[]
+  analysisRequests   AnalysisRequest[]
+  recommendationEvents RecommendationEvent[]
 }
 
 model OAuthAccount {
@@ -74,6 +94,16 @@ model Repository {
   archived                 Boolean   @default(false)
   pushedAt                 DateTime?
   approachabilityUpdatedAt DateTime?
+  // Whether newcomers succeed here (null until measured): share of recent PRs
+  // from outside the team that were merged, how many merged in the last 90 days,
+  // median hours until a maintainer first replies to an outsider's issue, and
+  // starter issues nobody has claimed (no assignee, no linked PR)
+  outsidePrMergeRate       Float?
+  outsidePrsMerged90d      Int?
+  maintainerResponseHours  Float?
+  unclaimedStarterIssues   Int?
+  // What the project is about: keywords from its description, topics and README
+  keywords                 String[]  @default([])
 
   likes           RepositoryLike[]
   imports         RepositoryImport[]
@@ -122,6 +152,10 @@ model UserInteraction {
 
   user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  // "Not for me" lists and the feed's exclusion filter look up by user and action
+  @@index([userId, action])
+  @@index([repositoryId, userId])
 }
 
 model UserInterest {
@@ -150,4 +184,45 @@ model RepositoryImport {
 
   @@unique([userId, repositoryId])
   @@index([userId])
+}
+
+// A repository a user asked OSCA to analyze, tracked from the moment it's queued
+// so the Imported page can show queued, analyzing and failed ones (BullMQ forgets
+// jobs after a day). Once done, the repo shows up as a RepositoryImport instead.
+model AnalysisRequest {
+  id           String   @id @default(uuid())
+  userId       String
+  url          String
+  fullName     String
+  status       String   @default("queued") // queued | analyzing | done | failed
+  error        String?
+  jobId        String?
+  repositoryId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fullName])
+  @@index([userId, status])
+}
+
+// What people do with recommendations: shown, opened, clicked through to GitHub,
+// liked, hidden, skipped. Drives the per-user learned weights and the metrics
+// script (scripts/recommendation-metrics.ts).
+model RecommendationEvent {
+  id           String   @id @default(uuid())
+  userId       String
+  type         String // impression | open | github | like | hide | skip | issue_open
+  surface      String // feed | focus | issues | repository
+  repositoryId String?
+  issueUrl     String?
+  position     Int?
+  explore      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
 }

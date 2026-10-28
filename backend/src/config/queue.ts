@@ -13,6 +13,10 @@ export const QUEUE_NAMES = {
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES]
 
+// Scheduled catalogue upkeep (refresh, discovery). Kept apart from QUEUE_NAMES,
+// which are the user-facing queues the jobs API lists.
+export const MAINTENANCE_QUEUE = `${prefix}-catalogue-maintenance`
+
 // ─── Default Job Options ─────────────────────────────────────────
 
 const defaultJobOptions: DefaultJobOptions = {
@@ -34,7 +38,7 @@ const defaultJobOptions: DefaultJobOptions = {
 
 const queues = new Map<string, Queue>()
 
-export const getQueue = (name: QueueName): Queue => {
+export const getQueue = (name: QueueName | typeof MAINTENANCE_QUEUE): Queue => {
   let queue = queues.get(name)
   if (!queue) {
     queue = new Queue(name, {

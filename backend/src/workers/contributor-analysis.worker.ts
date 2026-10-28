@@ -1,6 +1,7 @@
 import { Worker, Job, UnrecoverableError } from 'bullmq'
 import { isPermanentJobError } from '../lib/errors'
 import { waitOnGithubRateLimit } from './github-rate-limit'
+import { syncUserInterestAreas, syncUserRepoKeywords } from '../services/user-keywords.service'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { ContributorAnalysisService } from '../services/contributor-analysis.service'
@@ -48,6 +49,14 @@ const processContributorAnalysis = async (
           console.log(`[ContributorWorker] Synced ${ownedCount} OWNS edges for user ${userId}`)
         } catch (error) {
           console.error(`[ContributorWorker] Failed to sync owned repos for user ${userId}:`, error)
+        }
+
+        try {
+          const keywordCount = await syncUserRepoKeywords(userId)
+          await syncUserInterestAreas(userId)
+          console.log(`[ContributorWorker] Synced ${keywordCount} interest keywords for user ${userId}`)
+        } catch (error) {
+          console.error(`[ContributorWorker] Failed to sync interest keywords for user ${userId}:`, error)
         }
       }
     }

@@ -17,6 +17,8 @@
  *   --min-good-first-issues=N     Search threshold for open good first issues (default 5)
  *   --pushed-within-days=N        Only repos pushed within N days (default 90)
  *   --languages=a,b,c             Override the language list for search
+ *   --topics=a,b,c                Override the framework/topic list for search
+ *   --per-topic=N                 Top-starred search results per topic (default 30, max 100)
  *   --no-curated                  Skip the curated list
  *   --no-search                   Skip GitHub search discovery
  *   --include-existing            Re-analyze repositories already in the catalogue
@@ -28,6 +30,7 @@ import { config } from '../src/config'
 import { prisma } from '../src/utils/prisma'
 import { JobEnqueueService } from '../src/services/job-enqueue.service'
 import { closeAllQueues, getQueue, QUEUE_NAMES } from '../src/config/queue'
+import { DEFAULT_LANGUAGES, DEFAULT_TOPICS, discoverRepositories } from '../src/services/catalogue-discovery.service'
 
 // Well-known projects with active newcomer programs, labelled starter issues
 // and contributing guides. Discovery below keeps the catalogue fresh beyond these.
@@ -204,6 +207,16 @@ const CURATED_REPOS: string[] = [
 
   // Dart / Flutter
   'openfoodfacts/smooth-app',
+
+  // React Native / mobile
+  'expo/expo',
+  'infinitered/ignite',
+  'software-mansion/react-native-reanimated',
+  'callstack/react-native-paper',
+  'react-navigation/react-navigation',
+  'bluesky-social/social-app',
+  'mattermost/mattermost-mobile',
+  'rainbow-me/rainbow',
   'AppFlowy-IO/AppFlowy',
   'localsend/localsend',
   'fluttercommunity/plus_plugins',
@@ -253,12 +266,6 @@ const CURATED_REPOS: string[] = [
   'keploy/keploy'
 ]
 
-const DEFAULT_LANGUAGES = [
-  'TypeScript', 'JavaScript', 'Python', 'Go', 'Rust', 'Java', 'Kotlin',
-  'Ruby', 'PHP', 'C#', 'C++', 'C', 'Swift', 'Dart', 'Shell', 'Elixir',
-  'Scala', 'Haskell', 'Lua', 'Zig', 'R', 'Julia', 'Vue', 'Svelte', 'Clojure'
-]
-
 type Options = {
   dryRun: boolean
   ifEmpty: boolean
@@ -268,6 +275,8 @@ type Options = {
   minGoodFirstIssues: number
   pushedWithinDays: number
   languages: string[]
+  topics: string[]
+  perTopic: number
   curated: boolean
   search: boolean
 }
@@ -289,56 +298,11 @@ const parseOptions = (argv: string[]): Options => {
     minGoodFirstIssues: int('min-good-first-issues', 5),
     pushedWithinDays: int('pushed-within-days', 90),
     languages: value('languages')?.split(',').map((l) => l.trim()).filter(Boolean) ?? DEFAULT_LANGUAGES,
+    topics: value('topics')?.split(',').map((t) => t.trim()).filter(Boolean) ?? DEFAULT_TOPICS,
+    perTopic: int('per-topic', 30, 100),
     curated: !argv.includes('--no-curated'),
     search: !argv.includes('--no-search')
   }
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
-type SearchResponse = { items?: Array<{ full_name: string; stargazers_count: number }> }
-
-// Plain fetch so --dry-run also works without a token (at GitHub's lower
-// unauthenticated search limit).
-const searchLanguage = async (
-  language: string,
-  options: Options,
-  token: string,
-  sort: 'stars' | 'updated',
-  count: number
-): Promise<string[]> => {
-  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const q = [
-    `good-first-issues:>=${options.minGoodFirstIssues}`,
-    `language:"${language}"`,
-    `pushed:>=${daysAgo(options.pushedWithinDays)}`,
-    // Established projects only: new repos that mass-label "good first issue"
-    // (bounty/label farms) otherwise dominate the results.
-    `created:<=${daysAgo(365)}`,
-    'forks:>=20',
-    'archived:false',
-    'is:public',
-    'mirror:false',
-    // Skip toy repos and the very largest projects, which are hard to land a first PR in
-    'stars:200..50000'
-  ].join(' ')
-  // Sorting by help-wanted count rewards label farming. Stars within the band is a
-  // steady proxy; a second pass by last update adds active mid-size projects.
-  const url = `https://api.github.com/search/repositories?q=${encodeURIComponent(q)}&sort=${sort}&order=desc&per_page=${count}`
-
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'Open-Source-Contributor-Matching-Platform',
-      ...(token && { Authorization: `Bearer ${token}` })
-    },
-    signal: AbortSignal.timeout(15_000)
-  })
-  if (!response.ok) {
-    throw new Error(`GitHub search failed for ${language}: HTTP ${response.status} ${await response.text().catch(() => '')}`.slice(0, 300))
-  }
-  const data = (await response.json()) as SearchResponse
-  return (data.items ?? []).map((item) => item.full_name)
 }
 
 const main = async () => {
@@ -376,31 +340,8 @@ const main = async () => {
   }
 
   if (options.search) {
-    // Search API: 30 req/min authenticated, 10 unauthenticated.
-    const delayMs = token ? 2_500 : 7_000
-    const passes: Array<{ sort: 'stars' | 'updated'; count: number }> = [
-      { sort: 'stars', count: options.perLanguage },
-      ...(options.activePerLanguage > 0 ? [{ sort: 'updated' as const, count: options.activePerLanguage }] : [])
-    ]
-    let first = true
-    for (const language of options.languages) {
-      let added = 0
-      for (const pass of passes) {
-        if (!first) await sleep(delayMs)
-        first = false
-        try {
-          for (const fullName of await searchLanguage(language, options, token, pass.sort, pass.count)) {
-            if (!selected.has(fullName.toLowerCase())) {
-              selected.set(fullName.toLowerCase(), `search:${language}`)
-              added++
-            }
-          }
-        } catch (err) {
-          console.error(`[SeedBeginner] ${(err as Error).message}`)
-        }
-      }
-      console.log(`[SeedBeginner] ${language}: ${added} new`)
-    }
+    const found = await discoverRepositories(options, token, (label, added) => console.log(`[SeedBeginner] ${label}: ${added} new`))
+    for (const [key, source] of found) if (!selected.has(key)) selected.set(key, source)
   }
 
   // Keep the original casing for curated entries; search results come back canonical.

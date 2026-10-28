@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Removes a failed (or finished) analysis request from your In progress list. Retry by calling Queue Analysis again.'
+url: '{{BASE_URL}}/api/v1/repositories/requests/{{request_id}}'
+method: DELETE
+order: 2300

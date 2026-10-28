@@ -1,6 +1,7 @@
 import { Worker } from 'bullmq'
 import { createContributorWorker } from './contributor-analysis.worker'
 import { createRepositoryWorker } from './repository-analysis.worker'
+import { createCatalogueWorker, syncCatalogueSchedules } from './catalogue-maintenance.worker'
 
 // ─── Worker Registry ─────────────────────────────────────────────
 
@@ -16,6 +17,8 @@ export const initWorkers = (): void => {
   try {
     workers.push(createContributorWorker())
     workers.push(createRepositoryWorker())
+    workers.push(createCatalogueWorker())
+    syncCatalogueSchedules().catch((error) => console.error('[Workers] Failed to set catalogue schedules:', error))
     console.log(`[Workers] ${workers.length} workers initialized successfully`)
   } catch (error) {
     console.error('[Workers] Failed to initialize workers:', error)

@@ -1,0 +1,9 @@
+$kind: http-request
+description: 'Unclaimed starter issues (no assignee, no linked PR) from your best-matching repositories, best first, with reasons. Cached per user for 15 minutes.'
+url: '{{BASE_URL}}/api/v1/recommendations/issues?limit=30'
+method: GET
+queryParams:
+  - key: 'limit'
+    value: '30'
+    description: 'How many issues (1 to 60)'
+order: 2000

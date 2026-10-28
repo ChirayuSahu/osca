@@ -11,12 +11,21 @@ export const publicUserSelect = {
   contributionScore: true,
   createdAt: true,
   updatedAt: true,
-  contributorProfile: true
+  contributorProfile: true,
+  profileShowScores: true,
+  profileShowCalendar: true
 } satisfies Prisma.UserSelect
 
 export const selfUserSelect = {
   ...publicUserSelect,
   email: true,
+  communityHidden: true,
+  experienceLevel: true,
+  preferredLanguages: true,
+  excludedLanguages: true,
+  feedView: true,
+  interestAreas: true,
+  onboardedAt: true,
   oauthAccounts: {
     select: {
       id: true,

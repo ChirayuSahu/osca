@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Repositories you marked "Not for me", newest first. Restore one with Repositories > Clear Not Interested.'
+url: '{{BASE_URL}}/api/v1/users/{{user_id}}/not-interested'
+method: GET
+order: 4000

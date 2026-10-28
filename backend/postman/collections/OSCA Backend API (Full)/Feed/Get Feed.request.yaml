@@ -1,5 +1,5 @@
 $kind: http-request
-description: 'Ranked recommendations. The order changes per visit unless seed is fixed.'
+description: 'Ranked recommendations. The order changes per visit unless seed is fixed. Each item has scoreInfo.reasons (why it was recommended); about one in seven slots is an exploration pick.'
 url: '{{BASE_URL}}/api/v1/feed?page=1&limit=10'
 method: GET
 queryParams:

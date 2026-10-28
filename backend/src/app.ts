@@ -2,6 +2,7 @@ import express, { Application, Request, Response, NextFunction } from 'express'
 import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import helmet from 'helmet'
+import compression from 'compression'
 import { config } from './config'
 import { mountSwaggerDocs } from './config/swagger'
 import { apiRouter } from './router'
@@ -15,6 +16,8 @@ const app: Application = express()
 // the per-IP rate limits.
 app.set('trust proxy', config.trustProxy)
 app.use(helmet())
+// Feed and repository payloads are large JSON; gzip cuts them several-fold
+app.use(compression())
 app.use(cors({
   origin: config.nodeEnv === 'production'
     ? [config.frontendUrl]

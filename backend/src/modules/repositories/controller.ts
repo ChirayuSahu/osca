@@ -6,6 +6,8 @@ import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middl
 import { AppError, assertFound } from '../../lib/errors'
 import { resolveRepositoryUrl, getGithubIdForUser } from '../../lib/github'
 import { JobEnqueueService } from '../../services/job-enqueue.service'
+import { AnalysisRequestService } from '../../services/analysis-request.service'
+import { rebuildProfileIfOwnRepository } from '../../services/profile-refresh.service'
 import { RepositoryService } from './service'
 import { NOT_INTERESTED_ACTION } from '../../services/recommendation-engine.service'
 import { InteractionService } from '../../services/interaction.service'
@@ -49,6 +51,7 @@ const queueRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: R
   const userId = requireUserId(req)
   const url = resolveRepositoryUrl(req.body)
   const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId, false)
+  await AnalysisRequestService.recordQueued(userId, url, queued.jobId)
   sendResponse(res, 202, true, 'Repository analysis queued', queued)
 })
 
@@ -56,6 +59,7 @@ const queueForceRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, r
   const userId = requireUserId(req)
   const url = resolveRepositoryUrl(req.body)
   const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId, true)
+  await AnalysisRequestService.recordQueued(userId, url, queued.jobId)
   sendResponse(res, 202, true, 'Forced repository analysis queued', queued)
 })
 
@@ -338,6 +342,9 @@ const addRepositoryImport = asyncHandler(async (req: RequestWithUser, res: Respo
   })
   if (!existing) {
     await prisma.repositoryImport.create({ data: { userId, repositoryId } })
+    await rebuildProfileIfOwnRepository(userId, repository).catch((error) => {
+      console.error(`[Repositories] Failed to queue profile rebuild for user ${userId}:`, error)
+    })
   }
   sendResponse(res, existing ? 200 : 201, true, existing ? 'Repository already imported' : 'Repository imported', {
     repositoryId,
@@ -560,7 +567,22 @@ const hideRepository = asyncHandler(async (req: RequestWithUser, res: Response) 
   sendResponse(res, 200, true, 'Repository hidden successfully', updated)
 })
 
+// Analyses you asked for that aren't imports yet: queued, analyzing (with
+// progress) or failed (with the reason)
+const listAnalysisRequests = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const requests = await AnalysisRequestService.listOpen(requireUserId(req))
+  sendResponse(res, 200, true, 'Analysis requests retrieved successfully', requests)
+})
+
+const dismissAnalysisRequest = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const dismissed = await AnalysisRequestService.dismiss(requireUserId(req), String(req.params.requestId))
+  if (!dismissed) throw new AppError('Analysis request not found', 404)
+  sendResponse(res, 200, true, 'Analysis request dismissed')
+})
+
 export const RepositoryController = {
+  listAnalysisRequests,
+  dismissAnalysisRequest,
   queueRepositoryAnalysis,
   queueForceRepositoryAnalysis,
   getRepository,

@@ -18,6 +18,10 @@ router.put('/:id', authMiddleware, UserController.updateUser)
 
 router.post('/:id/analyze', authMiddleware, jobLimiter, UserController.analyzeProfile)
 
+router.get('/:id/not-interested', authMiddleware, UserController.listNotInterested)
+
+router.delete('/:id', authMiddleware, UserController.deleteUser)
+
 
 
 export const usersRouter = router

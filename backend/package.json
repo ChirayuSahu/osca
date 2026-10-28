@@ -17,7 +17,8 @@
     "seed:beginner": "node dist/scripts/seed-beginner-repositories.js",
     "seed:popular": "node dist/scripts/seed-repositories.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "encrypt-tokens": "node dist/scripts/encrypt-tokens.js"
+    "encrypt-tokens": "node dist/scripts/encrypt-tokens.js",
+    "metrics:recommendations": "node dist/scripts/recommendation-metrics.js"
   },
   "keywords": [],
   "author": "",
@@ -27,6 +28,7 @@
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "bullmq": "^5.79.0",
+    "compression": "1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -40,6 +42,7 @@
     "yamljs": "^0.3.0"
   },
   "devDependencies": {
+    "@types/compression": "1.8.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",

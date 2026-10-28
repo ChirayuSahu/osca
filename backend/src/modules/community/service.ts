@@ -102,7 +102,8 @@ const listContributors = async (userId: string, limit: number): Promise<Communit
   if (githubId === null) return []
 
   const result = await withSession(session =>
-    session.run(SIMILAR_USERS_CYPHER, { githubId, limit: neo4j.int(limit) })
+    // Extra rows so hiding some people doesn't leave the list short
+    session.run(SIMILAR_USERS_CYPHER, { githubId, limit: neo4j.int(Math.min(limit * 2, 100)) })
   )
   const rows = result.records.map(record => ({
     githubId: String(toNum(record.get('githubId'))),
@@ -115,7 +116,8 @@ const listContributors = async (userId: string, limit: number): Promise<Communit
 
   // Graph nodes only carry the GitHub id; profile details live in Postgres.
   const accounts = await prisma.oAuthAccount.findMany({
-    where: { provider: 'github', providerId: { in: rows.map(r => r.githubId) } },
+    // People who hid their profile don't appear in Community
+    where: { provider: 'github', providerId: { in: rows.map(r => r.githubId) }, user: { communityHidden: false } },
     select: { providerId: true, username: true, user: { select: { id: true, name: true, avatarUrl: true } } }
   })
   const byGithubId = new Map(accounts.map(a => [a.providerId, a]))
@@ -133,7 +135,7 @@ const listContributors = async (userId: string, limit: number): Promise<Communit
       sharedRepos: row.sharedRepos,
       matchScore: Math.round(row.match * 100)
     }]
-  })
+  }).slice(0, limit)
 }
 
 const listCollaborations = async (userId: string, limit: number): Promise<CollaborationOpportunity[]> => {

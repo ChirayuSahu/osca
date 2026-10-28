@@ -43,6 +43,12 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? '',
   // Prefix for BullMQ queue names (e.g. 'prod', 'staging', 'dev')
   queuePrefix: process.env.QUEUE_PREFIX ?? 'dev',
+  // Nightly signal refresh and weekly discovery of new repos, on the server
+  // GITHUB_TOKEN. On in production unless CATALOGUE_MAINTENANCE=false; off in
+  // development unless CATALOGUE_MAINTENANCE=true.
+  catalogueMaintenance: process.env.CATALOGUE_MAINTENANCE
+    ? process.env.CATALOGUE_MAINTENANCE === 'true'
+    : nodeEnv === 'production',
   redis: {
     host: process.env.REDIS_HOST ?? 'localhost',
     port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
@@ -58,11 +64,13 @@ export const config = {
   },
   recommendation: {
     // Weights for the feed's combined score: content (skill match) +
-    // collaborative (co-interaction) + topic similarity + normalized stars +
-    // approachability. Each component is in [0, 1], so these sum to ~1.
-    contentWeight: parseFloat(process.env.RECOMMENDATION_CONTENT_WEIGHT ?? '0.4'),
-    collabWeight: parseFloat(process.env.RECOMMENDATION_COLLAB_WEIGHT ?? '0.15'),
-    topicWeight: parseFloat(process.env.RECOMMENDATION_TOPIC_WEIGHT ?? '0.15'),
+    // collaborative (co-interaction) + topic similarity + keyword (what the project
+    // is about) + normalized stars + approachability. Each component is in [0, 1],
+    // so these sum to ~1. Collaborative stays small until there are many users.
+    contentWeight: parseFloat(process.env.RECOMMENDATION_CONTENT_WEIGHT ?? '0.35'),
+    collabWeight: parseFloat(process.env.RECOMMENDATION_COLLAB_WEIGHT ?? '0.1'),
+    topicWeight: parseFloat(process.env.RECOMMENDATION_TOPIC_WEIGHT ?? '0.1'),
+    keywordWeight: parseFloat(process.env.RECOMMENDATION_KEYWORD_WEIGHT ?? '0.15'),
     starsWeight: parseFloat(process.env.RECOMMENDATION_STARS_WEIGHT ?? '0.05'),
     // How easy the repo is for a newcomer: good first issues, activity, contributing guide
     approachabilityWeight: parseFloat(process.env.RECOMMENDATION_APPROACHABILITY_WEIGHT ?? '0.25'),

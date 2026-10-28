@@ -1,5 +1,5 @@
 $kind: http-request
-description: 'Update your own profile. Accepts name, avatarUrl and skills; email cannot be changed.'
+description: 'Update your own profile and settings. Accepts name, avatarUrl, skills, communityHidden, profileShowScores, profileShowCalendar, interestAreas (web, backend, mobile, ai, data, devtools, devops, games, security, docs, systems, design), onboarded (true marks onboarding done), experienceLevel (first | some | experienced), preferredLanguages, excludedLanguages (a language can''t be in both) and feedView (grid | focus). Email cannot be changed.'
 url: '{{BASE_URL}}/api/v1/users/{{user_id}}'
 method: PUT
 headers:
@@ -9,7 +9,10 @@ body:
   type: json
   content: |-
     {
-      "name": "Updated Name",
-      "skills": ["TypeScript", "React"]
+      "experienceLevel": "first",
+      "preferredLanguages": ["TypeScript", "Rust"],
+      "excludedLanguages": ["PHP"],
+      "feedView": "grid",
+      "profileShowScores": true
     }
 order: 2000

@@ -33,6 +33,7 @@ export const initNeo4j = async () => {
       await session.run(`CREATE CONSTRAINT repo_id IF NOT EXISTS FOR (r:Repository) REQUIRE r.id IS UNIQUE`)
       await session.run(`CREATE CONSTRAINT lang_name IF NOT EXISTS FOR (l:Language) REQUIRE l.name IS UNIQUE`)
       await session.run(`CREATE CONSTRAINT topic_name IF NOT EXISTS FOR (t:Topic) REQUIRE t.name IS UNIQUE`)
+      await session.run(`CREATE CONSTRAINT keyword_name IF NOT EXISTS FOR (k:Keyword) REQUIRE k.name IS UNIQUE`)
       await session.run(`CREATE CONSTRAINT skill_name IF NOT EXISTS FOR (s:Skill) REQUIRE s.name IS UNIQUE`)
       await session.run(`CREATE CONSTRAINT org_name IF NOT EXISTS FOR (o:Organization) REQUIRE o.name IS UNIQUE`)
     } finally {

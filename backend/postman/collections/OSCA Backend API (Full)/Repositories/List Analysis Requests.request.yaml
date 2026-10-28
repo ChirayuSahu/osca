@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Repositories you asked OSCA to analyze that are not imports yet: queued, analyzing (with progress) or failed (with the reason). Finished ones show up in List Repositories with scope=imported.'
+url: '{{BASE_URL}}/api/v1/repositories/requests'
+method: GET
+order: 2200

@@ -19,7 +19,8 @@ const enqueue = async (
   queueName: QueueName,
   jobName: string,
   data: RepositoryAnalysisJobData | ContributorAnalysisJobData,
-  jobId: string
+  jobId: string,
+  delayMs = 0
 ): Promise<QueuedJobResponse> => {
   const queue = getQueue(queueName)
 
@@ -45,7 +46,7 @@ const enqueue = async (
     }
   }
 
-  const job = await queue.add(jobName, data, { jobId })
+  const job = await queue.add(jobName, data, { jobId, ...(delayMs > 0 && { delay: delayMs }) })
 
   // #26: job.id should always match jobId we passed in, but guard defensively
   const resolvedId = job.id
@@ -72,5 +73,13 @@ export const JobEnqueueService = {
     // One active contributor analysis job per user at a time
     const jobId = deterministicJobId('contributor-analysis', userId)
     return enqueue(QUEUE_NAMES.CONTRIBUTOR_ANALYSIS, 'analyze-contributor', { userId }, jobId)
+  },
+
+  // Rebuilds the profile after the user imports one of their own repos. Delayed,
+  // and with its own id, so a burst of imports (or one landing while a profile
+  // analysis is already running) ends in a single rebuild that includes them all.
+  enqueueProfileRebuild: (userId: string, delayMs = 2 * 60 * 1000) => {
+    const jobId = deterministicJobId('contributor-rebuild', userId)
+    return enqueue(QUEUE_NAMES.CONTRIBUTOR_ANALYSIS, 'rebuild-contributor', { userId }, jobId, delayMs)
   }
 }

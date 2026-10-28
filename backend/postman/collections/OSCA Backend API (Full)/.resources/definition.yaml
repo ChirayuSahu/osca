@@ -32,3 +32,6 @@ variables:
   - key: job_id
     value: ''
     description: A job id from Queue Analysis or List User Jobs
+  - key: request_id
+    value: ''
+    description: An analysis request id from List Analysis Requests

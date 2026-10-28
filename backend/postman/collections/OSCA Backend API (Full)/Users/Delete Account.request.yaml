@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Deletes your account and everything OSCA stores about you (profile, scores, settings, likes, imports, interactions, graph node, feed history) and revokes OSCA''s GitHub grant. Cannot be undone.'
+url: '{{BASE_URL}}/api/v1/users/{{user_id}}'
+method: DELETE
+order: 5000

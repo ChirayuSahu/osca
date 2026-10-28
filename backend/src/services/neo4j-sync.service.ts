@@ -29,6 +29,13 @@ const relTypeFor = (action: string): string => {
 }
 
 export const Neo4jSyncService = {
+  // Removes the user and every edge to them (skills, stars, likes, not-for-me)
+  async deleteUser(githubId: number) {
+    await withSession(session =>
+      session.run('MATCH (u:User {githubId: $githubId}) DETACH DELETE u', { githubId })
+    )
+  },
+
   async syncUser(user: { githubId?: number; username: string }) {
     if (!user.githubId) return
 
@@ -54,6 +61,10 @@ export const Neo4jSyncService = {
     hasContributingGuide?: boolean;
     archived?: boolean;
     pushedAt?: Date | null;
+    outsidePrMergeRate?: number | null;
+    outsidePrsMerged90d?: number | null;
+    maintainerResponseHours?: number | null;
+    unclaimedStarterIssues?: number | null;
   }) {
     await withSession(session =>
       session.run(
@@ -67,7 +78,11 @@ export const Neo4jSyncService = {
             r.helpWanted = $helpWanted,
             r.hasContributing = $hasContributing,
             r.archived = $archived,
-            r.pushedAt = $pushedAt
+            r.pushedAt = $pushedAt,
+            r.outsideMergeRate = $outsideMergeRate,
+            r.outsideMerged90d = $outsideMerged90d,
+            r.responseHours = $responseHours,
+            r.unclaimedStarters = $unclaimedStarters
         `,
         {
           id: repo.id,
@@ -80,7 +95,12 @@ export const Neo4jSyncService = {
           hasContributing: repo.hasContributingGuide ?? false,
           archived: repo.archived ?? false,
           // epoch ms; null when unknown
-          pushedAt: repo.pushedAt ? repo.pushedAt.getTime() : null
+          pushedAt: repo.pushedAt ? repo.pushedAt.getTime() : null,
+          // null = not measured yet; scoring treats that as neutral
+          outsideMergeRate: repo.outsidePrMergeRate ?? null,
+          outsideMerged90d: repo.outsidePrsMerged90d ?? null,
+          responseHours: repo.maintainerResponseHours ?? null,
+          unclaimedStarters: repo.unclaimedStarterIssues ?? null
         }
       )
     )
@@ -212,6 +232,47 @@ export const Neo4jSyncService = {
           MERGE (r)-[:USES_CI]->(c)
           `,
           { repoId, ciCd: data.ciCd }
+        )
+      })
+    )
+  },
+
+  // What the project is about (see lib/text/keywords); replaces the previous set
+  async syncRepositoryKeywords(repoId: string, keywords: string[]) {
+    await withSession(session =>
+      session.executeWrite(async tx => {
+        await tx.run(
+          `MATCH (r:Repository {id: $repoId})-[rel:HAS_KEYWORD]->(k:Keyword) WHERE NOT k.name IN $keywords DELETE rel`,
+          { repoId, keywords }
+        )
+        await tx.run(
+          `MATCH (r:Repository {id: $repoId})
+           UNWIND $keywords AS kw
+           MERGE (k:Keyword {name: kw})
+           MERGE (r)-[:HAS_KEYWORD]->(k)`,
+          { repoId, keywords }
+        )
+      })
+    )
+  },
+
+  // What a user builds or is interested in, by source ("repos" from their GitHub
+  // repositories, "onboarding" from the interests they picked); each source is
+  // replaced on its own so refreshing one keeps the other
+  async syncUserKeywords(githubId: number, source: 'repos' | 'onboarding', keywords: Array<{ name: string; weight: number }>) {
+    await withSession(session =>
+      session.executeWrite(async tx => {
+        await tx.run(
+          `MATCH (u:User {githubId: $githubId})-[rel:INTERESTED_IN {source: $source}]->(:Keyword) DELETE rel`,
+          { githubId, source }
+        )
+        await tx.run(
+          `MATCH (u:User {githubId: $githubId})
+           UNWIND $keywords AS kw
+           MERGE (k:Keyword {name: kw.name})
+           MERGE (u)-[i:INTERESTED_IN {source: $source}]->(k)
+           SET i.weight = kw.weight`,
+          { githubId, source, keywords }
         )
       })
     )

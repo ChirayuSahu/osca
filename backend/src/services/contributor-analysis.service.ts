@@ -1,3 +1,4 @@
+import { importedOwnRepositories } from './profile-refresh.service'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../utils/prisma'
 import { assertFound } from '../lib/errors'
@@ -229,7 +230,13 @@ const analyzeProfile = async (
   const advancedStats = await fetchAdvancedStats(accessToken)
 
   await onProgress(10, 'Starting profile analysis...')
-  const skills = await analyzeGithubProfile(accessToken, onProgress, advancedStats?.contributedRepos ?? [])
+  const importedOwn = await importedOwnRepositories(userId)
+  const skills = await analyzeGithubProfile(
+    accessToken,
+    onProgress,
+    advancedStats?.contributedRepos ?? [],
+    importedOwn.map((repo) => repo.fullName)
+  )
 
   await onProgress(90, 'Saving extracted skills to database...')
 
@@ -366,7 +373,8 @@ const finalizeContributorProfile = async (
 const analyzeGithubProfile = async (
   accessToken: string,
   onProgress: ProgressCallback = noopProgress,
-  contributedRepos: { fullName: string; languages: string[] }[] = []
+  contributedRepos: { fullName: string; languages: string[] }[] = [],
+  importedOwnRepos: string[] = []
 ): Promise<Skill[]> => {
   await onProgress(15, 'Fetching repositories from GitHub...')
 
@@ -375,7 +383,14 @@ const analyzeGithubProfile = async (
     accessToken
   )
 
-  const ownedRepos = repos.filter((repo) => !repo.fork).slice(0, 30)
+  const recentOwned = repos.filter((repo) => !repo.fork).slice(0, 30)
+  // Own repos imported into OSCA always count, even if they're not among the 30
+  // most recently pushed: importing one says it's what the user works on
+  const recentNames = new Set(recentOwned.map((repo) => repo.full_name.toLowerCase()))
+  const importedExtra: GitHubRepo[] = importedOwnRepos
+    .filter((fullName) => !recentNames.has(fullName.toLowerCase()))
+    .map((fullName) => ({ name: fullName.split('/')[1] ?? fullName, full_name: fullName, language: null, fork: false, size: 0 }))
+  const ownedRepos = [...recentOwned, ...importedExtra]
   const ownedFullNames = new Set(ownedRepos.map((repo) => repo.full_name))
 
   // Include repos the user has pushed commits to but doesn't own (e.g. OSS PRs

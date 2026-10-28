@@ -1,0 +1,23 @@
+$kind: http-request
+description: 'Records what you did with recommendations, up to 50 events per call. type: impression | open | github | like | hide | skip | issue_open; surface: feed | focus | issues | repository. A breakdown (the scoreInfo.breakdown components) on open, github, like, issue_open, hide and skip tunes your ranking.'
+url: '{{BASE_URL}}/api/v1/recommendations/events'
+method: POST
+headers:
+  - key: 'Content-Type'
+    value: 'application/json'
+body:
+  type: json
+  content: |-
+    {
+      "events": [
+        { "type": "impression", "surface": "feed", "repositoryId": "{{repository_id}}", "position": 0 },
+        {
+          "type": "like",
+          "surface": "focus",
+          "repositoryId": "{{repository_id}}",
+          "position": 0,
+          "breakdown": { "content": 0.9, "collab": 0, "topic": 0.25, "keyword": 0.33, "stars": 0.7, "approachability": 0.8 }
+        }
+      ]
+    }
+order: 3000
