@@ -8,7 +8,7 @@ export default function HeroSection() {
       <div className="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: `url('/hero-bg.png')` }}
+          style={{ backgroundImage: `url('/backdrop.webp')` }}
         />
       </div>
 

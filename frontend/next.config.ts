@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
         ],
       },
+      {
+        // Images in public/ are served with max-age=0 by default; let browsers keep
+        // them for a week and refresh in the background after that
+        source: '/:all*(webp|png|svg|ico)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=86400' }],
+      },
     ]
   },
   images: {

@@ -20,7 +20,7 @@ export function LegalPage({ title, intro, children }: { title: string; intro: Re
         <section
           // Phones show the right side of the backdrop, so the glow stays in view
           className="border-b border-white/[0.06] bg-[#03130a] bg-cover bg-[position:78%_center] sm:bg-center"
-          style={{ backgroundImage: "url('/auth-bg.webp')" }}
+          style={{ backgroundImage: "url('/backdrop.webp')" }}
         >
           {/* Top padding clears the fixed navbar (h-16) */}
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pb-16 pt-32 md:px-12 md:pb-24 md:pt-40">

@@ -101,7 +101,8 @@ export function githubProfileUrl(login: string): string {
 
 /** A GitHub user's or organisation's picture, at `size` pixels */
 export function githubAvatarUrl(login: string, size = 80): string {
-  return `https://github.com/${encodeURIComponent(login)}.png?size=${size}`;
+  // Straight from GitHub's image server: github.com/<login>.png answers with a redirect first
+  return `https://avatars.githubusercontent.com/${encodeURIComponent(login)}?s=${size}`;
 }
 
 /** Repository owner's picture (square, as GitHub shows organisations), initials until it loads */

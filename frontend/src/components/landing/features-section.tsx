@@ -6,9 +6,9 @@ const CONTRIBUTION_LEVELS = [0, 2, 1, 3, 1, 0, 2, 3, 3, 1, 2, 0, 1, 3, 2, 2, 0, 
 const LEVEL_CLASSES = ["bg-emerald-950", "bg-emerald-800", "bg-emerald-600", "bg-emerald-400"];
 
 const LATER_STEPS = [
-  { step: "Step 3", desc: "Your repositories are analyzed across multiple metrics to understand what they need", image: "/group-19.png" },
-  { step: "Step 4", desc: "Our matching engine pairs you with projects that align with your skills and interests", image: "/group-18.png" },
-  { step: "Step 5", desc: "Receive your personalized roadmap and start contributing immediately", image: "/group-17.png" },
+  { step: "Step 3", desc: "Your repositories are analyzed across multiple metrics to understand what they need", image: "/step-3.webp" },
+  { step: "Step 4", desc: "Our matching engine pairs you with projects that align with your skills and interests", image: "/step-4.webp" },
+  { step: "Step 5", desc: "Receive your personalized roadmap and start contributing immediately", image: "/step-5.webp" },
 ];
 
 // Every card shares the radius, padding and type scale, so the two rows line up

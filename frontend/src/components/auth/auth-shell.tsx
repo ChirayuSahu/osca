@@ -35,7 +35,7 @@ export function AuthShell({
     <div
       // Phones show the right side of the backdrop, so the glow stays in view
       className="relative flex min-h-svh w-full flex-col bg-[#03130a] bg-cover bg-[position:78%_center] text-white sm:bg-center"
-      style={{ backgroundImage: "url('/auth-bg.webp')" }}
+      style={{ backgroundImage: "url('/backdrop.webp')" }}
     >
       <Navbar />
 
