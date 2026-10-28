@@ -5,6 +5,10 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
 import { JobService } from "@/services/job.service";
+import { Eyebrow } from "@/components/repo-ui";
+import { PageContainer } from "@/components/ui/page-container";
+import { PageHeader } from "@/components/ui/page-header";
+import { Spinner } from "@/components/ui/spinner";
 
 function ImportContent() {
   const searchParams = useSearchParams();
@@ -45,7 +49,7 @@ function ImportContent() {
             if (job.state === 'completed') {
               clearInterval(pollingInterval);
               setStatus("Analysis Complete! Redirecting...");
-              
+
               // The backend maps the BullMQ returnvalue to result
               if (job.result && job.result.repositoryId) {
                 router.push(`/dashboard/repository/${job.result.repositoryId}`);
@@ -73,54 +77,41 @@ function ImportContent() {
     };
   }, [url, token, router]);
 
-  if (!url) {
   return (
-    <div className="max-w-2xl mx-auto mt-20">
-      <ErrorState message="Missing repository URL." />
-    </div>
-  );
-}
+    <PageContainer size="narrow">
+      <PageHeader
+        eyebrow="Repositories"
+        title="Import"
+        description="We scan the repository and match it against your skills. This can take a minute."
+      />
 
-  return (
-    <div className="w-full h-[60vh] flex flex-col items-center justify-center text-center space-y-12 max-w-2xl mx-auto z-10 relative">
-      <div className="absolute top-1/2 right-0 w-96 h-96 bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none -translate-y-1/2" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-500/[0.02] rounded-full blur-3xl pointer-events-none" />
-
-      {error ? (
-        <ErrorState
-    message={error}
-    onRetry={() => window.location.reload()}
-  />
+      {!url ? (
+        <ErrorState message="Missing repository URL." />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => window.location.reload()} />
       ) : (
-        <div className="space-y-12 flex flex-col items-center w-full z-10">
-          <div className="space-y-4">
-            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white leading-none">
-              Importing <span className="font-serif italic font-medium text-neutral-200">Repository</span>
-            </h1>
-            <p className="text-neutral-400 text-sm md:text-base font-light max-w-lg mx-auto">
-              This process takes a little time. We are thoroughly scanning the repository&apos;s architecture, matching it against your interests, and generating personalized recommendations.
-            </p>
-          </div>
-
-          <div className="relative w-24 h-24 flex items-center justify-center mt-4">
-            <div className="absolute inset-0 border-t-2 border-emerald-500/40 rounded-full animate-spin duration-1000"></div>
-            <div className="absolute inset-3 border-r-2 border-emerald-400/20 rounded-full animate-spin duration-700 reverse"></div>
-            <div className="w-10 h-10 bg-emerald-500/10 rounded-full animate-pulse blur-md"></div>
-          </div>
-
-          <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-white/[0.02] border border-white/[0.03] rounded-full backdrop-blur-md">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <p className="text-emerald-400/90 text-sm font-medium tracking-wide">{status}</p>
+        <div className="rounded-md border border-border bg-card p-5">
+          <Eyebrow>Importing</Eyebrow>
+          <p className="mt-2 font-mono text-sm break-all text-muted-foreground">{url}</p>
+          <div className="mt-4 flex items-center gap-3 rounded-md border border-border bg-background px-4 py-3" role="status" aria-live="polite">
+            <Spinner />
+            <p className="text-sm">{status}</p>
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
 export default function ImportPage() {
   return (
-    <Suspense fallback={<div className="text-center mt-20">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center py-24">
+          <Spinner />
+        </div>
+      }
+    >
       <ImportContent />
     </Suspense>
   );

@@ -1,28 +1,27 @@
 "use client";
-import { ErrorState } from "@/components/ui/error-state";
+import { isGithubTokenError } from "@/lib/api";
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { ThreadService } from "@/services/thread.service";
 import { RepositoryService } from "@/services/repository.service";
-import { ArrowLeft, MessageSquare, Share2, MoreHorizontal, GitPullRequest } from "lucide-react";
-
-function getRelativeTime(dateString: string | Date | number) {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffTime = Math.abs(now.getTime() - date.getTime());
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return "today";
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays < 30) return `${diffDays} days ago`;
-  if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
-  return `${Math.floor(diffDays / 365)} years ago`;
-}
+import { ArrowRight, Check, CircleDot, GitBranch, GitPullRequest, Link2, ThumbsUp } from "lucide-react";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageContainer } from "@/components/ui/page-container";
+import { Button } from "@/components/ui/button";
+import { Dither } from "@/components/ui/dither";
+import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
+import { Eyebrow, StatusPill, timeAgo } from "@/components/repo-ui";
 import CommentSection from "@/components/comments/comment-section";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
+import { Markdown } from "@/components/markdown-lazy";
+import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
+import { GithubIcon } from "@/components/icons";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useBreadcrumbLabel } from "@/components/breadcrumbs";
+import { ThreadSkeleton } from "@/components/skeletons";
+import { cn } from "@/lib/utils";
 
 interface ThreadDetail {
   id?: string | number;
@@ -44,15 +43,20 @@ export default function ThreadPage() {
   const repositoryId = params.id as string;
   const threadId = params.threadId as string;
   const { token } = useAuth();
-  
+
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [repoDetails, setRepoDetails] = useState<{owner: string, name: string} | null>(null);
   const [relatedThreads, setRelatedThreads] = useState<ThreadDetail[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [prData, setPrData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [tokenExpired, setTokenExpired] = useState(false);
   const [isUpvoted, setIsUpvoted] = useState(false);
   const [copied, setCopied] = useState(false);
+  useBreadcrumbLabel(
+    `/dashboard/repository/${repositoryId}`,
+    repoDetails ? `${repoDetails.owner}/${repoDetails.name}` : null
+  );
 
   useEffect(() => {
     if (!token || !repositoryId || !threadId) return;
@@ -84,7 +88,9 @@ export default function ThreadPage() {
           .slice(0, 3); // Take top 3
         setRelatedThreads(otherThreads);
       } catch (err) {
-        console.error(err);
+        // An expired GitHub token is expected and shown as a reconnect notice
+        if (isGithubTokenError(err)) setTokenExpired(true);
+        else console.error(err);
       } finally {
         setLoading(false);
       }
@@ -93,210 +99,261 @@ export default function ThreadPage() {
     loadData();
   }, [repositoryId, threadId, token]);
 
-  if (loading) return <div className="p-12 text-center text-neutral-400 animate-pulse">Loading Thread...</div>;
+  if (loading) return <ThreadSkeleton />;
+
+  if (tokenExpired && !thread) {
+    return (
+      <PageContainer size="narrow">
+        <GithubReconnectNotice action="load this issue" />
+      </PageContainer>
+    );
+  }
+
   if (!thread || !repoDetails) {
-  return (
-    <div className="max-w-2xl mx-auto mt-20">
-      <ErrorState
-        message="Failed to load thread."
-        onRetry={() => window.location.reload()}
-      />
-    </div>
+    return (
+      <PageContainer size="narrow">
+        <ErrorState message="Failed to load thread." onRetry={() => window.location.reload()} />
+      </PageContainer>
+    );
+  }
+
+  const isPR = !!thread.pull_request;
+  const isClosed = thread.state === "closed";
+  const isMerged = isPR && !!prData?.merged;
+  const upvotes = (thread.reactions?.["+1"] || 0) + (isUpvoted ? 1 : 0);
+  const authorLogin = thread.user?.login;
+  const commentCount = typeof thread.comments === "number" ? thread.comments : null;
+  const baseRef: string | undefined = prData?.base?.ref || prData?.base?.label;
+  const headRef: string | undefined = prData?.head?.ref || prData?.head?.label;
+
+  const handleUpvote = async () => {
+    try {
+      if (!repoDetails) return;
+      setIsUpvoted(!isUpvoted);
+      const { added } = await ThreadService.toggleThumbsUp(repoDetails.owner, repoDetails.name, threadId, token!);
+      setIsUpvoted(added);
+    } catch (err) {
+      setIsUpvoted(isUpvoted);
+      console.error("Failed to upvote", err);
+      toast.error(isGithubTokenError(err) ? "Reconnect GitHub to react to issues." : "Couldn't add your reaction.");
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      toast.success("Link copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy the link");
+    }
+  };
+
+  const headerDither = (
+    <Dither cols={110} rows={34} cell={5} direction="radial" peak={0.75} className="text-emerald-500/[0.16]" />
   );
-}
+  const htmlUrl = typeof thread.html_url === "string" ? thread.html_url : undefined;
+  const assignees = Array.isArray(thread.assignees) ? (thread.assignees as { login: string }[]) : [];
+  const milestone = (thread.milestone as { title?: string } | null)?.title;
 
+  const details: { label: string; value: React.ReactNode }[] = [
+    { label: "Author", value: authorLogin ?? "Unknown" },
+    { label: "Opened", value: timeAgo(thread.created_at) },
+    ...(thread.updated_at ? [{ label: "Updated", value: timeAgo(thread.updated_at) }] : []),
+    ...(commentCount !== null ? [{ label: "Comments", value: commentCount }] : []),
+    ...(assignees.length > 0 ? [{ label: "Assignees", value: assignees.map((a) => a.login).join(", ") }] : []),
+    ...(milestone ? [{ label: "Milestone", value: milestone }] : []),
+    ...(isPR && typeof prData?.commits === "number" ? [{ label: "Commits", value: prData.commits }] : []),
+    ...(isPR && typeof prData?.changed_files === "number"
+      ? [{
+          label: "Changes",
+          value: (
+            <span className="tabular-nums">
+              {prData.changed_files} files{" "}
+              <span className="text-emerald-600 dark:text-emerald-400">+{prData.additions ?? 0}</span>{" "}
+              <span className="text-destructive">−{prData.deletions ?? 0}</span>
+            </span>
+          ),
+        }]
+      : []),
+  ];
 
   return (
-    <div className="max-w-[1200px] mx-auto space-y-8 pb-16 pt-8">
-      <a 
-        href={`/dashboard/repository/${repositoryId}`}
-        className="inline-flex items-center gap-2 text-sm font-medium text-neutral-500 hover:text-emerald-400 transition-colors mb-4 group"
-      >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-        {repoDetails.name} / Discussions / {thread.title}
-      </a>
+    <PageContainer>
+      {/* Header: status, title, meta; actions on the right */}
+      <header className="relative isolate flex flex-col gap-6">
+        <div className="pointer-events-none absolute -right-6 -top-8 -z-10 [mask-image:radial-gradient(closest-side,black_40%,transparent)]">
+          <DitheredImage
+            src={githubAvatarUrl(repoDetails.owner, 160)}
+            cols={64}
+            cell={5}
+            className="text-emerald-500/[0.18]"
+            fallback={headerDither}
+          />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        <div className="lg:col-span-3 space-y-8">
-          <div className="bg-[#0A0A0A] border border-white/[0.06] rounded-2xl p-8 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent pointer-events-none -z-10" />
-            
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex gap-2 flex-wrap">
-                {thread.labels?.map((label: { name: string; color: string }) => (
-                  <span 
-                    key={label.name} 
-                    className="px-3 py-1.5 text-[11px] font-semibold rounded-full"
-                    style={{
-                      backgroundColor: `#${label.color}1A`,
-                      color: `#${label.color}`
-                    }}
-                  >
-                    {label.name}
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center gap-4 text-xs font-medium text-neutral-400">
-                <div className="flex items-center gap-2">
-                  Watching 
-                  <div className="w-8 h-4 bg-emerald-500 rounded-full relative shadow-inner cursor-pointer">
-                    <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
-                  </div>
-                </div>
-                <MoreHorizontal className="w-5 h-5 text-neutral-500 cursor-pointer hover:text-white transition-colors" />
-              </div>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {isMerged ? (
+                <StatusPill>Merged</StatusPill>
+              ) : isClosed ? (
+                <StatusPill className="border-border bg-muted text-muted-foreground dark:text-muted-foreground [&>span]:bg-muted-foreground/50">
+                  Closed
+                </StatusPill>
+              ) : (
+                <StatusPill>Open</StatusPill>
+              )}
+              <span className="inline-flex items-center gap-1.5">
+                {isPR ? <GitPullRequest className="size-3.5" /> : <CircleDot className="size-3.5" />}
+                {isPR ? "Pull request" : "Issue"}
+              </span>
             </div>
 
-            <h1 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-snug mb-3">
-              {thread.title}
+            <h1 className="max-w-3xl break-words text-2xl font-semibold leading-snug tracking-tight md:text-3xl">
+              {thread.title}{" "}
+              <span className="font-normal text-muted-foreground tabular-nums">#{thread.number ?? threadId}</span>
             </h1>
 
-            {prData && (
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                    <GitPullRequest className="w-4 h-4 text-emerald-400" />
-                  </div>
-                  <span className="text-neutral-300 font-medium">
-                    <span className="text-emerald-400 font-semibold">{thread.user?.login}</span> wants to merge <span className="text-white font-semibold">{prData.commits || prData.commits_url ? 'some' : '0'}</span> commits into <code className="px-1.5 py-0.5 rounded bg-black/40 text-neutral-300 text-xs border border-white/10">{prData.base?.ref || prData.base?.label || 'base'}</code> from <code className="px-1.5 py-0.5 rounded bg-black/40 text-neutral-300 text-xs border border-white/10">{prData.head?.ref || prData.head?.label || 'head'}</code>
-                  </span>
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+              {authorLogin && <span className="font-medium text-foreground">{authorLogin}</span>}
+              <span>opened this {timeAgo(thread.created_at)}</span>
+              {commentCount !== null && (
+                <>
+                  <span className="text-muted-foreground/50">·</span>
+                  <span className="tabular-nums">{commentCount} {commentCount === 1 ? "comment" : "comments"}</span>
+                </>
+              )}
+            </p>
+
+            {isPR && baseRef && headRef && (
+              <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                <GitBranch className="size-3.5" />
+                <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-foreground">{headRef}</code>
+                <ArrowRight className="size-3" />
+                <code className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-foreground">{baseRef}</code>
+              </p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleUpvote}
+              aria-pressed={isUpvoted}
+              aria-label="Thumbs up"
+              className={cn(isUpvoted && "border-emerald-500/40 text-emerald-700 dark:text-emerald-300")}
+            >
+              <ThumbsUp className={cn(isUpvoted && "fill-current")} />
+              <span className="tabular-nums">{upvotes}</span>
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon-sm" onClick={handleShare} aria-label="Copy link">
+                  {copied ? <Check /> : <Link2 />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{copied ? "Copied" : "Copy link"}</TooltipContent>
+            </Tooltip>
+            {htmlUrl && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={htmlUrl} target="_blank" rel="noreferrer">
+                  <GithubIcon /> Open on GitHub
+                </a>
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+      </header>
+
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+          <article className="overflow-hidden rounded-md border border-border bg-card">
+            <div className="flex items-center gap-2 border-b border-border px-5 py-3 text-sm">
+              <span className="font-medium">{authorLogin ?? "Unknown"}</span>
+              <span className="text-muted-foreground">wrote {timeAgo(thread.created_at)}</span>
+              {typeof thread.author_association === "string" && thread.author_association !== "NONE" && (
+                <span className="ml-auto rounded-md border border-border px-1.5 py-0.5 text-[11px] capitalize text-muted-foreground">
+                  {thread.author_association.toLowerCase().replace(/_/g, " ")}
+                </span>
+              )}
+            </div>
+            <div className="px-5 py-4">
+              {thread.body ? (
+                <Markdown>{thread.body}</Markdown>
+              ) : (
+                <p className="text-sm italic text-muted-foreground">No description provided.</p>
+              )}
+            </div>
+          </article>
+
+          <CommentSection owner={repoDetails.owner} repo={repoDetails.name} threadId={threadId} />
+        </div>
+
+        <aside className="flex min-w-0 flex-col gap-6">
+          <div className="overflow-hidden rounded-md border border-border bg-card">
+            <div className="border-b border-border px-5 py-3.5">
+              <Eyebrow>Details</Eyebrow>
+            </div>
+            <dl className="divide-y divide-border text-sm">
+              {details.map((d) => (
+                <div key={d.label} className="flex items-baseline justify-between gap-4 px-5 py-2.5">
+                  <dt className="text-muted-foreground">{d.label}</dt>
+                  <dd className="min-w-0 truncate text-right font-medium">{d.value}</dd>
+                </div>
+              ))}
+            </dl>
+            {thread.labels && thread.labels.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-border px-5 py-3.5">
+                <span className="text-sm text-muted-foreground">Labels</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {thread.labels.map((label) => (
+                    <span key={label.name} className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-0.5 text-xs">
+                      <span className="size-2 rounded-full" style={{ backgroundColor: `#${label.color}` }} aria-hidden />
+                      {label.name}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
-
-            <div className="flex items-center gap-2 mb-8">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={thread.user?.avatar_url || "https://github.com/identicons/user.png"} alt={thread.user?.login} className="w-5 h-5 rounded-full border border-white/[0.1]" />
-              <div className="text-xs font-medium text-neutral-500 flex items-center gap-2">
-                <span>Posted {getRelativeTime(thread.created_at)} by <span className="text-neutral-300 font-semibold">{thread.user?.login}</span></span>
-                {thread.state === 'closed' && (
-                  <>
-                    <span className="text-neutral-600">•</span>
-                    <span className="text-emerald-400 flex items-center gap-1">✓ Answered</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="prose prose-invert prose-emerald max-w-none text-neutral-300 font-light text-[15px] leading-relaxed pb-8 border-b border-white/[0.06]">
-              <ReactMarkdown 
-                remarkPlugins={[remarkGfm]} 
-                rehypePlugins={[rehypeRaw]}
-                components={{
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  input: ({node, ...props}) => <input {...props} checked={props.checked ?? false} readOnly />
-                }}
-              >
-                {thread.body || ''}
-              </ReactMarkdown>
-            </div>
-
-            <div className="flex items-center gap-4 mt-6">
-              <button 
-                onClick={async () => {
-                  try {
-                    setIsUpvoted(!isUpvoted);
-                    await RepositoryService.toggleLike(repositoryId, token!);
-                  } catch (err) {
-                    setIsUpvoted(isUpvoted);
-                    console.error("Failed to upvote", err);
-                  }
-                }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${isUpvoted ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20'}`}
-              >
-                ↑ {(thread.reactions?.['+1'] || 0) + (isUpvoted ? 1 : 0)}
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] rounded-full text-sm font-medium transition-colors border border-white/[0.06]">
-                <MessageSquare className="w-4 h-4" /> {thread.comments || 0} replies
-              </button>
-              <button 
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-white/[0.04] text-neutral-300 hover:bg-white/[0.08] rounded-full text-sm font-medium transition-colors border border-white/[0.06]"
-              >
-                <Share2 className="w-4 h-4" /> {copied ? 'Copied!' : 'Share'}
-              </button>
-            </div>
           </div>
 
-          <div className="bg-[#0A0A0A] border border-white/[0.06] rounded-2xl p-6">
-            <CommentSection owner={repoDetails.owner} repo={repoDetails.name} threadId={threadId} />
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-[#0A0A0A] border border-white/[0.06] rounded-2xl p-6">
-            <h3 className="text-xs font-semibold tracking-wider text-neutral-500 mb-6 uppercase flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-              Participants
-            </h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-emerald-400">{thread.user?.login}</span>
-                <span className="text-xs text-neutral-500">author</span>
+          {relatedThreads.length > 0 && (
+            <div className="overflow-hidden rounded-md border border-border bg-card">
+              <div className="border-b border-border px-5 py-3.5">
+                <Eyebrow>More open issues</Eyebrow>
               </div>
-              {/* Other participants will be dynamically handled in a real app, but for now we only know the author from thread context */}
+              <ul className="divide-y divide-border">
+                {relatedThreads.map((rt) => (
+                  <li key={rt.number}>
+                    <Link
+                      href={`/dashboard/repository/${repositoryId}/threads/${rt.number}`}
+                      className="flex items-start gap-2.5 px-5 py-3 transition-colors hover:bg-muted/40"
+                      title={rt.title}
+                    >
+                      {rt.pull_request ? (
+                        <GitPullRequest className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <CircleDot className="mt-0.5 size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                      )}
+                      <span className="min-w-0">
+                        <span className="line-clamp-2 text-sm font-medium">{rt.title}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">
+                          #{rt.number} · {timeAgo(rt.created_at)}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-
-          <div className="bg-[#0A0A0A] border border-white/[0.06] rounded-2xl p-6">
-            <h3 className="text-xs font-semibold tracking-wider text-neutral-500 mb-6 uppercase flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              Thread Info
-            </h3>
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between border-b border-white/[0.04] pb-3">
-                <span className="text-neutral-500">Status</span>
-                <span className={thread.state === 'closed' ? "text-emerald-400" : "text-emerald-400"}>
-                  {thread.state === 'closed' ? 'Answered' : 'Needs Discussion'}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-white/[0.04] pb-3">
-                <span className="text-neutral-500">Created</span>
-                <span className="text-neutral-300">
-                  {new Date(thread.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-white/[0.04] pb-3">
-                <span className="text-neutral-500">Last reply</span>
-                <span className="text-neutral-300">
-                  {thread.updated_at ? new Date(thread.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                </span>
-              </div>
-              <div className="flex justify-between pb-1">
-                <span className="text-neutral-500">Upvotes</span>
-                <span className="text-neutral-300 font-medium">{thread.reactions?.['+1'] || 0}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-[#0A0A0A] border border-white/[0.06] rounded-2xl p-6">
-            <h3 className="text-xs font-semibold tracking-wider text-neutral-500 mb-6 uppercase flex items-center gap-2">
-              <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
-              Related Threads
-            </h3>
-            <div className="space-y-4">
-              {relatedThreads.length > 0 ? (
-                relatedThreads.map(rt => (
-                  <a 
-                    key={rt.number} 
-                    href={`/dashboard/repository/${repositoryId}/threads/${rt.number}`} 
-                    className="block text-sm font-medium text-neutral-400 hover:text-emerald-400 transition-colors truncate"
-                    title={rt.title}
-                  >
-                    {rt.title}
-                  </a>
-                ))
-              ) : (
-                <div className="text-sm text-neutral-600 italic">No related threads found.</div>
-              )}
-            </div>
-          </div>
-        </div>
+          )}
+        </aside>
       </div>
-    </div>
+    </PageContainer>
   );
 }
