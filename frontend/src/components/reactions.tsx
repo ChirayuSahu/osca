@@ -97,8 +97,8 @@ export function Reactions({
             className={cn(
               "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs tabular-nums transition-colors",
               mine
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                : "border-border text-muted-foreground hover:text-foreground"
+                ? "border-emerald-500/40 bg-tint-emerald-500 text-emerald-700 dark:text-emerald-300"
+                : "border-border bg-card text-muted-foreground hover:text-foreground"
             )}
           >
             <span className="text-sm leading-none" aria-hidden>

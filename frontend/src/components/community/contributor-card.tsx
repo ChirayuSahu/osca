@@ -32,7 +32,7 @@ export function ContributorCard({ contributor }: ContributorCardProps) {
             </Link>
             <p className="truncate text-sm text-muted-foreground">@{contributor.username}</p>
           </div>
-          <span className="ml-auto shrink-0 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
+          <span className="ml-auto shrink-0 rounded-md bg-tint-emerald-500 px-2 py-0.5 text-xs font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">
             {contributor.matchScore}%
           </span>
         </div>

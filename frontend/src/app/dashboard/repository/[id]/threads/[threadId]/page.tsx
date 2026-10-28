@@ -253,7 +253,7 @@ export default function ThreadPage() {
               <span className="font-medium">{authorLogin ?? "Unknown"}</span>
               <span className="text-muted-foreground">wrote {timeAgo(thread.created_at)}</span>
               {typeof thread.author_association === "string" && thread.author_association !== "NONE" && (
-                <span className="ml-auto rounded-md border border-border px-1.5 py-0.5 text-[11px] capitalize text-muted-foreground">
+                <span className="ml-auto rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] capitalize text-muted-foreground">
                   {thread.author_association.toLowerCase().replace(/_/g, " ")}
                 </span>
               )}

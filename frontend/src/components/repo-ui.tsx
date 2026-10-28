@@ -12,17 +12,17 @@ import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
 /* ─── Tags ─────────────────────────────────────────────────────────────────── */
 
 const TAG_COLORS: Record<string, string> = {
-  typescript: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  react: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  python: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
-  go: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
-  rust: "bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  typescript: "bg-tint-blue-500 text-blue-600 dark:text-blue-400",
+  react: "bg-tint-blue-500 text-blue-600 dark:text-blue-400",
+  python: "bg-tint-emerald-500 text-emerald-700 dark:text-emerald-400",
+  go: "bg-tint-cyan-500 text-cyan-700 dark:text-cyan-400",
+  rust: "bg-tint-orange-500 text-orange-700 dark:text-orange-400",
 };
 const FALLBACK_TAGS = [
-  "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
-  "bg-purple-500/15 text-purple-700 dark:text-purple-400",
-  "bg-pink-500/15 text-pink-700 dark:text-pink-400",
-  "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
+  "bg-tint-yellow-500 text-yellow-700 dark:text-yellow-400",
+  "bg-tint-purple-500 text-purple-700 dark:text-purple-400",
+  "bg-tint-pink-500 text-pink-700 dark:text-pink-400",
+  "bg-tint-indigo-500 text-indigo-700 dark:text-indigo-400",
 ];
 
 export function tagColor(tag: string) {
@@ -137,7 +137,7 @@ export function StatusPill({ children, className }: { children: React.ReactNode;
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-500/20 bg-emerald-500/[0.08] px-2.5 py-1 text-[11px] font-medium tracking-wide text-emerald-700 dark:text-emerald-400",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-500/20 bg-tint-emerald-500 px-2.5 py-1 text-[11px] font-medium tracking-wide text-emerald-700 dark:text-emerald-400",
         className
       )}
     >

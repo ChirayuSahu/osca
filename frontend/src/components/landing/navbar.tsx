@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const LINKS = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#features", label: "Features" },
+  // Absolute, so they also work from the legal pages
+  { href: "/#how-it-works", label: "How it works" },
+  { href: "/#features", label: "Features" },
 ];
 
 export function Wordmark() {

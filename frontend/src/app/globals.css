@@ -6,6 +6,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Opaque tinted fill for badges and pills: the colour mixed into the card
+   surface, so dither and logos behind a badge never show through it. */
+@utility bg-tint-* {
+  background-color: color-mix(in oklab, --value(--color-*) 14%, var(--card));
+}
+
 @theme inline {
   /* Motion: one fluid curve (fast start, soft landing) for every transition and enter/exit */
   --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
