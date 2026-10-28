@@ -21,7 +21,10 @@ export default function PrivacyPage() {
     >
       <LegalSection id="summary" title="The short version">
         <ul>
-          <li>You sign in with GitHub. OSCA asks only for read access to your public profile and email.</li>
+          <li>
+            You sign in with GitHub. OSCA reads your profile and email, and can post to public repositories only when
+            you comment, react or open an issue through it. It never sees your private repositories.
+          </li>
           <li>It analyzes your public GitHub activity to work out your skills, then recommends repositories.</li>
           <li>Chats with OscaBot are not saved by OSCA, but they are sent to an AI provider to generate replies.</li>
           <li>There are no ads, no analytics trackers, and your data is never sold.</li>
@@ -42,8 +45,9 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p>
-          The token is limited to the <code>read:user</code> and <code>user:email</code> permissions. OSCA cannot see
-          your private repositories.
+          The token has the <code>read:user</code>, <code>user:email</code> and <code>public_repo</code> permissions.
+          OSCA uses <code>public_repo</code> only to post the issues, comments and reactions you create through it, and
+          never to change code. The token gives no access to your private repositories.
         </p>
       </LegalSection>
 

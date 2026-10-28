@@ -1,14 +1,14 @@
 name: Dev
 values:
-  - key: JWT_TOKEN
-    value: 'Error:getaddrinfo ENOTFOUND {{base_url}}'
   - key: BASE_URL
+    value: http://localhost:8000
+    enabled: true
+    type: default
+  - key: JWT_TOKEN
     value: ''
-  - key: owner
+    enabled: true
+    type: secret
+  - key: DEV_SECRET
     value: ''
-  - key: repo
-    value: ''
-  - key: pull_number
-    value: ''
-  - key: queue_name
-    value: ''
+    enabled: true
+    type: secret

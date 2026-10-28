@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { ThreadService } from "@/services/thread.service";
 import { RepositoryService } from "@/services/repository.service";
-import { ArrowRight, Check, CircleDot, GitBranch, GitPullRequest, Link2, ThumbsUp } from "lucide-react";
+import { ArrowRight, Check, CircleDot, GitBranch, GitPullRequest, Link2 } from "lucide-react";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageContainer } from "@/components/ui/page-container";
 import { Button } from "@/components/ui/button";
@@ -15,25 +15,27 @@ import { Dither } from "@/components/ui/dither";
 import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
 import { Eyebrow, StatusPill, timeAgo } from "@/components/repo-ui";
 import CommentSection from "@/components/comments/comment-section";
-import { Markdown } from "@/components/markdown-lazy";
+import { GithubBody } from "@/components/markdown-lazy";
+import { Reactions, type ReactionRollup } from "@/components/reactions";
 import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
 import { GithubIcon } from "@/components/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { ThreadSkeleton } from "@/components/skeletons";
-import { cn } from "@/lib/utils";
 
 interface ThreadDetail {
   id?: string | number;
   number?: string | number;
   title?: string;
   body?: string;
+  body_html?: string;
   created_at: string | number | Date;
   updated_at?: string | number | Date;
   user?: { login: string; avatar_url: string };
   state?: string;
   labels?: { name: string; color: string }[];
-  reactions?: { '+1': number };
+  reactions?: ReactionRollup;
+  viewer_reactions?: string[];
   comments?: number;
   [key: string]: unknown;
 }
@@ -51,7 +53,6 @@ export default function ThreadPage() {
   const [prData, setPrData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [tokenExpired, setTokenExpired] = useState(false);
-  const [isUpvoted, setIsUpvoted] = useState(false);
   const [copied, setCopied] = useState(false);
   useBreadcrumbLabel(
     `/dashboard/repository/${repositoryId}`,
@@ -120,24 +121,10 @@ export default function ThreadPage() {
   const isPR = !!thread.pull_request;
   const isClosed = thread.state === "closed";
   const isMerged = isPR && !!prData?.merged;
-  const upvotes = (thread.reactions?.["+1"] || 0) + (isUpvoted ? 1 : 0);
   const authorLogin = thread.user?.login;
   const commentCount = typeof thread.comments === "number" ? thread.comments : null;
   const baseRef: string | undefined = prData?.base?.ref || prData?.base?.label;
   const headRef: string | undefined = prData?.head?.ref || prData?.head?.label;
-
-  const handleUpvote = async () => {
-    try {
-      if (!repoDetails) return;
-      setIsUpvoted(!isUpvoted);
-      const { added } = await ThreadService.toggleThumbsUp(repoDetails.owner, repoDetails.name, threadId, token!);
-      setIsUpvoted(added);
-    } catch (err) {
-      setIsUpvoted(isUpvoted);
-      console.error("Failed to upvote", err);
-      toast.error(isGithubTokenError(err) ? "Reconnect GitHub to react to issues." : "Couldn't add your reaction.");
-    }
-  };
 
   const handleShare = async () => {
     try {
@@ -238,17 +225,6 @@ export default function ThreadPage() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleUpvote}
-              aria-pressed={isUpvoted}
-              aria-label="Thumbs up"
-              className={cn(isUpvoted && "border-emerald-500/40 text-emerald-700 dark:text-emerald-300")}
-            >
-              <ThumbsUp className={cn(isUpvoted && "fill-current")} />
-              <span className="tabular-nums">{upvotes}</span>
-            </Button>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="outline" size="icon-sm" onClick={handleShare} aria-label="Copy link">
@@ -282,19 +258,27 @@ export default function ThreadPage() {
                 </span>
               )}
             </div>
-            <div className="px-5 py-4">
+            <div className="flex flex-col gap-4 px-5 py-4">
               {thread.body ? (
-                <Markdown>{thread.body}</Markdown>
+                <GithubBody html={thread.body_html} markdown={thread.body} />
               ) : (
                 <p className="text-sm italic text-muted-foreground">No description provided.</p>
               )}
+              <Reactions
+                key={thread.id}
+                reactions={thread.reactions}
+                viewerReactions={thread.viewer_reactions}
+                onToggle={(content) => ThreadService.toggleReaction(repoDetails.owner, repoDetails.name, threadId, content, token!)}
+              />
             </div>
           </article>
 
           <CommentSection owner={repoDetails.owner} repo={repoDetails.name} threadId={threadId} />
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-6">
+        {/* Pinned beside the issue and comments while they scroll (desktop only) */}
+        <aside className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100svh-3rem)] lg:overflow-y-auto">
+
           <div className="overflow-hidden rounded-md border border-border bg-card">
             <div className="border-b border-border px-5 py-3.5">
               <Eyebrow>Details</Eyebrow>

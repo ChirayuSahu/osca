@@ -1,6 +1,5 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/users/{{user_id}}"
+description: 'A user by id.'
+url: '{{BASE_URL}}/api/v1/users/{{user_id}}'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 order: 1000

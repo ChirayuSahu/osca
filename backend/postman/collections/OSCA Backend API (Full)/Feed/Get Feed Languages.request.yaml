@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Languages available as feed filters.'
+url: '{{BASE_URL}}/api/v1/feed/languages'
+method: GET
+order: 2000

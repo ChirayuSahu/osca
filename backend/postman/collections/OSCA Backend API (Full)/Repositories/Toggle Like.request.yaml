@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Likes the repository, or unlikes it. Returns liked.'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}/like'
+method: POST
+order: 5000

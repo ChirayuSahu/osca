@@ -52,7 +52,7 @@ function ConnectVisual() {
     <div className="flex items-center gap-3 rounded-md border border-border bg-background px-4 py-3">
       <GithubIcon className="size-5" />
       <FlowLine />
-      <span className="text-xs text-muted-foreground">read-only</span>
+      <span className="text-xs text-muted-foreground">public only</span>
       <FlowLine />
       <span className="inline-flex items-baseline gap-1">
         <span className="font-serif text-lg font-semibold italic leading-none">osca</span>
@@ -170,7 +170,7 @@ export default function FeaturesSection() {
         </Reveal>
 
         <Reveal stagger className="grid gap-4 lg:grid-cols-6">
-          <Step step="01" title="Connect GitHub. OSCA only asks to read your public profile." className="lg:col-span-3">
+          <Step step="01" title="Connect GitHub. OSCA never sees your private repositories." className="lg:col-span-3">
             <ConnectVisual />
           </Step>
           <Step step="02" title="Your repos and contributions become a skill profile." className="lg:col-span-3">

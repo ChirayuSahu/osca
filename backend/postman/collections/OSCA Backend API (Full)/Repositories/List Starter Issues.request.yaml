@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Unassigned good first issues of a repository.'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}/starter-issues'
+method: GET
+order: 4000

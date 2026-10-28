@@ -1,10 +1,10 @@
 $kind: http-request
-name: Toggle Pull Reaction
-url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/reactions"
+description: 'Adds or removes your reaction on a pull request.'
+url: '{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/reactions'
 method: POST
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-

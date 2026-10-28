@@ -1,7 +1,24 @@
 $kind: http-request
-name: Get Dev Token
-url: "{{BASE_URL}}/api/v1/auth/dev-token?email=chirayusahu@github.com"
+description: 'Non-production only. Needs DEV_TOKEN_SECRET from backend/.env in the x-dev-secret header. Saves JWT_TOKEN and user_id.'
+url: '{{BASE_URL}}/api/v1/auth/dev-token?email=you@example.com'
 method: GET
+headers:
+  - key: 'x-dev-secret'
+    value: '{{DEV_SECRET}}'
+    description: 'DEV_TOKEN_SECRET from backend/.env'
 queryParams:
-  email: chirayusahu@github.com
-order: 4000
+  - key: 'email'
+    value: 'you@example.com'
+    description: 'Email of an existing user'
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      const body = pm.response.json();
+      if (body?.data?.token) {
+        pm.environment.set('JWT_TOKEN', body.data.token);
+        if (body.data.user?.id) pm.collectionVariables.set('user_id', body.data.user.id);
+      }
+order: 3000

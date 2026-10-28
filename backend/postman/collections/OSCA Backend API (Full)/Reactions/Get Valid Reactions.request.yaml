@@ -1,5 +1,7 @@
 $kind: http-request
-name: Get Valid Reactions
-url: "{{BASE_URL}}/api/v1/reactions"
+description: 'The reaction content values the toggle endpoints accept. No auth.'
+url: '{{BASE_URL}}/api/v1/reactions'
 method: GET
+auth:
+  type: noauth
 order: 1000

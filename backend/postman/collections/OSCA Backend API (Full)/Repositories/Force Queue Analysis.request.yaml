@@ -1,14 +1,14 @@
 $kind: http-request
-name: Force Queue Analysis
-url: "{{BASE_URL}}/api/v1/repositories/analyze/force"
+description: 'Re-analyzes even if a recent analysis exists. Same body as Queue Analysis.'
+url: '{{BASE_URL}}/api/v1/repositories/analyze/force'
 method: POST
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-
     {
       "url": "https://github.com/docker/cli"
     }
-order: 2001
+order: 2100

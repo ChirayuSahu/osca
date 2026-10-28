@@ -1,0 +1,20 @@
+$kind: http-request
+description: 'Your GitHub repositories, optionally with your organizations''.'
+url: '{{BASE_URL}}/api/v1/repositories/github?page=1&limit=10'
+method: GET
+queryParams:
+  - key: 'page'
+    value: '1'
+    description: 'Page number, starting at 1'
+  - key: 'limit'
+    value: '10'
+    description: 'Items per page (max 100)'
+  - key: 'q'
+    value: ''
+    description: 'Filter by name'
+    disabled: true
+  - key: 'includeOrg'
+    value: 'true'
+    description: 'Include organization repositories'
+    disabled: true
+order: 3000

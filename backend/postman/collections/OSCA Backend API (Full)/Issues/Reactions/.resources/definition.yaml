@@ -1,2 +1,3 @@
 $kind: collection
+description: 'Reactions on issues and issue comments. Content is one of +1, -1, laugh, hooray, confused, heart, rocket, eyes.'
 order: 7000

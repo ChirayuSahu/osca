@@ -1,7 +1,5 @@
 $kind: http-request
-name: List Issue Reactions
-url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}/reactions"
+description: 'Reactions on an issue or PR.'
+url: '{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}/reactions'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 order: 1000

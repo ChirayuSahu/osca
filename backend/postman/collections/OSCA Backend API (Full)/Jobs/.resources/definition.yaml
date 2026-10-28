@@ -1,2 +1,3 @@
 $kind: collection
+description: 'Background analysis jobs (BullMQ).'
 order: 6000

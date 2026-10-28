@@ -12,6 +12,10 @@ import { selfUserSelect } from '../../utils/user-response'
 import { encryptToken } from '../../lib/crypto/token-cipher'
 import { redisClient } from '../../utils/redis-client'
 
+// read:user + user:email for the profile; public_repo so issues, comments and
+// reactions can be posted to public repositories as the user. No private repo access.
+const GITHUB_SCOPES = 'read:user,user:email,public_repo'
+
 interface GithubTokenResponse {
   access_token?: string
 }
@@ -36,7 +40,7 @@ const redirectToGithub = (req: Request, res: Response): void => {
     maxAge: 10 * 60 * 1000 // 10 minutes
   })
 
-  let authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${config.githubClientId}&scope=read:user,user:email&state=${state}`
+  let authorizeUrl = `https://github.com/login/oauth/authorize?client_id=${config.githubClientId}&scope=${GITHUB_SCOPES}&state=${state}`
   if (config.githubCallbackUrl !== '') {
     authorizeUrl += `&redirect_uri=${encodeURIComponent(config.githubCallbackUrl)}`
   }

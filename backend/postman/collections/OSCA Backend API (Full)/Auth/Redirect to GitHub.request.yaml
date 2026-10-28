@@ -1,4 +1,7 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/auth/github"
+description: 'Starts GitHub OAuth (scopes read:user, user:email, public_repo) and sets the oauth_state cookie. Open in a browser.'
+url: '{{BASE_URL}}/api/v1/auth/github'
 method: GET
+auth:
+  type: noauth
 order: 1000

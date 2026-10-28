@@ -30,6 +30,21 @@ const parseGithubError = (status: number, context: string): AppError => {
   return new AppError(`GitHub API error (${context}): HTTP ${status}`, 502)
 }
 
+// Tokens issued before OSCA asked for public_repo can read but not write. GitHub
+// answers those writes with 403/404, and X-OAuth-Scopes shows the token is why.
+const lacksWriteScope = (response: Response): boolean => {
+  const scopes = response.headers.get('x-oauth-scopes')
+  if (scopes === null) return false
+  return !scopes.split(',').some((s) => ['repo', 'public_repo'].includes(s.trim()))
+}
+
+const parseWriteError = (response: Response, method: string, context: string): AppError => {
+  if (method !== 'GET' && (response.status === 403 || response.status === 404) && lacksWriteScope(response)) {
+    return new AppError('GitHub token is missing permission to post on GitHub. Please sign in with GitHub again.', 403)
+  }
+  return parseGithubError(response.status, context)
+}
+
 export const githubGetJson = async <T>(path: string, token: string): Promise<T> => {
   const response = await fetch(`${GITHUB_API}${path}`, {
     headers: buildHeaders(token)
@@ -141,7 +156,7 @@ export const fetchGithub = async (
   })
 
   if (!response.ok) {
-    throw parseGithubError(response.status, path)
+    throw parseWriteError(response, method, path)
   }
 
   return response
@@ -169,7 +184,7 @@ export const fetchGithubWithAccept = async (
   })
 
   if (!response.ok) {
-    throw parseGithubError(response.status, path)
+    throw parseWriteError(response, method, path)
   }
 
   return response

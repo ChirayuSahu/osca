@@ -1,11 +1,15 @@
-# Full OSCA stack: Postgres, Redis, Neo4j, backend API (+ BullMQ workers) and frontend.
+# OSCA stack: Postgres, Redis, Neo4j and the backend API (+ BullMQ workers). The
+# frontend is opt-in, so it can be hosted elsewhere (e.g. Vercel):
 #
-#   docker compose up --build
+#   docker compose up --build                      # backend stack only
+#   docker compose --profile frontend up --build   # backend stack + frontend
 #
-# Secrets (GitHub OAuth, JWT_SECRET, OPENROUTER_API_KEY, ...) come from backend/.env;
-# the datastore settings below override whatever that file points at, so the stack
-# always talks to its own containers. Only the frontend (3000) and backend (8000)
-# publish ports; Postgres, Redis and Neo4j are reachable only on the compose network.
+# Secrets (GitHub OAuth, JWT_SECRET, OPENROUTER_API_KEY, ...) come from backend/.env,
+# as do FRONTEND_URL (CORS and the post-login redirect) and GITHUB_CALLBACK_URL: point
+# them at wherever the frontend and API are served. The datastore settings below
+# override whatever that file points at, so the stack always talks to its own
+# containers. Only the frontend (3000) and backend (8000) publish ports; Postgres,
+# Redis and Neo4j are reachable only on the compose network.
 #
 # First start on empty volumes: `migrate` applies the schema, then `seed` queues the
 # beginner-friendly repo catalogue (needs GITHUB_TOKEN in backend/.env) and the
@@ -101,7 +105,6 @@ services:
     environment:
       <<: *local-datastores
       PORT: "8000"
-      FRONTEND_URL: http://localhost:3000
     ports:
       - "8000:8000"
     depends_on:
@@ -118,7 +121,9 @@ services:
       retries: 12
       start_period: 15s
 
+  # Only started with `--profile frontend` (or COMPOSE_PROFILES=frontend)
   frontend:
+    profiles: ["frontend"]
     build:
       context: ./frontend
       args:

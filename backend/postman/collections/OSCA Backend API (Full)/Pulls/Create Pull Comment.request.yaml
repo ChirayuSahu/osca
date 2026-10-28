@@ -1,9 +1,10 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/comments"
+description: 'Comments on a pull request as you. Needs the public_repo scope.'
+url: '{{BASE_URL}}/api/v1/pulls/{{owner}}/{{repo}}/{{pull_number}}/comments'
 method: POST
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-

@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Removes the repository from your feed.'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}/not-interested'
+method: POST
+order: 5200

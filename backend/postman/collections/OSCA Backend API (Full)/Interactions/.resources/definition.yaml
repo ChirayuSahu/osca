@@ -1,2 +1,3 @@
 $kind: collection
+description: 'Signals that tune recommendations.'
 order: 8000

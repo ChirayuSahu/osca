@@ -1,7 +1,15 @@
 $kind: http-request
-name: Search Easy Contributions
-url: "{{BASE_URL}}/api/v1/repositories/discover/easy-contributions?page=1&limit=10&language=typescript"
+description: 'Repositories with open good first issues.'
+url: '{{BASE_URL}}/api/v1/repositories/discover/easy-contributions?page=1&limit=10&language=typescript'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
+queryParams:
+  - key: 'page'
+    value: '1'
+    description: 'Page number, starting at 1'
+  - key: 'limit'
+    value: '10'
+    description: 'Items per page (max 100)'
+  - key: 'language'
+    value: 'typescript'
+    description: 'Primary language'
 order: 3500

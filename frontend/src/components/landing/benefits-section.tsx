@@ -24,7 +24,7 @@ const FEATURES: { icon: LucideIcon; title: string; description: string }[] = [
   { icon: GitBranch, title: "Codebase map", description: "See where the code lives, what to read first, and its dependencies." },
   { icon: ListChecks, title: "Good first issues", description: "Unassigned starter issues for every repository, ready to pick up." },
   { icon: Users, title: "Community", description: "Find developers with your skills and the projects they're active in." },
-  { icon: ShieldCheck, title: "Private by default", description: "Read-only GitHub access, encrypted tokens, chats that aren't stored." },
+  { icon: ShieldCheck, title: "Private by default", description: "No private repo access, encrypted tokens, chats that aren't stored." },
 ];
 
 export default function BenefitsSection() {

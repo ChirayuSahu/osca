@@ -1,10 +1,10 @@
 $kind: http-request
-name: Create Issue Comment
-url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}/comments"
+description: 'Comments on an issue or PR as you. Needs the public_repo scope.'
+url: '{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}/comments'
 method: POST
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-

@@ -123,8 +123,9 @@ export function AuthShell({
             <div className="mt-6 flex items-start gap-2.5 text-xs leading-relaxed text-muted-foreground">
               <Lock className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               <span>
-                OSCA reads your public GitHub profile and email to match you with projects. It can&apos;t see private
-                code, and nothing is posted to GitHub unless you do it yourself.
+                OSCA reads your GitHub profile and email to match you with projects. GitHub also asks to let it post to
+                public repositories, which it does only when you comment, react or open an issue. It can&apos;t see
+                private code.
               </span>
             </div>
 

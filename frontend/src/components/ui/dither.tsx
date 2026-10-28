@@ -44,7 +44,7 @@ function intensity(x: number, y: number, cols: number, rows: number, direction: 
 // Every DitherCard draws the same corner pattern, so finished paths are shared
 const pathCache = new Map<string, string>()
 
-function ditherPath(cols: number, rows: number, direction: Direction, falloff: number, peak: number): string {
+export function ditherPath(cols: number, rows: number, direction: Direction, falloff: number, peak: number): string {
   const key = `${cols}:${rows}:${direction}:${falloff}:${peak}`
   const cached = pathCache.get(key)
   if (cached !== undefined) return cached
