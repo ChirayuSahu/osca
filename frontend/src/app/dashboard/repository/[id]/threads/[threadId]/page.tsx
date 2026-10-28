@@ -22,6 +22,7 @@ import { GithubIcon } from "@/components/icons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { ThreadSkeleton } from "@/components/skeletons";
+import { useStickyEnd } from "@/hooks/use-sticky-end";
 
 interface ThreadDetail {
   id?: string | number;
@@ -45,6 +46,7 @@ export default function ThreadPage() {
   const repositoryId = params.id as string;
   const threadId = params.threadId as string;
   const { token } = useAuth();
+  const sidebar = useStickyEnd<HTMLElement>();
 
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [repoDetails, setRepoDetails] = useState<{owner: string, name: string} | null>(null);
@@ -276,8 +278,8 @@ export default function ThreadPage() {
           <CommentSection owner={repoDetails.owner} repo={repoDetails.name} threadId={threadId} />
         </div>
 
-        {/* Pinned beside the issue and comments while they scroll (desktop only) */}
-        <aside className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100svh-3rem)] lg:overflow-y-auto">
+        {/* Pinned beside the issue and comments; when taller than the screen it scrolls to its end first (desktop only) */}
+        <aside ref={sidebar.ref} style={{ top: sidebar.top }} className="flex min-w-0 flex-col gap-6 lg:sticky">
 
           <div className="overflow-hidden rounded-md border border-border bg-card">
             <div className="border-b border-border px-5 py-3.5">

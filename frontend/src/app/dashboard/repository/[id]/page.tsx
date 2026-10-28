@@ -37,6 +37,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { RepositoryInsights } from "@/components/repository-insights";
 import { NewcomerPanel } from "@/components/newcomer-panel";
+import { useStickyEnd } from "@/hooks/use-sticky-end";
 import { cn } from "@/lib/utils";
 import { trackRecommendation } from "@/lib/recommendation-events";
 
@@ -70,6 +71,7 @@ export default function RepositoryPage() {
   const params = useParams();
   const repositoryId = params.id as string;
   const { token } = useAuth();
+  const sidebar = useStickyEnd<HTMLDivElement>();
 
   const [repo, setRepo] = useState<RepositoryDetail | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -418,7 +420,8 @@ export default function RepositoryPage() {
           <CodebaseCard folderStructure={repo.folderStructure} dependencies={repo.dependencies} repoUrl={repo.url} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6">
+        {/* Pinned while the page scrolls; when taller than the screen it scrolls to its end first (desktop only) */}
+        <div ref={sidebar.ref} style={{ top: sidebar.top }} className="flex min-w-0 flex-col gap-6 lg:sticky">
           {token && <NewcomerPanel repositoryId={repositoryId} token={token} repo={repo} />}
           <RepositoryInsights repo={repo} />
         </div>
