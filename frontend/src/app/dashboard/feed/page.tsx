@@ -1,5 +1,7 @@
 import { Metadata } from 'next'
 import { FeedList } from '@/components/feed/FeedList'
+import { PageContainer } from '@/components/ui/page-container'
+import { PageHeader } from '@/components/ui/page-header'
 
 export const metadata: Metadata = {
   title: 'Your Feed | OSCA',
@@ -8,8 +10,13 @@ export const metadata: Metadata = {
 
 export default function FeedPage() {
   return (
-    <div className="w-full">
+    <PageContainer>
+      <PageHeader
+        eyebrow="Discover"
+        title="For you"
+        description="Repositories matched to your skills, ranked by how friendly they are to newcomers."
+      />
       <FeedList />
-    </div>
+    </PageContainer>
   )
 }

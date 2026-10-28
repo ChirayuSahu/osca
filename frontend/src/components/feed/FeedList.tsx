@@ -1,27 +1,69 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
-import { FeedService } from '@/services/feed.service'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { toast } from 'sonner'
+import { Compass, GalleryHorizontal, LayoutGrid, Sprout } from 'lucide-react'
+import { FeedService, FeedFilters, FeedLanguage } from '@/services/feed.service'
 import { FeedItem } from '@/types/feed'
-import { FeedCard } from './FeedCard'
+import { FeedCard, FeedCardSkeleton } from './FeedCard'
+import { FeedFocus } from './FeedFocus'
+import { FeedFocusSkeleton } from '@/components/skeletons'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useAuth } from '@/context/auth-context'
 import { Button } from '@/components/ui/button'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+
+const PAGE_SIZE = 10
+const VIEW_KEY = 'osca:feed-view'
+
+type FeedView = 'grid' | 'focus'
+// Select items can't use an empty-string value, so "no language filter" gets a sentinel.
+const ALL_LANGUAGES = 'all'
 
 export function FeedList() {
   const { token } = useAuth()
   const [items, setItems] = useState<FeedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  
+
   // Pagination state
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  const fetchFeed = async (pageToFetch: number, isInitial = false) => {
+  // Filters
+  const [filters, setFilters] = useState<FeedFilters>({})
+  const [view, setViewState] = useState<FeedView>('grid')
+
+  // Remember the last view for this browser
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === 'focus') setViewState('focus')
+    } catch {
+      // storage unavailable: stay on the grid
+    }
+  }, [])
+  const setView = useCallback((next: FeedView) => {
+    setViewState(next)
+    try {
+      localStorage.setItem(VIEW_KEY, next)
+    } catch {
+      // ignore
+    }
+  }, [])
+  const [languages, setLanguages] = useState<FeedLanguage[]>([])
+
+  // Guards against an older request resolving after a newer one (fast filter changes)
+  const requestId = useRef(0)
+  // One seed per visit: a fresh order each time the page is opened, stable while scrolling
+  const [seed] = useState(() => Date.now())
+
+  const fetchFeed = useCallback(async (pageToFetch: number, activeFilters: FeedFilters, isInitial = false) => {
     if (!token) return
-    
+    const id = ++requestId.current
+
     try {
       if (isInitial) {
         setLoading(true)
@@ -29,109 +71,214 @@ export function FeedList() {
       } else {
         setLoadingMore(true)
       }
-      
-      const response = await FeedService.getFeed(token, pageToFetch, 10)
-      
-      if (isInitial) {
-        setItems(response.data)
-      } else {
-        setItems(prev => [...prev, ...response.data])
-      }
-      
+
+      const response = await FeedService.getFeed(token, pageToFetch, PAGE_SIZE, activeFilters, seed)
+      if (id !== requestId.current) return
+
+      setItems(prev => {
+        if (isInitial) return response.data
+        const known = new Set(prev.map(i => i.repository.id))
+        return [...prev, ...response.data.filter(i => !known.has(i.repository.id))]
+      })
       setHasMore(response.pagination.page < response.pagination.totalPages)
     } catch (err) {
+      if (id !== requestId.current) return
       setError(err instanceof Error ? err.message : 'Failed to load feed')
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (id === requestId.current) {
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
-  }
+  }, [token, seed])
 
   useEffect(() => {
-    fetchFeed(1, true)
+    setPage(1)
+    fetchFeed(1, filters, true)
+  }, [fetchFeed, filters])
+
+  useEffect(() => {
+    if (!token) return
+    FeedService.getLanguages(token)
+      .then(setLanguages)
+      .catch(err => console.error('Failed to load feed languages', err))
   }, [token])
 
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
-      const nextPage = page + 1
-      setPage(nextPage)
-      fetchFeed(nextPage)
+  const loadNextPage = useCallback(() => {
+    if (loading || loadingMore || !hasMore || error) return
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchFeed(nextPage, filters)
+  }, [loading, loadingMore, hasMore, error, page, filters, fetchFeed])
+
+  // Infinite scroll: load the next page as the marker below the grid nears the viewport
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting)) loadNextPage()
+      },
+      { rootMargin: '600px 0px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, loadNextPage])
+
+  const restoreItem = (item: FeedItem, index: number) => {
+    setItems(prev => {
+      if (prev.some(i => i.repository.id === item.repository.id)) return prev
+      const next = [...prev]
+      next.splice(Math.min(index, next.length), 0, item)
+      return next
+    })
+  }
+
+  const handleUndo = async (item: FeedItem, index: number) => {
+    if (!token) return
+    restoreItem(item, index)
+    try {
+      await FeedService.clearNotInterested(token, item.repository.id)
+    } catch (err) {
+      console.error(err)
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-4" />
-        <p className="text-neutral-400">Curating repositories for your skills...</p>
-      </div>
-    )
+  const handleNotInterested = async (item: FeedItem) => {
+    if (!token) return
+    const index = items.findIndex(i => i.repository.id === item.repository.id)
+    setItems(prev => prev.filter(i => i.repository.id !== item.repository.id))
+
+    const toastId = toast(`Hidden ${item.repository.fullName} from your feed`, {
+      duration: 8000,
+      action: { label: 'Undo', onClick: () => handleUndo(item, index) },
+    })
+
+    try {
+      await FeedService.markNotInterested(token, item.repository.id)
+    } catch (err) {
+      console.error(err)
+      // Put it back: the server didn't record the preference
+      restoreItem(item, index)
+      toast.dismiss(toastId)
+      toast.error(`Couldn't hide ${item.repository.fullName}. Try again.`)
+    }
   }
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="bg-red-500/10 text-red-400 p-4 rounded-xl border border-red-500/20 max-w-md">
-          <p className="font-medium mb-2">Something went wrong</p>
-          <p className="text-sm opacity-80">{error}</p>
-          <Button 
-            variant="outline" 
-            onClick={() => fetchFeed(1, true)}
-            className="mt-4 border-red-500/20 hover:bg-red-500/20"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" /> Try again
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
-  if (items.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-white/[0.1] rounded-xl bg-white/[0.01]">
-        <h3 className="text-xl font-bold text-white mb-2">Your feed is empty</h3>
-        <p className="text-neutral-400 max-w-md">
-          We couldn&apos;t find any repositories matching your exact skill profile right now. Try updating your profile or exploring all repositories.
-        </p>
-      </div>
-    )
-  }
+  const filtersActive = !!filters.language || !!filters.beginnerOnly
 
   return (
-    <div className="w-full">
-      <div className="space-y-2 mb-10">
-        <h1 className="text-[40px] font-serif italic text-white font-medium tracking-wide">Your Feed</h1>
-        <p className="text-xl font-bold text-white">Repositories recommended specifically for your skill set</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {items.map((item) => (
-          <FeedCard key={item.repository.id} item={item} />
-        ))}
-      </div>
-      
-      {hasMore && (
-        <div className="mt-10 mb-8 flex justify-center">
-          <Button 
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="bg-white hover:bg-neutral-200 text-black font-semibold rounded-full px-8 py-6 text-[15px]"
+    <div className="flex flex-col gap-6">
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select
+          value={filters.language ?? ALL_LANGUAGES}
+          onValueChange={value => setFilters(f => ({ ...f, language: value === ALL_LANGUAGES ? undefined : value }))}
+        >
+          <SelectTrigger
+            aria-label="Language"
+            className="h-9 min-w-0 flex-1 rounded-md border-border bg-card px-3.5 sm:min-w-40 sm:flex-none shadow-none transition-colors hover:border-foreground/20 dark:bg-card dark:hover:bg-card"
           >
-            {loadingMore ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Loading...
-              </>
-            ) : (
-              'Load more repositories'
-            )}
+            <SelectValue placeholder="All languages" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_LANGUAGES}>All languages</SelectItem>
+            {languages.map(l => (
+              <SelectItem key={l.language} value={l.language}>
+                {l.language} <span className="text-muted-foreground tabular-nums">({l.count})</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={!!filters.beginnerOnly}
+          onClick={() => setFilters(f => ({ ...f, beginnerOnly: !f.beginnerOnly || undefined }))}
+          className="h-9 border-border bg-card px-3.5 font-normal text-muted-foreground shadow-none transition-colors hover:border-foreground/20 hover:bg-card hover:text-foreground has-[>svg]:px-3.5 dark:border-border aria-pressed:border-foreground/25 aria-pressed:bg-muted aria-pressed:text-foreground aria-pressed:hover:bg-muted"
+        >
+          <Sprout className="text-emerald-600 dark:text-emerald-400" />
+          <span className="sm:hidden">Good first issues</span>
+          <span className="hidden sm:inline">Has good first issues</span>
+        </Button>
+
+        {filtersActive && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setFilters({})}
+            className="h-9 px-2 font-normal text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent"
+          >
+            Clear filters
           </Button>
+        )}
+
+        <SegmentedControl
+          aria-label="View"
+          className="w-full sm:ml-auto sm:w-auto [&>button]:flex-1 sm:[&>button]:flex-none"
+          value={view}
+          onValueChange={setView}
+          options={[
+            { value: 'grid', label: 'Grid', icon: LayoutGrid },
+            { value: 'focus', label: 'One by one', icon: GalleryHorizontal },
+          ]}
+        />
+      </div>
+
+      {loading && view === 'focus' ? (
+        <FeedFocusSkeleton />
+      ) : loading ? (
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading recommendations">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <FeedCardSkeleton key={i} />
+          ))}
         </div>
-      )}
-      
-      {!hasMore && items.length > 0 && (
-        <div className="mt-8 text-center text-neutral-500 text-sm">
-          You&apos;ve reached the end of your recommendations for now.
-        </div>
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => fetchFeed(1, filters, true)} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<Compass />}
+          title={filtersActive ? 'No repositories match these filters' : 'Your feed is empty'}
+          description={
+            filtersActive
+              ? 'Try another language or turn off the good-first-issues filter.'
+              : "Nothing matches your skill profile yet. Update your profile or browse all repositories."
+          }
+          action={
+            filtersActive ? (
+              <Button variant="outline" size="sm" onClick={() => setFilters({})}>
+                Clear filters
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : view === 'focus' ? (
+        <FeedFocus
+          items={items}
+          token={token}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onNeedMore={loadNextPage}
+          onNotInterested={handleNotInterested}
+          onExit={() => setView('grid')}
+        />
+      ) : (
+        <>
+          <div className="stagger-in grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-busy={loadingMore}>
+            {items.map(item => (
+              <FeedCard key={item.repository.id} item={item} onNotInterested={handleNotInterested} />
+            ))}
+            {loadingMore && Array.from({ length: 3 }).map((_, i) => <FeedCardSkeleton key={`more-${i}`} />)}
+          </div>
+
+          {hasMore ? (
+            <div ref={sentinelRef} aria-hidden className="h-px" />
+          ) : (
+            <p className="py-2 text-center text-xs text-muted-foreground">You&apos;re all caught up.</p>
+          )}
+        </>
       )}
     </div>
   )
