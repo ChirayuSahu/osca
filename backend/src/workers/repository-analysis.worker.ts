@@ -1,5 +1,6 @@
 import { Worker, Job, UnrecoverableError } from 'bullmq'
 import { isPermanentJobError } from '../lib/errors'
+import { waitOnGithubRateLimit } from './github-rate-limit'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { RepositoryAnalysisService } from '../services/repository-analysis.service'
@@ -71,9 +72,9 @@ const processRepositoryAnalysis = async (
 }
 
 export const createRepositoryWorker = (): Worker => {
-  const worker = new Worker<RepositoryAnalysisJobData, RepositoryAnalysisJobResult>(
+  const worker: Worker<RepositoryAnalysisJobData, RepositoryAnalysisJobResult> = new Worker<RepositoryAnalysisJobData, RepositoryAnalysisJobResult>(
     QUEUE_NAMES.REPOSITORY_ANALYSIS,
-    processRepositoryAnalysis,
+    waitOnGithubRateLimit('queue', () => worker, processRepositoryAnalysis),
     {
       connection: getRedisConnectionOptions(),
       concurrency: 2,

@@ -8,7 +8,19 @@ export class AppError extends Error {
   }
 }
 
-export const assertFound = <T>(value: T | null | undefined, message: string): T => {
+// GitHub's request budget for the token ran out. Not the job's fault: workers
+// pause their queue until `retryAt` instead of failing or burning retries.
+export class GithubRateLimitError extends AppError {
+  readonly retryAt: number
+
+  constructor(retryAt: number) {
+    super('GitHub rate limit exceeded. Try again later.', 429)
+    this.name = 'GithubRateLimitError'
+    this.retryAt = retryAt
+  }
+}
+
+export const assertFound =<T>(value: T | null | undefined, message: string): T => {
   if (value == null) {
     throw new AppError(message, 404)
   }
