@@ -1,0 +1,9 @@
+$kind: http-request
+description: 'Projects where people like you are active.'
+url: '{{BASE_URL}}/api/v1/community/collaborations?limit=10'
+method: GET
+queryParams:
+  - key: 'limit'
+    value: '10'
+    description: 'How many to return'
+order: 2000

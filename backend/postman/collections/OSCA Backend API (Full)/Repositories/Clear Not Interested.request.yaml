@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Brings the repository back into your feed.'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}/not-interested'
+method: DELETE
+order: 5300

@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Hides the repository from the catalogue (owner or admin).'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}/hide'
+method: POST
+order: 5100

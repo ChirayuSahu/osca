@@ -1,4 +1,34 @@
 $kind: collection
+name: OSCA Backend API (Full)
+description: |-
+  Every route the OSCA backend mounts under /api/v1. Requests use the
+  collection's bearer auth with JWT_TOKEN; get one with Auth > Get Dev Token
+  (local only) or Auth > Exchange Code. Public routes are marked no-auth.
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{JWT_TOKEN}}'
 variables:
-  BASE_URL: http://localhost:8000
-  JWT_TOKEN: ""
+  - key: owner
+    value: excalidraw
+  - key: repo
+    value: excalidraw
+  - key: issue_number
+    value: '1'
+  - key: pull_number
+    value: '1'
+  - key: comment_id
+    value: ''
+    description: A comment id from List Issue Comments or List Pull Comments
+  - key: repository_id
+    value: ''
+    description: An OSCA repository id from List Repositories
+  - key: user_id
+    value: ''
+    description: Set by Get Dev Token and Exchange Code
+  - key: queue_name
+    value: repository-analysis
+  - key: job_id
+    value: ''
+    description: A job id from Queue Analysis or List User Jobs

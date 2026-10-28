@@ -1,0 +1,9 @@
+$kind: http-request
+description: 'Developers with skills like yours.'
+url: '{{BASE_URL}}/api/v1/community/contributors?limit=12'
+method: GET
+queryParams:
+  - key: 'limit'
+    value: '12'
+    description: 'How many to return'
+order: 1000

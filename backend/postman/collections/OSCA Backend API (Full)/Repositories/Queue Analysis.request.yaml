@@ -1,10 +1,10 @@
 $kind: http-request
-name: Queue Analysis
-url: "{{BASE_URL}}/api/v1/repositories/analyze"
+description: 'Queues a repository-analysis job. Body takes url, fullName ("owner/repo") or owner + repo. POST /repositories is an alias. Rate limited.'
+url: '{{BASE_URL}}/api/v1/repositories/analyze'
 method: POST
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-

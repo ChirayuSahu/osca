@@ -1,10 +1,12 @@
 $kind: http-request
-name: List Issues
-url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}?page=2&limit=10"
+description: 'Issues and PRs, newest first, with sub-issues.'
+url: '{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}?page=1&limit=10'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 queryParams:
-  page: "2"
-  limit: "10"
+  - key: 'page'
+    value: '1'
+    description: 'Page number, starting at 1'
+  - key: 'limit'
+    value: '10'
+    description: 'Items per page (max 100)'
 order: 1000

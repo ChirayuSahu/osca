@@ -1,10 +1,24 @@
 $kind: http-request
-name: Get Feed
-url: "{{BASE_URL}}/api/v1/feed?page=2&limit=10"
+description: 'Ranked recommendations. The order changes per visit unless seed is fixed.'
+url: '{{BASE_URL}}/api/v1/feed?page=1&limit=10'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 queryParams:
-  page: "2"
-  limit: "10"
+  - key: 'page'
+    value: '1'
+    description: 'Page number, starting at 1'
+  - key: 'limit'
+    value: '10'
+    description: 'Items per page (max 100)'
+  - key: 'language'
+    value: 'TypeScript'
+    description: 'Only repositories in this language'
+    disabled: true
+  - key: 'beginner'
+    value: 'true'
+    description: 'Only beginner-friendly repositories'
+    disabled: true
+  - key: 'seed'
+    value: '42'
+    description: 'Fix the visit seed to get a stable order'
+    disabled: true
 order: 1000

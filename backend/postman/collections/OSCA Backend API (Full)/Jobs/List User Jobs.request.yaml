@@ -1,7 +1,12 @@
 $kind: http-request
-name: List User Jobs
-url: "{{BASE_URL}}/api/v1/jobs"
+description: 'Your analysis jobs across both queues.'
+url: '{{BASE_URL}}/api/v1/jobs?page=1&limit=10'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-order: 1001
+queryParams:
+  - key: 'page'
+    value: '1'
+    description: 'Page number, starting at 1'
+  - key: 'limit'
+    value: '10'
+    description: 'Items per page (max 100)'
+order: 1000

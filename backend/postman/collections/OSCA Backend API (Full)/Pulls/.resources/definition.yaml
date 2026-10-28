@@ -1,2 +1,3 @@
 $kind: collection
+description: 'GitHub pull requests of a repository.'
 order: 3500

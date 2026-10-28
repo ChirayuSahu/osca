@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Adds the repository to your imports.'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}/import'
+method: POST
+order: 6000

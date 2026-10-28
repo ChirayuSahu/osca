@@ -1,7 +1,5 @@
 $kind: http-request
-name: Get Repository
-url: "{{BASE_URL}}/api/v1/repositories/{{owner}}/{{repo}}"
+description: 'One repository by OSCA id, with analysis.'
+url: '{{BASE_URL}}/api/v1/repositories/{{repository_id}}'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 order: 1500

@@ -1,14 +1,15 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/users/{{user_id}}"
+description: 'Update your own profile. Accepts name, avatarUrl and skills; email cannot be changed.'
+url: '{{BASE_URL}}/api/v1/users/{{user_id}}'
 method: PUT
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-
     {
       "name": "Updated Name",
-      "skills": ["JavaScript", "React"]
+      "skills": ["TypeScript", "React"]
     }
 order: 2000

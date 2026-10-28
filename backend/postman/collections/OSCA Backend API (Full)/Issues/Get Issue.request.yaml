@@ -1,6 +1,5 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}"
+description: 'One issue or PR, with body_html and viewer_reactions.'
+url: '{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 order: 2000

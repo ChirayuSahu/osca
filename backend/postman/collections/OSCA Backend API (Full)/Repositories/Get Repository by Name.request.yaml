@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'One repository by owner and name.'
+url: '{{BASE_URL}}/api/v1/repositories/{{owner}}/{{repo}}'
+method: GET
+order: 1600

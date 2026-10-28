@@ -1,6 +1,5 @@
 $kind: http-request
-url: "{{BASE_URL}}/api/v1/users/{{user_id}}/analyze"
+description: 'Queues a contributor-analysis job for your GitHub profile. Rate limited.'
+url: '{{BASE_URL}}/api/v1/users/{{user_id}}/analyze'
 method: POST
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 order: 3000

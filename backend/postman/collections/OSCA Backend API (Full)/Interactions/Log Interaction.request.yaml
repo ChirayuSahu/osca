@@ -1,15 +1,15 @@
 $kind: http-request
-name: Log Interaction
-url: "{{BASE_URL}}/api/v1/interactions"
+description: 'Records an interaction. action is one of REPOSITORY_VIEW, ISSUE_VIEW, REPOSITORY_LIKE, REPOSITORY_SAVE, ISSUE_COMMENT, CONTRIBUTION.'
+url: '{{BASE_URL}}/api/v1/interactions'
 method: POST
 headers:
-  Authorization: Bearer {{JWT_TOKEN}}
-  Content-Type: application/json
+  - key: 'Content-Type'
+    value: 'application/json'
 body:
   type: json
   content: |-
     {
-      "repositoryId": "79799657-deac-455a-a1b9-6a45b086af61",
-      "action": "REPOSITORY_LIKE"
+      "repositoryId": "{{repository_id}}",
+      "action": "REPOSITORY_VIEW"
     }
 order: 1000

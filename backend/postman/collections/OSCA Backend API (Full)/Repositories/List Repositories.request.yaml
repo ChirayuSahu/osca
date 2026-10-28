@@ -1,16 +1,16 @@
 $kind: http-request
-name: List Repositories
-url: "{{BASE_URL}}/api/v1/repositories?limit=10&page=1"
+description: 'Visible catalogue, paginated. scope=imported lists only what you imported plus repos you own.'
+url: '{{BASE_URL}}/api/v1/repositories?page=1&limit=10'
 method: GET
-headers:
-  Authorization: Bearer {{JWT_TOKEN}}
 queryParams:
-  - key: limit
-    value: "10"
-    disabled: false
-    description: ""
-  - key: page
-    value: "1"
-    disabled: false
-    description: ""
+  - key: 'page'
+    value: '1'
+    description: 'Page number, starting at 1'
+  - key: 'limit'
+    value: '10'
+    description: 'Items per page (max 100)'
+  - key: 'scope'
+    value: 'imported'
+    description: 'Only your imports and owned repos'
+    disabled: true
 order: 1000

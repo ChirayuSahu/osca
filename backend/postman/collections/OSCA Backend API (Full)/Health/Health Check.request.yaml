@@ -1,0 +1,7 @@
+$kind: http-request
+description: 'Returns 200 when the API is up. No auth.'
+url: '{{BASE_URL}}/api/v1/health'
+method: GET
+auth:
+  type: noauth
+order: 1000

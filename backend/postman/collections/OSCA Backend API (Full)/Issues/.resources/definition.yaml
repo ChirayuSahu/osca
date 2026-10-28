@@ -1,2 +1,3 @@
 $kind: collection
+description: 'GitHub issues of a repository, via the signed-in user''s GitHub token. Responses include body_html (GitHub''s rendering) and viewer_reactions.'
 order: 3000
