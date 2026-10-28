@@ -6,7 +6,7 @@ import { RotateCw, X } from "lucide-react";
 import { RepositoryService, AnalysisRequest } from "@/services/repository.service";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { SegmentedMeter, timeAgo } from "@/components/repo-ui";
+import { Meter, timeAgo } from "@/components/repo-ui";
 import { GithubIcon } from "@/components/icons";
 import { cn } from "@/lib/utils";
 
@@ -121,7 +121,7 @@ export function AnalysisRequests({ token, onFinished }: { token: string; onFinis
                 <StatusBadge request={request} />
               </div>
               {request.status === "analyzing" && typeof request.progress?.percent === "number" && (
-                <SegmentedMeter value={request.progress.percent} segments={32} className="max-w-sm" />
+                <Meter value={request.progress.percent} className="max-w-sm" />
               )}
               <p className={cn("text-xs", request.status === "failed" ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>
                 {request.status === "failed"

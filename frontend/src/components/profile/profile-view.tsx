@@ -18,9 +18,8 @@ import {
 import { ErrorState } from "@/components/ui/error-state";
 import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
 import { GithubIcon } from "@/components/icons";
-import { Dither } from "@/components/ui/dither";
-import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
-import { Eyebrow, SegmentedMeter, Tag, timeAgo } from "@/components/repo-ui";
+import { Eyebrow, Meter, Tag, githubAvatarUrl, timeAgo } from "@/components/repo-ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { API_URL } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ProfileSkeleton } from "@/components/skeletons";
@@ -279,9 +278,9 @@ export function ProfileView({ userId }: { userId?: string }) {
   };
 
   const header = isSelf ? (
-    <PageHeader eyebrow="Account" title="Profile" description="Contribution metrics from your GitHub history." />
+    <PageHeader title={<>Your <em>profile</em></>} description="Contribution metrics from your GitHub history." />
   ) : (
-    <PageHeader eyebrow="Community" title="Contributor" description="Contribution metrics from their public GitHub history." />
+    <PageHeader title={<>Contributor <em>profile</em></>} description="Contribution metrics from their public GitHub history." />
   );
 
   if (loading) {
@@ -326,8 +325,6 @@ export function ProfileView({ userId }: { userId?: string }) {
       ]
     : [];
 
-  const bannerFallback = <Dither cols={90} rows={34} cell={5} direction="radial" className="text-emerald-500/20" />;
-
   return (
     <PageContainer>
       {header}
@@ -342,25 +339,19 @@ export function ProfileView({ userId }: { userId?: string }) {
         </Alert>
       ))}
 
-      {/* Identity: avatar dithered into the background only */}
-      <div className="relative isolate overflow-hidden rounded-md border border-border bg-card">
-        <div className="pointer-events-none absolute -right-8 top-1/2 -z-10 -translate-y-1/2 [mask-image:radial-gradient(ellipse_at_right,black_30%,transparent_70%)]">
-          {username ? (
-            <DitheredImage
-              src={githubAvatarUrl(username, 200)}
-              cols={64}
-              cell={5}
-              className="text-emerald-500/25"
-              fallback={bannerFallback}
-            />
-          ) : (
-            bannerFallback
-          )}
-        </div>
+      {/* Identity */}
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-8">
+          <div className="flex min-w-0 items-start gap-5">
+          <Avatar className="size-16 shrink-0 rounded-full border border-border md:size-20">
+            {(profile?.avatarUrl || username) && (
+              <AvatarImage src={profile?.avatarUrl || githubAvatarUrl(username!, 160)} alt="" />
+            )}
+            <AvatarFallback className="text-lg font-semibold">{(profile?.name || username || "?").slice(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
           <div className="min-w-0 space-y-3">
             <div>
-              <h2 className="font-serif text-3xl font-medium italic tracking-tight md:text-4xl">{profile?.name || username}</h2>
+              <h2 className="text-2xl font-semibold tracking-tight md:text-3xl">{profile?.name || username}</h2>
               <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                 {username && (
                   <a
@@ -385,6 +376,7 @@ export function ProfileView({ userId }: { userId?: string }) {
                 {tagSkills.map((skill) => <Tag key={skill}>{skill}</Tag>)}
               </div>
             )}
+          </div>
           </div>
           {isSelf && (
           <div className="flex shrink-0 flex-wrap items-center gap-3 self-start sm:mt-1.5">
@@ -443,12 +435,12 @@ export function ProfileView({ userId }: { userId?: string }) {
                 {Math.round(analytics.overallScore)}
                 <span className="ml-1 font-sans text-base not-italic text-muted-foreground">/ 100</span>
               </p>
-              <SegmentedMeter value={analytics.overallScore} segments={32} className="mt-5" />
+              <Meter value={analytics.overallScore} className="mt-5" />
               <div className="mt-6 space-y-3.5">
                 {metrics.map(({ label, value }) => (
                   <div key={label} className="grid grid-cols-[7.5rem_1fr_2.5rem] items-center gap-3 text-sm">
                     <span className="text-muted-foreground">{label}</span>
-                    <SegmentedMeter value={value} segments={20} />
+                    <Meter value={value} />
                     <span className="text-right font-medium tabular-nums">{Math.round(value)}</span>
                   </div>
                 ))}
@@ -486,7 +478,7 @@ export function ProfileView({ userId }: { userId?: string }) {
                     <span className="font-medium">{name}</span>
                     <span className="tabular-nums text-muted-foreground">{val}%</span>
                   </div>
-                  <SegmentedMeter value={val} segments={32} />
+                  <Meter value={val} />
                 </div>
               ))}
             </div>

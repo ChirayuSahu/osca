@@ -23,10 +23,8 @@ import { ErrorState } from "@/components/ui/error-state";
 import { PageContainer } from "@/components/ui/page-container";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Dither } from "@/components/ui/dither";
-import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
 import { GithubIcon } from "@/components/icons";
-import { StatStrip, Tag, compactNumber, timeAgo, topLanguages } from "@/components/repo-ui";
+import { OwnerAvatar, StatStrip, Tag, compactNumber, timeAgo, topLanguages } from "@/components/repo-ui";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
 import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
 import { isGithubTokenError } from "@/lib/api";
@@ -209,29 +207,13 @@ export default function RepositoryPage() {
   const visibleThreads = threadFilter === "prs" ? threads.filter((t) => t.isPR) : threads;
   const showThreadsEmpty = !threadsError && !threadsLoading && threads.length === 0;
 
-  const headerDither = (
-    <Dither cols={110} rows={40} cell={5} direction="radial" falloff={1.4} className="text-emerald-500/20" />
-  );
-
   return (
     <PageContainer>
       {/* Repository header (D1) */}
-      <div className="relative isolate overflow-hidden rounded-md border border-border bg-card">
-        <div className="pointer-events-none absolute -right-10 top-1/2 -z-10 -translate-y-[58%] [mask-image:radial-gradient(closest-side,black_45%,transparent)]">
-          {owner ? (
-            <DitheredImage
-              src={githubAvatarUrl(owner, 200)}
-              cols={72}
-              cell={5}
-              className="text-emerald-500/25"
-              fallback={headerDither}
-            />
-          ) : (
-            headerDither
-          )}
-        </div>
-
+      <div className="overflow-hidden rounded-md border border-border bg-card">
         <div className="flex flex-col gap-6 p-5 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 items-start gap-5">
+          {owner && <OwnerAvatar owner={owner} className="size-14 md:size-16" />}
           <div className="min-w-0 space-y-3">
             <div className="min-w-0">
               {owner && (
@@ -239,7 +221,7 @@ export default function RepositoryPage() {
                   {owner} <span className="text-muted-foreground/50">/</span>
                 </p>
               )}
-              <h1 className="break-words font-serif text-4xl font-medium italic tracking-wide md:text-5xl">{repo.name}</h1>
+              <h1 className="break-words text-3xl font-semibold tracking-tight md:text-4xl">{repo.name}</h1>
             </div>
             {repo.description && (
               <p className="max-w-2xl text-base leading-relaxed text-muted-foreground">{repo.description}</p>
@@ -265,6 +247,7 @@ export default function RepositoryPage() {
                 )}
               </div>
             )}
+          </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -343,15 +326,7 @@ export default function RepositoryPage() {
             )}
 
             {showThreadsEmpty && (
-              <div className="relative isolate flex flex-col items-center justify-center px-6 py-14 text-center">
-                <Dither
-                  cols={70}
-                  rows={22}
-                  cell={4}
-                  direction="radial"
-                  peak={0.6}
-                  className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
-                />
+              <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
                 <p className="font-medium">No open issues</p>
                 <p className="mt-1 text-sm text-muted-foreground">Nothing is open on GitHub right now.</p>
               </div>

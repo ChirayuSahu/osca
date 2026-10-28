@@ -80,8 +80,7 @@ function ImportContent() {
   return (
     <PageContainer size="narrow">
       <PageHeader
-        eyebrow="Repositories"
-        title="Import"
+        title={<>Import a <em>repository</em></>}
         description="We scan the repository and match it against your skills. This can take a minute."
       />
 

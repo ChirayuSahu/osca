@@ -84,7 +84,7 @@ export function Reactions({
   const shown = REACTIONS.filter((r) => (state.counts[r.content] ?? 0) > 0);
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {shown.map((r) => {
         const mine = state.mine.has(r.content);
         return (
@@ -95,10 +95,10 @@ export function Reactions({
             aria-pressed={mine}
             aria-label={`${r.label}: ${state.counts[r.content]}`}
             className={cn(
-              "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs tabular-nums transition-colors",
+              "inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tabular-nums transition-colors",
               mine
-                ? "border-emerald-500/40 bg-tint-emerald-500 text-emerald-700 dark:text-emerald-300"
-                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                ? "border-emerald-500/40 bg-tint-emerald-500 text-emerald-600 dark:text-emerald-400"
+                : "border-border bg-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             )}
           >
             <span className="text-sm leading-none" aria-hidden>
@@ -114,12 +114,12 @@ export function Reactions({
           <button
             type="button"
             aria-label="Add reaction"
-            className="inline-flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground data-[state=open]:text-foreground"
+            className="inline-flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground data-[state=open]:bg-muted/50 data-[state=open]:text-foreground"
           >
             <SmilePlus className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="grid w-auto min-w-0 grid-cols-4 gap-0.5 p-1">
+        <DropdownMenuContent align="start" className="flex w-auto min-w-0 gap-0.5 p-1">
           {REACTIONS.map((r) => (
             <DropdownMenuItem
               key={r.content}

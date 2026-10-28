@@ -12,7 +12,7 @@ const buttonVariants = cva(
         default: "bg-primary font-semibold text-primary-foreground shadow-xs hover:bg-primary/90",
         destructive:
           "bg-destructive text-white shadow-xs hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:bg-destructive/60 dark:focus-visible:ring-destructive/40",
-        // Solid background so it stays readable over dither/decoration
+        // Solid background so it stays readable over whatever sits behind it
         outline:
           "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input",
         secondary: "bg-secondary text-secondary-foreground shadow-xs hover:bg-secondary/80",

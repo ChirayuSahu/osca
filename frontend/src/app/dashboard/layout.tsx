@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -41,8 +42,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {user && user.onboardedAt === null && <OnboardingDialog />}
       <SidebarInset>
         {/* Phones only: the sidebar is a drawer there, so it needs an opener */}
-        <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center border-b bg-background px-4 md:hidden">
+        <header className="sticky top-0 z-20 grid h-14 shrink-0 grid-cols-[2rem_1fr_2rem] items-center border-b border-border bg-background px-4 md:hidden">
           <SidebarTrigger className="-ml-1" />
+          <Link href="/dashboard" aria-label="osca home" className="justify-self-center font-serif text-[22px] font-semibold italic leading-none tracking-tight">
+            osca
+          </Link>
         </header>
         <GithubReconnectBanner />
         <BreadcrumbProvider>

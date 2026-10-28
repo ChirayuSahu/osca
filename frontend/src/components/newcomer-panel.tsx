@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { RepositoryService, StarterIssue } from "@/services/repository.service";
 import { Button } from "@/components/ui/button";
-import { Dither } from "@/components/ui/dither";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Eyebrow, timeAgo } from "@/components/repo-ui";
 import { cn } from "@/lib/utils";
@@ -59,9 +58,7 @@ export function NewcomerPanel({ repositoryId, token, repo }: NewcomerPanelProps)
   ];
 
   return (
-    <div className="relative isolate overflow-hidden rounded-md border border-border bg-card">
-      <Dither cols={40} rows={18} cell={4} direction="radial" peak={0.7} className="absolute -right-6 -top-8 -z-10 text-emerald-500/[0.14]" />
-
+    <div className="overflow-hidden rounded-md border border-border bg-card">
       <div className="flex items-center justify-between px-5 pt-5">
         <h3 className="text-base font-semibold">Start contributing</h3>
         {owner && name && (

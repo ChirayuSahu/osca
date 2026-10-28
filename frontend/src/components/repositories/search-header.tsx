@@ -14,8 +14,7 @@ interface SearchHeaderProps {
 export function SearchHeader({ searchQuery, setSearchQuery }: SearchHeaderProps) {
   return (
     <PageHeader
-      eyebrow="Repositories"
-      title="Search GitHub"
+      title={<>Search <em>GitHub</em></>}
       description="Search your own repositories first, then all of GitHub. Import any public repository into OSCA."
     >
       <div className="relative w-full max-w-xl">

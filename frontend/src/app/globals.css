@@ -7,7 +7,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Opaque tinted fill for badges and pills: the colour mixed into the card
-   surface, so dither and logos behind a badge never show through it. */
+   surface, so nothing behind a badge shows through it. */
 @utility bg-tint-* {
   background-color: color-mix(in oklab, --value(--color-*) 14%, var(--card));
 }
@@ -25,6 +25,8 @@
   --font-mono: var(--font-jetbrains-mono);
   --font-heading: var(--font-manrope);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-nav-active: var(--nav-active);
+  --color-nav-active-foreground: var(--nav-active-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
@@ -104,44 +106,51 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.596 0.145 163.225);
+  /* Active sidebar row */
+  --nav-active: oklch(0.95 0.035 160);
+  --nav-active-foreground: oklch(0.32 0.07 160);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.178 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  /* Near-black with a faint green cast, as in the dashboard designs */
+  --background: oklch(0.135 0.008 160);
+  --foreground: oklch(0.975 0.004 160);
+  --card: oklch(0.172 0.008 160);
+  --card-foreground: oklch(0.975 0.004 160);
+  --popover: oklch(0.19 0.009 160);
+  --popover-foreground: oklch(0.975 0.004 160);
   --primary: oklch(0.696 0.17 162.48);
   --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.235 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.235 0.01 160);
+  --secondary-foreground: oklch(0.975 0.004 160);
+  --muted: oklch(0.225 0.01 160);
+  --muted-foreground: oklch(0.7 0.01 160);
+  --accent: oklch(0.24 0.012 160);
+  --accent-foreground: oklch(0.975 0.004 160);
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.696 0.17 162.48);
   --success-foreground: oklch(0.145 0 0);
   --warning: oklch(0.769 0.188 70.08);
   --warning-foreground: oklch(0.145 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
   --ring: oklch(0.696 0.17 162.48);
   --chart-1: oklch(0.696 0.17 162.48);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.488 0.243 264.376);
   --chart-4: oklch(0.769 0.188 70.08);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.165 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.155 0.012 160);
+  --sidebar-foreground: oklch(0.975 0.004 160);
   --sidebar-primary: oklch(0.696 0.17 162.48);
   --sidebar-primary-foreground: oklch(0.145 0 0);
-  --sidebar-accent: oklch(0.235 0 0);
+  --sidebar-accent: oklch(0.215 0.012 160);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.696 0.17 162.48);
+  /* Active sidebar row: a deep green fill */
+  --nav-active: oklch(0.33 0.075 155);
+  --nav-active-foreground: oklch(0.985 0 0);
 }
 
 @layer base {
@@ -353,17 +362,6 @@
 .hero-rise > *:nth-child(4) { animation-delay: 270ms; }
 .hero-rise > *:nth-child(5) { animation-delay: 360ms; }
 
-/* Meter segments light up left to right (each sets --i) */
-@keyframes segment-on {
-  from { background-color: var(--muted); }
-}
-.in-view .segment-on {
-  animation: segment-on 380ms var(--ease-fluid) both;
-  animation-delay: calc(250ms + var(--i, 0) * 28ms);
-}
-.reveal:not(.in-view) .segment-on,
-.reveal-stagger:not(.in-view) .segment-on { background-color: var(--muted); }
-
 /* Bars grow from the left */
 @keyframes grow-x {
   from { transform: scaleX(0); }
@@ -390,32 +388,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal:not(.in-view) .segment-on,
-  .reveal-stagger:not(.in-view) .segment-on { background-color: revert-layer; }
   .reveal, .reveal-stagger > *, .hero-rise > * { opacity: 1; transform: none; animation: none !important; }
-  .in-view .segment-on, .in-view .grow-x, .in-view .slide-row, .dash-flow { animation: none !important; }
+  .in-view .grow-x, .in-view .slide-row, .dash-flow { animation: none !important; }
 }
 
 /* ── Toasts ──────────────────────────────────────────────────────────────────
-   Sonner places and stacks them; components/ui/sonner.tsx sets the look. The
-   corner dither is tinted by type, and toasts move on the app's fluid curve. */
+   Sonner places and stacks them; components/ui/sonner.tsx sets the look.
+   Toasts move on the app's fluid curve. */
 .osca-toast[data-sonner-toast] {
-  --toast-tint: var(--color-emerald-500, oklch(69.6% 0.17 162.48));
   transition-timing-function: var(--ease-fluid);
-}
-.osca-toast[data-sonner-toast][data-type="error"] { --toast-tint: var(--color-red-500, oklch(63.7% 0.237 25.331)); }
-.osca-toast[data-sonner-toast][data-type="warning"] { --toast-tint: var(--color-amber-500, oklch(76.9% 0.188 70.08)); }
-.osca-toast[data-sonner-toast][data-type="loading"] { --toast-tint: var(--muted-foreground); }
-.osca-toast[data-sonner-toast]::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: -1;
-  width: 160px;
-  height: 72px;
-  background-color: var(--toast-tint);
-  opacity: 0.16;
-  mask: var(--toast-dither) top right / 160px 72px no-repeat;
-  pointer-events: none;
 }

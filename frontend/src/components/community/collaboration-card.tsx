@@ -4,7 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sprout, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DitherCard, RepoTitle } from "@/components/repo-ui";
+import { RepoCard, RepoTitle } from "@/components/repo-ui";
 import type { CollaborationOpportunity } from "@/services/community.service";
 
 interface CollaborationCardProps {
@@ -17,9 +17,8 @@ export function CollaborationCard({ collaboration }: CollaborationCardProps) {
   const { peers, goodFirstIssueCount } = collaboration;
 
   return (
-    <DitherCard
+    <RepoCard
       className="h-full"
-      logo={collaboration.owner}
       role="link"
       tabIndex={0}
       aria-label={`${collaboration.owner}/${collaboration.name}`}
@@ -45,7 +44,7 @@ export function CollaborationCard({ collaboration }: CollaborationCardProps) {
         )}
         <ArrowRight className="ml-auto size-4" />
       </div>
-    </DitherCard>
+    </RepoCard>
   );
 }
 

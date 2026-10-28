@@ -12,8 +12,7 @@ export default function FeedPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Discover"
-        title="For you"
+        title={<>For <em>you</em></>}
         description="Repositories matched to your skills, ranked by how friendly they are to newcomers."
       />
       <FeedList />

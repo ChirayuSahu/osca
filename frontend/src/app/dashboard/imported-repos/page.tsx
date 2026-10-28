@@ -161,8 +161,7 @@ function ImportedReposContent() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Repositories"
-        title="Imported"
+        title={<>Imported <em>repositories</em></>}
         description="Projects you've added to OSCA."
         actions={
           <Button variant="outline" size="sm" asChild>
@@ -214,10 +213,10 @@ function ImportedReposContent() {
           if (!open && !deleting) setPendingDelete(null);
         }}
       >
-        <DialogContent className="gap-6 p-6 sm:max-w-md">
-          <DialogHeader className="gap-2">
-            <DialogTitle className="text-base font-semibold">Remove repository?</DialogTitle>
-            <DialogDescription className="text-sm">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove repository?</DialogTitle>
+            <DialogDescription>
               <span className="font-medium text-foreground">{pendingDelete?.name}</span> will be removed from
               your imported repositories. It stays available in OSCA for other users.
             </DialogDescription>

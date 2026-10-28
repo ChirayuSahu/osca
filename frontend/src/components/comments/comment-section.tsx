@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { CommentService } from "@/services/comment.service";
 import { isGithubTokenError } from "@/lib/api";
-import { ChevronDown, MessageSquare, Trash2 } from "lucide-react";
+import { ChevronDown, MessageSquare, Reply, Send, Trash2 } from "lucide-react";
 import { GithubBody } from "@/components/markdown-lazy";
 import { Reactions, type ReactionRollup } from "@/components/reactions";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Dither } from "@/components/ui/dither";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -34,6 +34,34 @@ interface Comment {
   user?: { login: string; avatar_url: string };
   reactions?: ReactionRollup;
   viewer_reactions?: string[];
+}
+
+/** Up to two letters from a GitHub login, e.g. "arjun_devs" -> "AD", "octocat" -> "OC" */
+function initials(login?: string | null) {
+  if (!login) return "?";
+  const parts = login.split(/[-_.\s]+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : login.slice(0, 2);
+  return letters.toUpperCase();
+}
+
+/** Round avatar: the GitHub picture when there is one, initials on an emerald tint otherwise */
+export function UserAvatar({
+  login,
+  avatarUrl,
+  className,
+}: {
+  login?: string | null;
+  avatarUrl?: string | null;
+  className?: string;
+}) {
+  return (
+    <Avatar className={cn("size-8 text-[11px]", className)}>
+      {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
+      <AvatarFallback className="bg-tint-emerald-500 text-[length:inherit] font-semibold text-emerald-700 dark:text-emerald-300">
+        {initials(login)}
+      </AvatarFallback>
+    </Avatar>
+  );
 }
 
 export default function CommentSection({ owner, repo, threadId }: { owner: string; repo: string; threadId: string }) {
@@ -100,13 +128,14 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
   return (
     <section className="overflow-hidden rounded-md border border-border bg-card">
       {/* Header row: title, count, collapse */}
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3.5">
-        <h2 className="text-base font-semibold">Comments</h2>
+      <div className="flex items-center gap-2 border-b border-border px-5 py-3 sm:px-6">
+        <MessageSquare className="size-4 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        <h2 className="text-sm font-semibold">Comments</h2>
         <span className="text-sm text-muted-foreground tabular-nums">{comments.length}</span>
         <Button
           variant="ghost"
           size="icon-sm"
-          className="ml-auto text-muted-foreground"
+          className="-mr-2 ml-auto text-muted-foreground"
           onClick={() => setIsCollapsed(!isCollapsed)}
           aria-expanded={!isCollapsed}
           aria-label={isCollapsed ? "Show comments" : "Hide comments"}
@@ -117,65 +146,73 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
 
       {!isCollapsed && (
         loading ? (
-          <div className="flex flex-col gap-2 p-5">
-            <Skeleton className="h-16 w-full rounded-md" />
-            <Skeleton className="h-16 w-full rounded-md" />
+          <div className="flex flex-col gap-5 p-5 sm:p-6">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex gap-3">
+                <Skeleton className="size-8 shrink-0 rounded-full" />
+                <div className="flex flex-1 flex-col gap-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-12 w-full rounded-md" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : comments.length === 0 ? (
-          <div className="relative isolate flex items-center justify-center px-6 py-10 text-center">
-            <Dither
-              cols={60}
-              rows={18}
-              cell={4}
-              direction="radial"
-              peak={0.6}
-              className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
-            />
+          <div className="flex items-center justify-center px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">No comments yet.</p>
           </div>
         ) : (
-          <ul className="divide-y divide-border">
+          // Timeline: a thin line runs from each avatar down to the next one
+          <ul className="flex flex-col p-5 sm:p-6">
             {comments.map((comment) => {
+              const login = comment.user?.login;
               return (
-                <li key={comment.id} className="flex flex-col gap-2 px-5 py-4">
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="font-medium">{comment.user?.login || "User"}</span>
-                    <span className="text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
-                    <div className="ml-auto flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-muted-foreground"
-                        onClick={() => {
-                          setNewComment(`@${comment.user?.login || 'User'} `);
-                          textareaRef.current?.focus();
-                        }}
-                      >
-                        <MessageSquare className="size-3.5" /> Reply
-                      </Button>
-                      {currentUser?.username === comment.user?.login && (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="size-7 text-muted-foreground"
-                          onClick={() => setPendingDelete(comment.id)}
-                          aria-label="Delete comment"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      )}
-                    </div>
+                <li key={comment.id} className="group/comment flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <UserAvatar login={login} avatarUrl={comment.user?.avatar_url} />
+                    <span className="mt-2 w-px flex-1 bg-border group-last/comment:hidden" aria-hidden />
                   </div>
 
-                  <GithubBody html={comment.body_html} markdown={comment.body} />
-                  {token && (
-                    <Reactions
-                      className="pt-1"
-                      reactions={comment.reactions}
-                      viewerReactions={comment.viewer_reactions}
-                      onToggle={(content) => CommentService.toggleReaction(owner, repo, comment.id, content, token)}
-                    />
-                  )}
+                  <div className="flex min-w-0 flex-1 flex-col gap-2 pb-6 group-last/comment:pb-0">
+                    <div className="flex min-h-8 min-w-0 items-center gap-2 text-sm">
+                      <span className="truncate font-medium">{login || "User"}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
+                      <div className="-mr-2 ml-auto flex shrink-0 items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
+                          onClick={() => {
+                            setNewComment(`@${login || 'User'} `);
+                            textareaRef.current?.focus();
+                          }}
+                        >
+                          <Reply className="size-3.5" /> Reply
+                        </Button>
+                        {currentUser?.username === login && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="size-7 text-muted-foreground"
+                            onClick={() => setPendingDelete(comment.id)}
+                            aria-label="Delete comment"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <GithubBody html={comment.body_html} markdown={comment.body} />
+                    {token && (
+                      <Reactions
+                        className="pt-1"
+                        reactions={comment.reactions}
+                        viewerReactions={comment.viewer_reactions}
+                        onToggle={(content) => CommentService.toggleReaction(owner, repo, comment.id, content, token)}
+                      />
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -184,36 +221,45 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
       )}
 
       {/* Composer */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2 border-t border-border bg-background p-4">
-        <Label htmlFor="new-comment" className="sr-only">Add a comment</Label>
-        <Textarea
-          id="new-comment"
-          ref={textareaRef}
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Add a comment"
-          rows={4}
-          className="min-h-24 resize-none rounded-md"
-          required
-        />
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-muted-foreground">Markdown supported</span>
-          <div className="flex gap-2">
-            {newComment && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setNewComment("")}>
-                Clear
-              </Button>
-            )}
-            <Button type="submit" size="sm" disabled={submitting || !newComment.trim()}>
-              {submitting && <Spinner className="text-current" />}
-              Comment
-            </Button>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 border-t border-border p-5 sm:p-6">
+        <Label htmlFor="new-comment" className="text-sm font-medium">Add a comment</Label>
+        <div className="flex gap-3">
+          <UserAvatar
+            login={currentUser?.username}
+            avatarUrl={currentUser?.avatarUrl}
+            className="hidden sm:flex"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <Textarea
+              id="new-comment"
+              ref={textareaRef}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add a comment"
+              rows={4}
+              className="min-h-28 resize-none rounded-md bg-background dark:bg-background"
+              required
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Markdown supported</span>
+              <div className="flex gap-2">
+                {newComment && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setNewComment("")}>
+                    Clear
+                  </Button>
+                )}
+                <Button type="submit" size="sm" disabled={submitting || !newComment.trim()}>
+                  {submitting ? <Spinner className="text-current" /> : <Send />}
+                  Comment
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </form>
 
       <Dialog open={pendingDelete !== null} onOpenChange={(open) => !open && !deleting && setPendingDelete(null)}>
-        <DialogContent className="rounded-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete comment?</DialogTitle>
             <DialogDescription>This removes your comment from the GitHub thread. This can&apos;t be undone.</DialogDescription>

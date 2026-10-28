@@ -1,5 +1,5 @@
 import React from 'react'
-import { Eyebrow, LanguageDot, SegmentedMeter, Tag } from '@/components/repo-ui'
+import { Eyebrow, LanguageDot, Meter, Tag } from '@/components/repo-ui'
 
 interface RepositoryInsightsProps {
   repo: {
@@ -39,7 +39,7 @@ export function RepositoryInsights({ repo }: RepositoryInsightsProps) {
                   <LanguageDot language={name} className="min-w-0 truncate font-medium" />
                   <span className="shrink-0 tabular-nums text-muted-foreground">{pct.toFixed(1)}%</span>
                 </div>
-                <SegmentedMeter value={pct} segments={20} />
+                <Meter value={pct} />
               </div>
             ))}
           </div>

@@ -15,7 +15,6 @@ import {
   Compass,
   AlertTriangle,
   RefreshCw,
-  Shuffle,
   EyeOff,
   CircleDot,
   MessageSquare,
@@ -23,7 +22,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Kbd, KbdGroup } from "@/components/ui/kbd";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -33,31 +31,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RepositoryService } from "@/services/repository.service";
-import { DitherCard, RepoTitle } from "@/components/repo-ui";
-import { Dither } from "@/components/ui/dither";
-import { AnimatedDither } from "@/components/ui/animated-dither";
-import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
+import { RepoCard, RepoTitle } from "@/components/repo-ui";
 import { GithubIcon as GithubMarkIcon } from "@/components/icons";
 import { isGithubTokenError } from "@/lib/api";
 import { useAuth } from "@/context/auth-context";
 import { Markdown, preloadMarkdown } from "@/components/markdown-lazy";
-
-// Prompt pool built from the user's analyzed skills; the generic list is the fallback
-function promptsForSkills(skills: string[]): string[] {
-  const [a, b, c] = skills;
-  if (!a) return SUGGESTED_PROMPTS;
-  const second = b ?? a;
-  const third = c ?? second;
-  return [
-    `Find beginner-friendly ${a} repositories with good first issues`,
-    b ? `I know ${a} and ${b}. Where can I make my first contribution?` : `I know ${a}. Where can I make my first contribution?`,
-    `Which ${second} projects are welcoming to new contributors?`,
-    `What should I learn next after ${a} to contribute to bigger projects?`,
-    `Show me ${a} projects where I could start with docs or tests`,
-    `Find active ${second} projects where maintainers review PRs quickly`,
-    `I have a free weekend. Suggest a ${third} issue I could finish`,
-  ];
-}
 
 const pickOne = <T,>(list: readonly T[], except?: T): T => {
   const pool = list.length > 1 && except !== undefined ? list.filter((x) => x !== except) : list;
@@ -107,13 +85,6 @@ async function loadTopSkills(userId: string, token: string): Promise<string[]> {
   skillsCache.set(userId, skills);
   return skills;
 }
-
-const SUGGESTED_PROMPTS = [
-  "I'm a React dev looking to learn Rust. Where should I start?",
-  "Find beginner-friendly Python repos with good mentorship",
-  "What are trending Go projects that need contributors?",
-  "Suggest ML repos suited for someone who knows PyTorch",
-];
 
 // Custom GitHub SVG icon used across the chat surface
 const GithubIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -293,12 +264,9 @@ function RecommendationCard({
     }
   };
 
-  const stripDither = <Dither cols={80} rows={24} cell={4} direction="top-right" className="text-emerald-500/25" />;
-
   return (
     <>
-      <DitherCard
-        logo={owner ?? undefined}
+      <RepoCard
         role="button"
         tabIndex={0}
         onClick={() => setOpen(true)}
@@ -326,30 +294,13 @@ function RecommendationCard({
             <Download className="size-3.5" /> Import to explore
           </span>
         </div>
-      </DitherCard>
+      </RepoCard>
 
       <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next && status !== "importing") setStatus("idle"); }}>
-        <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
-          {/* Repo owner's logo, dithered, across the top */}
-          <div className="relative h-24 overflow-hidden border-b border-border bg-muted/30">
-            <div className="pointer-events-none absolute -right-4 -top-10 [mask-image:linear-gradient(to_left,black_30%,transparent)]">
-              {owner ? (
-                <DitheredImage
-                  src={githubAvatarUrl(owner, 160)}
-                  cols={48}
-                  cell={4}
-                  className="text-emerald-500/30"
-                  fallback={stripDither}
-                />
-              ) : (
-                stripDither
-              )}
-            </div>
-          </div>
-
-          <div className="px-5 pt-5">
-            <DialogHeader className="gap-1 text-left">
-              <DialogTitle className="text-base font-semibold">
+        <DialogContent className="gap-0 overflow-hidden p-0">
+          <div className="px-6 pt-6">
+            <DialogHeader>
+              <DialogTitle>
                 {owner && <span className="font-normal text-muted-foreground">{owner} / </span>}
                 {name}
               </DialogTitle>
@@ -362,7 +313,7 @@ function RecommendationCard({
             </DialogHeader>
           </div>
 
-          <DialogFooter className="mt-5 flex-row items-center justify-end gap-2 border-t border-border px-5 py-3">
+          <DialogFooter className="mt-6 flex-row items-center justify-end gap-2 border-t border-border px-6 py-4">
             {githubUrl && (
               <Button variant="ghost" size="icon-sm" asChild className="mr-auto text-muted-foreground">
                 <a href={githubUrl} target="_blank" rel="noopener noreferrer" aria-label="View on GitHub" title="View on GitHub">
@@ -714,28 +665,14 @@ export function ChatConsole() {
 
   // Picked on the client after mount (random and time-based), so server and client markup match
   const [heading, setHeading] = useState<Heading | null>(null);
-  // null while the user's skills load; then a pool built from them (or the generic list)
-  const [promptPool, setPromptPool] = useState<string[] | null>(null);
-  const [suggestion, setSuggestion] = useState<string | null>(null);
 
   useEffect(() => {
     setHeading(pickOne(headingsFor(new Date().getHours())));
   }, []);
 
+  // Warm the skills cache, so the thinking steps can mention the user's skills
   useEffect(() => {
-    if (!user || !token) return;
-    let cancelled = false;
-    const use = (pool: string[]) => {
-      if (cancelled) return;
-      setPromptPool(pool);
-      setSuggestion(pickOne(pool));
-    };
-    loadTopSkills(user.id, token)
-      .then((skills) => use(promptsForSkills(skills)))
-      .catch(() => use(SUGGESTED_PROMPTS));
-    return () => {
-      cancelled = true;
-    };
+    if (user && token) loadTopSkills(user.id, token).catch(() => {});
   }, [user, token]);
 
   // True while keys are being pressed; settles shortly after the last keystroke
@@ -747,10 +684,6 @@ export function ChatConsole() {
     typingTimer.current = window.setTimeout(() => setTyping(false), 700);
   }, []);
   useEffect(() => () => window.clearTimeout(typingTimer.current), []);
-
-  const shuffleSuggestion = useCallback(() => {
-    if (promptPool) setSuggestion((current) => pickOne(promptPool, current ?? undefined));
-  }, [promptPool]);
 
   // Fetch the markdown renderer while the user reads the greeting, so the first reply renders at once
   useEffect(() => {
@@ -820,11 +753,6 @@ export function ChatConsole() {
     setStreamingMessage(null);
     setLastUserPrompt(null);
     setSearchQuery("");
-  }, []);
-
-  const submitPrompt = useCallback((prompt: string) => {
-    setSearchQuery(prompt);
-    window.setTimeout(() => textareaRef.current?.focus(), 0);
   }, []);
 
   const sendPrompt = useCallback(
@@ -974,15 +902,7 @@ export function ChatConsole() {
 
       {empty ? (
         // Greeting fills the space above the composer, which stays pinned at the bottom
-        <div className="relative isolate flex w-full flex-1 flex-col items-center justify-center gap-8 pb-8 text-center animate-in fade-in duration-500">
-          <AnimatedDither
-            cols={160}
-            rows={70}
-            cell={5}
-            falloff={1.3}
-            peak={0.6}
-            className="absolute left-1/2 top-[42%] -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.10]"
-          />
+        <div className="flex w-full flex-1 flex-col items-center justify-center gap-8 pb-8 text-center animate-in fade-in duration-500">
           <h1
             className={`max-w-4xl text-balance text-4xl font-light leading-tight tracking-tight text-foreground transition-opacity duration-300 md:text-6xl ${
               heading ? "opacity-100" : "opacity-0"
@@ -995,38 +915,12 @@ export function ChatConsole() {
             {heading?.after}
           </h1>
 
-          {/* One suggestion, from the user's skills; shuffle for another */}
-          <div className="flex w-full max-w-xl items-stretch gap-2">
-            {suggestion === null ? (
-              <div className="h-12 flex-1 animate-pulse rounded-md border border-border bg-card" aria-hidden />
-            ) : (
-              <button
-                key={suggestion}
-                type="button"
-                onClick={() => submitPrompt(suggestion)}
-                className="flex flex-1 items-center gap-2.5 rounded-md border border-border bg-card px-4 py-3 text-left text-sm text-muted-foreground transition-colors animate-in fade-in duration-300 hover:border-foreground/20 hover:text-foreground"
-              >
-                <Compass className="size-4 shrink-0" />
-                <span className="leading-snug">{suggestion}</span>
-              </button>
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-auto min-h-12 w-12 shrink-0 bg-card text-muted-foreground"
-                  onClick={shuffleSuggestion}
-                  disabled={!promptPool || promptPool.length < 2}
-                  aria-label="Suggest another question"
-                >
-                  <Shuffle />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Another suggestion</TooltipContent>
-            </Tooltip>
-          </div>
+          {/* Conversations live only in this page's memory */}
+          {/* Icon flows with the text, so it stays beside the first word when the line wraps */}
+          <p className="max-w-md text-balance text-sm leading-relaxed text-muted-foreground">
+            <EyeOff className="mr-1.5 inline size-4 -translate-y-px align-middle" aria-hidden />
+            Chats aren&apos;t saved. This one clears when you leave or refresh.
+          </p>
         </div>
       ) : (
         <div
@@ -1092,11 +986,13 @@ export function ChatConsole() {
       <div className="mt-auto w-full shrink-0 pt-2">
         <form onSubmit={handleSearchSubmit} className="group relative isolate w-full">
           <div className="mb-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-            {/* Conversations live only in this page's memory */}
-            <span className="inline-flex items-center gap-1.5">
-              <EyeOff className="size-3.5 shrink-0" aria-hidden />
-              This chat isn&apos;t saved — it clears when you leave or refresh.
-            </span>
+            {/* During a chat the "not saved" note moves here from under the greeting */}
+            {!empty && (
+              <span className="inline-flex items-center gap-1.5">
+                <EyeOff className="size-3.5 shrink-0" aria-hidden />
+                This chat isn&apos;t saved — it clears when you leave or refresh.
+              </span>
+            )}
             <span className="ml-auto hidden items-center gap-1.5 sm:inline-flex"><Kbd>Enter</Kbd> to send</span>
             <span className="hidden items-center gap-1.5 md:inline-flex">
               <KbdGroup><Kbd>Shift</Kbd>+<Kbd>Enter</Kbd></KbdGroup> for a new line

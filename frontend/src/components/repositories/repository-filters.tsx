@@ -35,10 +35,10 @@ export function RepositoryFilters({ isOpen, onClose, onApply }: RepositoryFilter
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="gap-6 p-6 sm:max-w-md">
-        <DialogHeader className="gap-2">
-          <DialogTitle className="text-base font-semibold">Filter repositories</DialogTitle>
-          <DialogDescription className="text-sm">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Filter repositories</DialogTitle>
+          <DialogDescription>
             Narrow the list by language and popularity.
           </DialogDescription>
         </DialogHeader>

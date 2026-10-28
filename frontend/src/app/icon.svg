@@ -1,13 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- OSCA mark: italic "o" with the emerald dot, a few dither pixels as the brand nod -->
+  <!-- OSCA mark: italic "o" with the emerald dot -->
   <rect width="32" height="32" rx="7" fill="#0b0d0c"/>
-  <g fill="#10b981">
-    <rect x="25" y="4" width="2" height="2" opacity=".7"/>
-    <rect x="21" y="4" width="2" height="2" opacity=".35"/>
-    <rect x="23" y="6" width="2" height="2" opacity=".5"/>
-    <rect x="27" y="8" width="2" height="2" opacity=".35"/>
-    <rect x="25" y="8" width="2" height="2" opacity=".2"/>
-  </g>
   <!-- calligraphic "o": thick sides, thin top and bottom, slanted like Playfair italic -->
   <path fill-rule="evenodd" fill="#f5f5f4" d="M13.6 9.2c4.6 0 7.4 3.6 6.2 8.6-1.1 4.7-4.9 7.4-8.6 7.4-4.5 0-7.3-3.6-6.1-8.6 1.1-4.6 4.8-7.4 8.5-7.4Zm-.4 1.6c-1.6 0-3 2.4-3.7 5.5-.8 3.5-.3 7.3 2.2 7.3 1.6 0 3-2.5 3.7-5.6.8-3.5.3-7.2-2.2-7.2Z"/>
   <circle cx="24.6" cy="22.4" r="2.8" fill="#10b981"/>

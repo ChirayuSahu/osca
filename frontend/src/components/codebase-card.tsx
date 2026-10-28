@@ -14,8 +14,7 @@ import {
   Workflow,
   type LucideIcon,
 } from "lucide-react";
-import { Dither } from "@/components/ui/dither";
-import { Eyebrow, SegmentedMeter } from "@/components/repo-ui";
+import { Eyebrow, Meter } from "@/components/repo-ui";
 import { VisualMap, type ManifestNode, type TreeNode } from "@/components/visual-map";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { cn } from "@/lib/utils";
@@ -224,7 +223,7 @@ function Overview({
                     {a.name ? `${a.name}/` : "root files"}
                   </span>
                 </span>
-                <SegmentedMeter value={(a.count / Math.max(fileCount, 1)) * 100} segments={32} />
+                <Meter value={(a.count / Math.max(fileCount, 1)) * 100} />
                 <span className="text-right text-xs text-muted-foreground tabular-nums">{a.count.toLocaleString()}</span>
               </RowLink>
             </li>
@@ -332,15 +331,7 @@ export function CodebaseCard({
       </div>
 
       {!hasData ? (
-        <div className="relative isolate flex items-center justify-center px-6 py-14 text-center">
-          <Dither
-            cols={70}
-            rows={22}
-            cell={4}
-            direction="radial"
-            peak={0.6}
-            className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
-          />
+        <div className="flex items-center justify-center px-6 py-14 text-center">
           <p className="text-sm text-muted-foreground">This repository hasn&apos;t been mapped yet.</p>
         </div>
       ) : view === "overview" ? (

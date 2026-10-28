@@ -54,10 +54,10 @@ export default function CreateThreadDialog({ isOpen, onClose, owner, repo, onThr
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="gap-0 overflow-hidden rounded-md p-0 sm:max-w-xl">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
         <form onSubmit={handleSubmit}>
-          <DialogHeader className="gap-0 border-b border-border px-5 py-3 text-left">
-            <DialogTitle className="flex items-center gap-2 text-sm font-medium">
+          <DialogHeader className="border-b border-border px-6 py-4">
+            <DialogTitle className="flex items-center gap-2">
               <GithubIcon className="size-4 text-muted-foreground" />
               {owner && repo ? (
                 <>
@@ -70,7 +70,7 @@ export default function CreateThreadDialog({ isOpen, onClose, owner, repo, onThr
             <DialogDescription className="sr-only">Opens a new issue on GitHub.</DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col px-5 pt-4">
+          <div className="flex flex-col px-6 pt-5">
             <Label htmlFor="thread-title" className="sr-only">Title</Label>
             <input
               id="thread-title"
@@ -96,7 +96,7 @@ export default function CreateThreadDialog({ isOpen, onClose, owner, repo, onThr
             {error && <p role="alert" className="pb-1 text-sm text-destructive">{error}</p>}
           </div>
 
-          <DialogFooter className="mt-3 flex-row items-center gap-2 border-t border-border px-5 py-3 sm:justify-between">
+          <DialogFooter className="mt-4 flex-row items-center gap-2 border-t border-border px-6 py-4 sm:justify-between">
             <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:inline-flex">
               <FileText className="size-3.5" /> Markdown supported
             </span>

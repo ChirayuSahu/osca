@@ -1,23 +1,25 @@
 # OSCA UI guidelines
 
-OSCA's look: a dark-first, emerald-accented interface with italic display headings, a
-1-bit emerald dither that reacts to the pointer, and fluid, quiet motion (no glows,
-gradients or blur). Every screen keeps that
+OSCA's look: a dark-first, emerald-accented interface with italic display headings,
+plain minimal surfaces and fluid, quiet motion (no glows, gradients or blur). Every screen keeps that
 language, built from the shared components in `src/components/ui`, and works in both
 light and dark mode (theme switcher in the top bar).
 
 ## Design language (keep it)
 
-- **Display type.** Page titles are Playfair Display italic (`PageHeader` does this:
-  `font-serif italic text-[40px]` + bold subtitle). Body is Manrope, code/numbers JetBrains Mono.
+- **Display type.** Page titles are sans (Manrope, semibold) with the key word in Playfair Display
+  italic: `<PageHeader title={<>Search <em>GitHub</em></>} />`. Body is Manrope, code/numbers JetBrains Mono.
+- **Dark first.** The app defaults to dark: a near-black with a faint green cast (`.dark` tokens in
+  `globals.css`). The active sidebar row uses the deep green `bg-nav-active` fill. Light mode still works.
+- **Cards.** `RepoCard` is `bg-card` with a thin border and an emerald bottom edge (`border-b-emerald-500/40`).
+  Descriptions reserve two lines (`min-h-[2lh]`) so sections and footers line up across a grid row.
 - **Emerald accent.** Primary actions are solid emerald buttons (`Button` default).
   Accents, active states, links and highlights use emerald.
-- **Dither, not glow.** Decoration is 1-bit ordered dither in emerald (`Dither`,
-  `DitheredImage`). Use `direction="radial"` (or a mask) so patterns fade out on every side —
-  never a hard-edged block. Repo/user logos appear only as dithered backgrounds, never as
-  foreground images in cards.
+- **No decoration layer.** The emerald 1-bit dither (and logos/avatars drawn as dithered
+  backgrounds) is no longer used, and its components have been removed. Don't replace it
+  with gradients, glows, blurs or patterns; headers, banners and cards hold only their content.
 - **Minimal cards.** Show only what's needed to decide (name, one-line description, one
-  meta line). Hover is quiet: border to `hover:border-foreground/20` and the dither firms up —
+  meta line). Hover is quiet: border to `hover:border-foreground/20` —
   no lifts, glows, colour shifts or sliding arrows.
 - **Motion.** Content fades/slides in (`animate-in fade-in slide-in-from-bottom-2`),
   lists stagger with `style={{ animationDelay }}`, hovers transition over 200–300ms,
@@ -39,7 +41,6 @@ The emerald look must read well in light mode too:
 | Borders | `border` / `border-border`, hover `hover:border-foreground/15` (never `border-white/[..]`) |
 | Emerald text | `text-emerald-600 dark:text-emerald-400` (500/600 for light, 300/400 for dark) |
 | Emerald fills/tints | `bg-emerald-500`, `bg-emerald-500/10`, `border-emerald-500/20–40` (fine in both themes) |
-| Glows | `shadow-[0_0_Npx_rgba(16,185,129,a)]` emerald glows are allowed; no white/black glows |
 | Status | `text-warning`/`bg-warning/10`, `text-destructive`, success = emerald |
 
 ## Layout and spacing

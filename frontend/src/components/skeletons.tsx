@@ -12,13 +12,9 @@ import { cn } from "@/lib/utils";
 /** Eyebrow, serif title, description, divider — as in PageHeader */
 export function PageHeaderSkeleton() {
   return (
-    <div className="flex flex-col gap-4" aria-hidden>
-      <Skeleton className="h-3 w-24" />
-      <div className="space-y-3">
-        <Skeleton className="h-11 w-56 md:h-12" />
-        <Skeleton className="h-4 w-96 max-w-full" />
-      </div>
-      <div className="mt-2 h-px bg-border" />
+    <div className="space-y-2" aria-hidden>
+      <Skeleton className="h-9 w-64 max-w-full md:h-10" />
+      <Skeleton className="h-4 w-96 max-w-full" />
     </div>
   );
 }
@@ -149,7 +145,7 @@ export function ChatSkeleton() {
   return (
     <div
       aria-busy="true"
-      className="mx-auto flex h-[calc(100svh-5rem)] w-full max-w-5xl flex-col px-4 pb-6 pt-2 md:h-[calc(100svh-2rem)] md:px-6"
+      className="mx-auto flex h-[calc(100svh-4.5rem)] w-full max-w-5xl flex-col px-4 pb-4 md:h-[calc(100svh-2rem)] md:px-6 md:pb-6"
     >
       <div className="flex flex-1 flex-col items-center justify-center gap-8">
         <Skeleton className="h-12 w-[min(36rem,90%)] md:h-16" />
@@ -219,32 +215,31 @@ export function RepositorySkeleton() {
 export function ThreadSkeleton() {
   return (
     <PageContainer aria-busy="true">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="rounded-md border border-border bg-card p-5 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
           <div className="flex-1 space-y-3">
             <div className="flex gap-2">
               <Skeleton className="h-6 w-16" />
               <Skeleton className="h-6 w-20" />
             </div>
-            <Skeleton className="h-8 w-full max-w-2xl md:h-9" />
+            <Skeleton className="h-7 w-full max-w-2xl md:h-8" />
             <Skeleton className="h-4 w-56" />
           </div>
           <div className="flex shrink-0 gap-2">
-            <Skeleton className="h-8 w-14" />
             <Skeleton className="size-8" />
             <Skeleton className="h-8 w-36" />
           </div>
         </div>
-        <div className="h-px bg-border" />
       </div>
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <div className="overflow-hidden rounded-md border border-border bg-card">
-            <div className="flex items-center gap-2 border-b border-border px-5 py-3">
+            <div className="flex items-center gap-2.5 border-b border-border px-5 py-3 sm:px-6">
+              <Skeleton className="size-6 rounded-full" />
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-3.5 w-20" />
             </div>
-            <div className="space-y-2.5 px-5 py-4">
+            <div className="space-y-2.5 p-5 sm:p-6">
               <Skeleton className="h-3.5 w-full" />
               <Skeleton className="h-3.5 w-11/12" />
               <Skeleton className="h-3.5 w-4/5" />

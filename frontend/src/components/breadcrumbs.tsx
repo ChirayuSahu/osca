@@ -72,7 +72,7 @@ export function AppBreadcrumbs({ className }: { className?: string }) {
   const pathname = usePathname();
   const ctx = React.useContext(LabelsContext);
   const crumbs = crumbsFor(pathname, ctx?.labels ?? {});
-  if (crumbs.length === 0) return <div aria-hidden className="h-6 md:h-8" />;
+  if (crumbs.length === 0) return <div aria-hidden className="h-4 md:h-8" />;
 
   return (
     <nav aria-label="Breadcrumb" className={cn("flex h-12 items-center", className)}>

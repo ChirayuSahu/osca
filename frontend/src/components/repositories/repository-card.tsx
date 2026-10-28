@@ -2,12 +2,12 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock, Download, Star, Trash2 } from "lucide-react";
+import { Clock, Download, GitFork, Star, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { DitherCard, LanguageDot, RepoTitle, StatusPill, compactNumber } from "@/components/repo-ui";
+import { RepoCard, LanguageDot, RepoTitle, StatusPill, compactNumber } from "@/components/repo-ui";
 
 export interface Repository {
   id: number | string;
@@ -59,49 +59,36 @@ export function RepositoryCard({ repo, mode = "view", importStatus, onAction, on
 
   const [owner, name] = splitName(repo.name);
   const isImportMode = mode === "import";
-  const imported = isImportMode ? importStatus?.state === "imported" : true;
+  // Only search results need the tag; everything on the Imported page is imported
+  const imported = isImportMode && importStatus?.state === "imported";
   const detailsHref =
     isImportMode && importStatus?.state === "imported"
       ? `/dashboard/repository/${importStatus.internalId}`
       : `/dashboard/repository/${repo.id}`;
 
-  let action: React.ReactNode;
+  // Imported repos open from anywhere on the card; search results not yet imported don't open
+  const openable = !isImportMode || importStatus?.state === "imported";
+
+  let action: React.ReactNode = null;
   if (!isImportMode) {
-    action = (
-      <>
-        {onDelete && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Remove from imported"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={(e) => {
-                  e.preventDefault();
-                  onDelete(repo);
-                }}
-              >
-                <Trash2 />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Remove from imported</TooltipContent>
-          </Tooltip>
-        )}
-        <Button variant="outline" size="sm" asChild>
-          <Link href={detailsHref}>
-            Open <ArrowRight />
-          </Link>
-        </Button>
-      </>
-    );
-  } else if (importStatus?.state === "imported") {
-    action = (
-      <Button variant="outline" size="sm" asChild>
-        <Link href={detailsHref}>
-          Open <ArrowRight />
-        </Link>
-      </Button>
+    action = onDelete && (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Remove from imported"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete(repo);
+            }}
+          >
+            <Trash2 />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Remove from imported</TooltipContent>
+      </Tooltip>
     );
   } else if (importStatus?.state === "queued") {
     action = (
@@ -109,7 +96,7 @@ export function RepositoryCard({ repo, mode = "view", importStatus, onAction, on
         <Clock /> Queued
       </Button>
     );
-  } else {
+  } else if (importStatus?.state !== "imported") {
     action = (
       <Button size="sm" onClick={handleAction} disabled={isLoading}>
         {isLoading ? <Spinner className="text-current" /> : <Download />}
@@ -119,43 +106,53 @@ export function RepositoryCard({ repo, mode = "view", importStatus, onAction, on
   }
 
   return (
-    <DitherCard className="h-full" logo={owner || undefined}>
-      <div className="flex flex-1 flex-col gap-3 p-5">
+    <RepoCard className={openable ? "h-full cursor-pointer has-[a:focus-visible]:border-ring" : "h-full"}>
+      <div className="flex flex-1 flex-col gap-2 px-6 pb-5 pt-6">
         <div className="flex items-center gap-3">
-          <RepoTitle owner={owner} name={name} />
+          {openable ? (
+            // Stretched over the whole card; the buttons sit above it
+            <Link href={detailsHref} className="min-w-0 outline-none after:absolute after:inset-0 after:content-['']">
+              <RepoTitle owner={owner} name={name} />
+            </Link>
+          ) : (
+            <RepoTitle owner={owner} name={name} />
+          )}
           {imported && (
             <div className="ml-auto">
               <StatusPill>Imported</StatusPill>
             </div>
           )}
         </div>
-        {repo.description && (
-          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{repo.description}</p>
-        )}
+        {/* Always two lines tall, so the footers line up across a row */}
+        <p className="line-clamp-2 min-h-[2lh] text-sm leading-relaxed text-muted-foreground">{repo.description}</p>
       </div>
-      <div className="flex min-w-0 items-center gap-3 whitespace-nowrap px-5 pb-4 text-xs text-muted-foreground">
+      <div className="flex min-h-14 min-w-0 items-center gap-4 whitespace-nowrap px-6 pb-6 text-xs text-muted-foreground">
         {repo.language && <LanguageDot language={repo.language} />}
+        {repo.forks > 0 && (
+          <span className="inline-flex items-center gap-1 tabular-nums" title="Forks">
+            <GitFork className="size-3.5" aria-hidden />
+            <span className="sr-only">Forks</span>
+            {compactNumber(repo.forks)}
+          </span>
+        )}
         <span className="inline-flex items-center gap-1 tabular-nums" title="Stars">
           <Star className="size-3.5" aria-hidden />
           <span className="sr-only">Stars</span>
           {compactNumber(repo.stars)}
         </span>
-        <div className="ml-auto flex shrink-0 items-center gap-1">{action}</div>
+        {action && <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1">{action}</div>}
       </div>
-    </DitherCard>
+    </RepoCard>
   );
 }
 
 export function RepositoryCardSkeleton() {
   return (
-    <div className="flex h-full flex-col gap-3 rounded-md border border-border bg-card p-5">
-      <div className="space-y-1.5">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="h-4 w-36" />
-      </div>
+    <div className="flex h-full flex-col gap-2 rounded-md border border-border bg-card p-6">
+      <Skeleton className="h-4 w-44" />
       <Skeleton className="h-3.5 w-full" />
-      <Skeleton className="h-3.5 w-3/4" />
-      <div className="mt-1 flex items-center justify-between">
+      <Skeleton className="mb-6 h-3.5 w-3/4" />
+      <div className="mt-auto flex items-center justify-between">
         <Skeleton className="h-3.5 w-28" />
         <Skeleton className="h-8 w-20" />
       </div>

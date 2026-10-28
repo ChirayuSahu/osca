@@ -1,13 +1,12 @@
 "use client";
 
 // Shared building blocks for repository/contributor UI (see /dashboard/samples
-// and DESIGN.md): minimal dither cards, coloured tags, language dots, status
-// chips and the segmented meter.
+// and DESIGN.md): minimal cards, coloured tags, language dots, status
+// chips and the meter.
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { Dither } from "@/components/ui/dither";
-import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 /* ─── Tags ─────────────────────────────────────────────────────────────────── */
 
@@ -76,46 +75,18 @@ export function topLanguages(languages: unknown, count = 3): string[] {
 
 /* ─── Card surface ─────────────────────────────────────────────────────────── */
 
-interface DitherCardProps extends React.ComponentProps<"div"> {
-  /** GitHub login whose avatar is dithered into the top-right corner */
-  logo?: string;
-}
-
-// Minimal card: the owner's logo is dithered into the corner (plain dither
-// without one); hover only firms up the border and the dots.
-export function DitherCard({ logo, className, children, onClick, ...props }: DitherCardProps) {
-  const cornerDither = (
-    <Dither
-      cols={36}
-      rows={14}
-      cell={4}
-      direction="top-right"
-      className="absolute right-0 top-0 text-emerald-500/[0.10] transition-colors duration-500 group-hover:text-emerald-500/25"
-    />
-  );
+// Minimal card surface with a thin emerald bottom edge; hover only firms up the border.
+export function RepoCard({ className, children, onClick, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       onClick={onClick}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-md border border-border bg-card transition-colors duration-300 hover:border-foreground/20",
+        "group relative flex flex-col overflow-hidden rounded-md border border-border border-b-emerald-500/40 bg-card transition-colors duration-300 hover:border-foreground/20 hover:border-b-emerald-500/60",
         onClick && "cursor-pointer",
         className
       )}
       {...props}
     >
-      {logo ? (
-        <div className="pointer-events-none absolute -right-6 -top-6 [mask-image:radial-gradient(circle_at_top_right,black_35%,transparent_75%)]">
-          <DitheredImage
-            src={githubAvatarUrl(logo)}
-            cols={34}
-            cell={4}
-            className="text-emerald-500/[0.16] transition-colors duration-500 group-hover:text-emerald-500/35"
-            fallback={cornerDither}
-          />
-        </div>
-      ) : (
-        cornerDither
-      )}
       <div className="relative flex flex-1 flex-col">{children}</div>
     </div>
   );
@@ -123,11 +94,30 @@ export function DitherCard({ logo, className, children, onClick, ...props }: Dit
 
 /* ─── Text bits ────────────────────────────────────────────────────────────── */
 
+/** A GitHub user's or organisation's picture, at `size` pixels */
+export function githubAvatarUrl(login: string, size = 80): string {
+  return `https://github.com/${encodeURIComponent(login)}.png?size=${size}`;
+}
+
+/** Repository owner's picture (square, as GitHub shows organisations), initials until it loads */
+export function OwnerAvatar({ owner, className }: { owner: string; className?: string }) {
+  return (
+    <Avatar className={cn("size-9 shrink-0 rounded-md border border-border", className)}>
+      <AvatarImage src={githubAvatarUrl(owner)} alt="" />
+      <AvatarFallback className="rounded-md text-xs font-semibold">{owner.slice(0, 2).toUpperCase()}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+/** Owner's picture, then "owner/name" on one line with the name in bold */
 export function RepoTitle({ owner, name, className }: { owner: string; name: string; className?: string }) {
   return (
-    <div className={cn("min-w-0", className)}>
-      <p className="truncate text-xs text-muted-foreground">{owner}</p>
-      <p className="truncate text-[17px] font-semibold leading-tight">{name}</p>
+    <div className={cn("flex min-w-0 items-center gap-3", className)}>
+      {owner && <OwnerAvatar owner={owner} />}
+      <p className="min-w-0 truncate text-base leading-tight" title={owner ? `${owner}/${name}` : name}>
+        {owner && <span className="text-muted-foreground">{owner}/</span>}
+        <span className="font-semibold">{name}</span>
+      </p>
     </div>
   );
 }
@@ -208,30 +198,18 @@ export function StatStrip({ stats, className }: { stats: Stat[]; className?: str
 
 /* ─── Meter ────────────────────────────────────────────────────────────────── */
 
-/** Pixel meter in the dither style: filled squares out of `segments` */
-export function SegmentedMeter({
-  value,
-  segments = 24,
-  animated = false,
-  className,
-}: {
-  value: number;
-  segments?: number;
-  /** Filled segments light up left to right once a parent gets `in-view` (landing page) */
-  animated?: boolean;
-  className?: string;
-}) {
+/** Thin progress bar: an emerald fill on a muted track, 0–100 */
+export function Meter({ value, className }: { value: number; className?: string }) {
   const clamped = Math.max(0, Math.min(100, value));
-  const filled = Math.round((clamped / 100) * segments);
   return (
-    <div className={cn("flex gap-[3px]", className)} role="meter" aria-valuenow={Math.round(clamped)} aria-valuemin={0} aria-valuemax={100}>
-      {Array.from({ length: segments }, (_, i) => (
-        <span
-          key={i}
-          className={cn("h-2 flex-1 rounded-[1px]", i < filled ? "bg-emerald-500" : "bg-muted", animated && i < filled && "segment-on")}
-          style={animated && i < filled ? ({ "--i": i } as React.CSSProperties) : undefined}
-        />
-      ))}
+    <div
+      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}
+      role="meter"
+      aria-valuenow={Math.round(clamped)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${clamped}%` }} />
     </div>
   );
 }

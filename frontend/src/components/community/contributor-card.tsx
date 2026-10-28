@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GithubIcon } from "@/components/icons";
-import { DitherCard, Tag } from "@/components/repo-ui";
+import { RepoCard, Tag, githubAvatarUrl } from "@/components/repo-ui";
 import type { CommunityContributor } from "@/services/community.service";
 
 interface ContributorCardProps {
@@ -16,11 +16,11 @@ interface ContributorCardProps {
 // while "View on GitHub" stays its own link above it.
 export function ContributorCard({ contributor }: ContributorCardProps) {
   return (
-    <DitherCard className="h-full cursor-pointer has-[a:focus-visible]:border-ring">
+    <RepoCard className="h-full cursor-pointer has-[a:focus-visible]:border-ring">
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="flex items-center gap-3">
-          <Avatar className="size-11 rounded-md border border-border">
-            {contributor.avatarUrl && <AvatarImage src={contributor.avatarUrl} alt={contributor.name} />}
+          <Avatar className="size-11 rounded-full border border-border">
+            <AvatarImage src={contributor.avatarUrl ?? githubAvatarUrl(contributor.username)} alt={contributor.name} />
             <AvatarFallback className="font-semibold">{contributor.name.substring(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="min-w-0">
@@ -52,7 +52,7 @@ export function ContributorCard({ contributor }: ContributorCardProps) {
           <GithubIcon className="size-3.5" /> View on GitHub
         </a>
       </div>
-    </DitherCard>
+    </RepoCard>
   );
 }
 
@@ -60,7 +60,7 @@ export function ContributorCardSkeleton() {
   return (
     <div className="flex h-full flex-col gap-4 rounded-md border border-border bg-card p-5">
       <div className="flex items-center gap-3">
-        <Skeleton className="size-11 rounded-md" />
+        <Skeleton className="size-11 rounded-full" />
         <div className="space-y-2">
           <Skeleton className="h-4 w-28" />
           <Skeleton className="h-3.5 w-20" />

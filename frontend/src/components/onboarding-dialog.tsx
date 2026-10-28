@@ -74,9 +74,9 @@ export function OnboardingDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && !saving && finish(false)}>
-      <DialogContent className="max-h-[90svh] gap-6 overflow-y-auto rounded-md sm:max-w-2xl">
+      <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="font-serif text-2xl font-medium italic">What do you want to work on?</DialogTitle>
+          <DialogTitle>What do you want to <em>work on</em>?</DialogTitle>
           <DialogDescription>
             Three quick questions so your first recommendations fit. You can change any of it in Settings.
           </DialogDescription>

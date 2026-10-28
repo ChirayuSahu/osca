@@ -1,12 +1,12 @@
 import { PageContainer } from "@/components/ui/page-container";
-import { ListCardSkeleton, PageHeaderSkeleton } from "@/components/skeletons";
+import { CardGridSkeleton, PageHeaderSkeleton, RepoCardSkeleton } from "@/components/skeletons";
 
-// Next issues: one list card of issue rows
+// Next issues: a grid of issue cards
 export default function Loading() {
   return (
     <PageContainer aria-busy="true">
       <PageHeaderSkeleton />
-      <ListCardSkeleton rows={6} action={false} />
+      <CardGridSkeleton card={<RepoCardSkeleton />} />
     </PageContainer>
   );
 }

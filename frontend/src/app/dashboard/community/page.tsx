@@ -49,8 +49,7 @@ export default function CommunityPage() {
   return (
     <PageContainer>
       <PageHeader
-        eyebrow="Discover"
-        title="Community"
+        title={<em>Community</em>}
         description="People who share your skills, and projects where they're active."
       />
 

@@ -32,8 +32,8 @@ export function GroupChatPanel({ isOpen, onClose }: GroupChatPanelProps) {
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-md">
         <SheetHeader className="border-b p-4">
-          <SheetTitle className="text-base font-semibold">Repository chat</SheetTitle>
-          <SheetDescription className="text-sm">Talk with other contributors to this repository.</SheetDescription>
+          <SheetTitle>Repository chat</SheetTitle>
+          <SheetDescription>Talk with other contributors to this repository.</SheetDescription>
         </SheetHeader>
 
         <div className="flex flex-1 flex-col overflow-y-auto p-4">

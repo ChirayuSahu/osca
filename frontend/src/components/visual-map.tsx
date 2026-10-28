@@ -5,7 +5,6 @@ import dynamic from 'next/dynamic'
 import { useTheme } from 'next-themes'
 import { Maximize, Minimize } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Dither } from '@/components/ui/dither'
 import { cn } from '@/lib/utils'
 
 // Deeper paths are left out so large repos stay readable
@@ -260,15 +259,7 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
 
   if (!folderStructure && !dependencies) {
     return (
-      <div className="relative isolate flex items-center justify-center rounded-md border border-border bg-background px-6 py-14 text-center">
-        <Dither
-          cols={70}
-          rows={22}
-          cell={4}
-          direction="radial"
-          peak={0.6}
-          className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
-        />
+      <div className="flex items-center justify-center rounded-md border border-border bg-background px-6 py-14 text-center">
         <p className="text-sm text-muted-foreground">No map data for this repository yet.</p>
       </div>
     )

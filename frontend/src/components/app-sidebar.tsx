@@ -18,7 +18,6 @@ import {
   Users,
 } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
-import { Dither } from "@/components/ui/dither";
 import { useAuth } from "@/context/auth-context";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -100,13 +99,12 @@ function ThemeSwitch() {
   );
 }
 
-// Nav row: muted by default; the active page gets a thin emerald marker and a
-// quiet background. Hover only lightens the background.
+// Nav row: muted by default; the active page gets the deep green fill.
+// Hover only lightens the background.
 const NAV_ITEM_CLASS =
-  "relative h-9 gap-3 px-3 text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-foreground " +
-  "data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-foreground " +
-  "before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:rounded-full before:bg-emerald-500 before:opacity-0 " +
-  "data-[active=true]:before:opacity-100 group-data-[collapsible=icon]:before:hidden";
+  "h-10 gap-3 rounded-md px-3 text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground " +
+  "data-[active=true]:bg-nav-active data-[active=true]:font-medium data-[active=true]:text-nav-active-foreground " +
+  "data-[active=true]:hover:bg-nav-active data-[active=true]:hover:text-nav-active-foreground";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -125,17 +123,15 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <div className="contents" onClick={closeOnNavigate}>
-      <SidebarHeader className="px-2 pb-2 pt-4">
+      <SidebarHeader className="px-3 pb-4 pt-6">
         {/* Wordmark centred in the header; the collapse button sits on the right edge */}
-        <div className="relative flex h-9 items-center justify-center">
+        <div className="relative flex h-10 items-center justify-center">
           <Link
             href={ROUTES.DASHBOARD}
             aria-label="osca home"
-            className="flex items-baseline gap-1.5 group-data-[collapsible=icon]:hidden"
+            className="font-serif text-[28px] font-semibold italic leading-none tracking-tight group-data-[collapsible=icon]:hidden"
           >
-            <span className="font-serif text-[26px] font-semibold italic leading-none tracking-tight">osca</span>
-            {/* Sits on the baseline, raised to the middle of the lowercase letters (x-height ≈ 14px) */}
-            <span className="size-2 shrink-0 -translate-y-[3px] rounded-full bg-emerald-500" />
+            osca
           </Link>
           <SidebarTrigger className="absolute right-0 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:static" />
         </div>
@@ -143,17 +139,17 @@ export function AppSidebar() {
 
       <SidebarContent>
         {NAV_GROUPS.map((group) => (
-          <SidebarGroup key={group.label} className="py-1.5">
+          <SidebarGroup key={group.label} className="px-3 py-2">
             <SidebarGroupLabel className="h-7 px-3 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
               {group.label}
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
+              <SidebarMenu className="gap-1">
                 {group.items.map((item) => (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton asChild isActive={isActive(item.href)} tooltip={item.name} className={NAV_ITEM_CLASS}>
                       <Link href={item.href}>
-                        <item.icon className={isActive(item.href) ? "text-emerald-600 dark:text-emerald-400" : undefined} />
+                        <item.icon />
                         <span>{item.name}</span>
                       </Link>
                     </SidebarMenuButton>
@@ -165,23 +161,14 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
 
-      <SidebarFooter className="relative isolate overflow-hidden p-2">
-        {/* Faint dither cloud under the account card */}
-        <Dither
-          cols={70}
-          rows={30}
-          cell={4}
-          direction="radial"
-          peak={0.6}
-          className="absolute -bottom-16 left-1/2 -z-10 -translate-x-1/2 text-emerald-500/[0.10] group-data-[collapsible=icon]:hidden"
-        />
+      <SidebarFooter className="p-3">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="h-12 gap-3 rounded-md border border-sidebar-border bg-sidebar px-2.5 hover:bg-sidebar-accent/60 data-[state=open]:bg-sidebar-accent group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0!"
+                  className="h-12 gap-3 rounded-md border border-sidebar-border bg-sidebar px-2.5 hover:bg-sidebar-accent data-[state=open]:bg-sidebar-accent group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:p-0!"
                 >
                   <Avatar className="size-8 rounded-md group-data-[collapsible=icon]:size-8">
                     {user?.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}

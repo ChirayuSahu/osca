@@ -48,7 +48,7 @@ const VIEW_OPTIONS = [
   { value: "focus", label: "One by one" },
 ] as const satisfies readonly { value: FeedView; label: string }[];
 
-const HEADER = <PageHeader eyebrow="Account" title="Settings" description="Your profile's visibility, what you're recommended, and your account." />;
+const HEADER = <PageHeader title={<em>Settings</em>} description="Your profile's visibility, what you're recommended, and your account." />;
 
 /* ─── Layout pieces ────────────────────────────────────────────────────────── */
 
@@ -388,7 +388,7 @@ export default function SettingsPage() {
           if (!open) setConfirmText("");
         }}
       >
-        <DialogContent className="rounded-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete your account?</DialogTitle>
             <DialogDescription>

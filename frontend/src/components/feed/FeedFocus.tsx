@@ -23,9 +23,7 @@ import { RepositoryService, type StarterIssue } from '@/services/repository.serv
 import { isGithubTokenError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Kbd, KbdGroup } from '@/components/ui/kbd'
-import { Dither } from '@/components/ui/dither'
-import { DitheredImage, githubAvatarUrl } from '@/components/ui/dithered-image'
-import { Eyebrow, SegmentedMeter, StatStrip, Tag, compactNumber, timeAgo, topLanguages } from '@/components/repo-ui'
+import { Eyebrow, Meter, StatStrip, Tag, compactNumber, timeAgo, topLanguages } from '@/components/repo-ui'
 import { cn } from '@/lib/utils'
 
 interface FeedFocusProps {
@@ -389,8 +387,6 @@ function FocusCard({
     { label: 'Good first issues', value: goodFirst.toLocaleString(), icon: Sprout, accent: true },
   ]
 
-  const fallbackDither = <Dither cols={90} rows={60} cell={5} direction="radial" className="text-emerald-500/20" />
-
   return (
     <article
       onPointerDown={onPointerDown}
@@ -399,18 +395,13 @@ function FocusCard({
       onPointerCancel={onPointerUp}
       style={dragX ? { transform: `translateX(${dragX}px) rotate(${dragX / 40}deg)` } : undefined}
       className={cn(
-        'relative isolate flex min-h-0 w-full flex-1 touch-pan-y select-none flex-col overflow-hidden rounded-md border bg-card',
+        'relative flex min-h-0 w-full flex-1 touch-pan-y select-none flex-col overflow-hidden rounded-md border bg-card',
         'animate-in fade-in duration-200 motion-reduce:animate-none',
         direction === 'next' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         dragX === 0 && 'transition-transform',
         liked ? 'border-emerald-500/40' : 'border-border'
       )}
     >
-      {/* Owner logo, dithered, fading out on all sides */}
-      <div className="pointer-events-none absolute -right-12 -top-10 -z-10 [mask-image:radial-gradient(closest-side,black_45%,transparent)]">
-        <DitheredImage src={githubAvatarUrl(owner, 200)} cols={84} cell={5} className="text-emerald-500/25" fallback={fallbackDither} />
-      </div>
-
       <div className="flex shrink-0 flex-col gap-4 p-5 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           {breakdown.fallback ? (
@@ -435,7 +426,7 @@ function FocusCard({
           <p className="text-sm text-muted-foreground">
             {owner} <span className="text-muted-foreground/50">/</span>
           </p>
-          <h2 className="break-words font-serif text-4xl font-medium italic tracking-wide">{name}</h2>
+          <h2 className="break-words text-3xl font-semibold tracking-tight">{name}</h2>
         </div>
 
         {repo.description ? (
@@ -460,13 +451,13 @@ function FocusCard({
           {match !== null && !breakdown.fallback && (
             <div className="flex flex-col gap-2">
               <Eyebrow>Skill match</Eyebrow>
-              <SegmentedMeter value={match} segments={24} />
+              <Meter value={match} />
             </div>
           )}
           {!breakdown.fallback && typeof breakdown.approachabilityScore === 'number' && (
             <div className="flex flex-col gap-2">
               <Eyebrow>Newcomer friendly</Eyebrow>
-              <SegmentedMeter value={Math.round(breakdown.approachabilityScore * 100)} segments={24} />
+              <Meter value={Math.round(breakdown.approachabilityScore * 100)} />
             </div>
           )}
         </div>
@@ -564,15 +555,7 @@ function StarterIssues({ repositoryId, token }: { repositoryId: string; token: s
 
 function EndCard({ loading, onBack, onExit }: { loading: boolean; onBack: () => void; onExit: () => void }) {
   return (
-    <div className="relative isolate flex w-full flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-md border border-border bg-card px-6 py-20 text-center">
-      <Dither
-        cols={110}
-        rows={40}
-        cell={5}
-        direction="radial"
-        peak={0.6}
-        className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
-      />
+    <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 overflow-hidden rounded-md border border-border bg-card px-6 py-20 text-center">
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading more repositories…</p>
       ) : (
