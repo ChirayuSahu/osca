@@ -1,74 +1,64 @@
 "use client";
 
 import React from "react";
-import { Users, ArrowRight, Clock } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-interface Collaboration {
-  id: string;
-  repoName: string;
-  repoOwner: string;
-  title: string;
-  description: string;
-  requestedRoles: string[];
-  activeContributors: number;
-  timeAgo: string;
-  ownerAvatarUrl?: string;
-}
+import { useRouter } from "next/navigation";
+import { ArrowRight, Sprout, Users } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DitherCard, RepoTitle } from "@/components/repo-ui";
+import type { CollaborationOpportunity } from "@/services/community.service";
 
 interface CollaborationCardProps {
-  collaboration: Collaboration;
+  collaboration: CollaborationOpportunity;
 }
 
 export function CollaborationCard({ collaboration }: CollaborationCardProps) {
+  const router = useRouter();
+  const href = `/dashboard/repository/${collaboration.repositoryId}`;
+  const { peers, goodFirstIssueCount } = collaboration;
+
   return (
-    <div className="bg-[#0A0A0A] border border-[#222222] hover:border-emerald-500/30 transition-all duration-300 rounded-[28px] p-7 group relative overflow-hidden">
-      {/* Subtle background flair */}
-      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none -translate-y-1/2 translate-x-1/2 group-hover:bg-emerald-500/10 transition-colors" />
-
-      <div className="flex items-center gap-3 mb-5">
-        <Avatar className="w-8 h-8 border border-white/10">
-          <AvatarImage src={collaboration.ownerAvatarUrl} alt={collaboration.repoOwner} />
-          <AvatarFallback className="bg-neutral-800 text-xs text-neutral-400">
-            {collaboration.repoOwner.substring(0, 2).toUpperCase()}
-          </AvatarFallback>
-        </Avatar>
-        <div className="text-sm font-medium text-neutral-400">
-          {collaboration.repoOwner} <span className="text-neutral-600">/</span> <span className="text-neutral-200">{collaboration.repoName}</span>
-        </div>
+    <DitherCard
+      className="h-full"
+      logo={collaboration.owner}
+      role="link"
+      tabIndex={0}
+      aria-label={`${collaboration.owner}/${collaboration.name}`}
+      onClick={() => router.push(href)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") router.push(href);
+      }}
+    >
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <RepoTitle owner={collaboration.owner} name={collaboration.name} />
+        {collaboration.description && (
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{collaboration.description}</p>
+        )}
       </div>
-
-      <h3 className="text-xl font-medium text-white mb-2 leading-snug group-hover:text-emerald-400 transition-colors">
-        {collaboration.title}
-      </h3>
-      
-      <p className="text-neutral-400 text-sm font-light leading-relaxed line-clamp-2 mb-6">
-        {collaboration.description}
-      </p>
-
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-500 font-medium uppercase tracking-wider">Seeking</span>
-          <div className="flex flex-wrap gap-2">
-            {collaboration.requestedRoles.map(role => (
-              <span key={role} className="px-2 py-0.5 text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full">
-                {role}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex items-center justify-between pt-5 border-t border-white/[0.04]">
-          <div className="flex items-center gap-4 text-xs text-neutral-500 font-light">
-            <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> {collaboration.activeContributors} Active</span>
-            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> {collaboration.timeAgo}</span>
-          </div>
-
-          <button className="text-sm text-neutral-300 hover:text-white font-medium flex items-center gap-1.5 group-hover:translate-x-1 transition-transform">
-            View Details <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="flex items-center gap-3 whitespace-nowrap px-5 pb-4 text-xs text-muted-foreground tabular-nums">
+        <span className="inline-flex items-center gap-1">
+          <Users className="size-3.5" /> {peers} {peers === 1 ? "person" : "people"} like you
+        </span>
+        {goodFirstIssueCount > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <Sprout className="size-3.5 text-emerald-600 dark:text-emerald-400" /> {goodFirstIssueCount} good first
+          </span>
+        )}
+        <ArrowRight className="ml-auto size-4" />
       </div>
+    </DitherCard>
+  );
+}
+
+export function CollaborationCardSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-3 rounded-md border border-border bg-card p-5">
+      <div className="space-y-1.5">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-4 w-36" />
+      </div>
+      <Skeleton className="h-3.5 w-full" />
+      <Skeleton className="h-3.5 w-3/4" />
+      <Skeleton className="mt-1 h-3.5 w-1/2" />
     </div>
   );
 }
