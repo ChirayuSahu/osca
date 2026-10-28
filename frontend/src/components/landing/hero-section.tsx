@@ -24,7 +24,7 @@ export default function HeroSection() {
           </div>
 
           <div>
-            <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
+            <a href="/dashboard" className="inline-block bg-neutral-900 border border-neutral-800 text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-neutral-800 transition-all duration-200">
               Sign up
             </a>
           </div>
@@ -43,7 +43,7 @@ export default function HeroSection() {
             An intelligent matchmaking layer that understands both sides and brings them together faster.
           </p>
           <div className="pt-2 flex justify-center lg:justify-start">
-            <a href="#how-it-works" className="inline-block text-[#FFFFFF] bg-emerald-500 hover:bg-emerald-600  font-semibold px-7 py-3.5 rounded-full text-sm transition-all duration-200 text-center active:scale-95 shadow-lg shadow-emerald-500/10">
+            <a href="#how-it-works" className="inline-block text-[#FFFFFF] bg-emerald-500 hover:bg-emerald-600  font-semibold px-7 py-3.5 rounded-md text-sm transition-all duration-200 text-center active:scale-95 shadow-lg shadow-emerald-500/10">
               Get Started
             </a>
           </div>
@@ -58,7 +58,7 @@ export default function HeroSection() {
               </div>
 
               <div className="flex flex-row sm:flex-col gap-1.5 w-full shrink-0">
-                <button className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-neutral-900 bg-white rounded-lg transition-colors">
+                <button className="flex items-center gap-2 w-full px-3 py-2 text-xs font-medium text-neutral-900 bg-white rounded-md transition-colors">
                   <svg className="w-3.5 h-3.5 stroke-current fill-none" viewBox="0 0 24 24" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
                   </svg>

@@ -17,7 +17,7 @@ export default function Navbar() {
           <a href="#benefits" className="hover:text-white transition-colors duration-200">Features</a>
         </div>
 
-        <a href="/dashboard" className="bg-[#3CAE6B] text-[#F0FFF2] font-medium px-6 py-2 rounded-full text-sm hover:bg-emerald-600 transition-all duration-200">
+        <a href="/dashboard" className="bg-[#3CAE6B] text-[#F0FFF2] font-medium px-6 py-2 rounded-md text-sm hover:bg-emerald-600 transition-all duration-200">
           Sign up
         </a>
       </nav>

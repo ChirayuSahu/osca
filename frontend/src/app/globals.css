@@ -7,12 +7,17 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Motion: one fluid curve (fast start, soft landing) for every transition and enter/exit */
+  --ease-fluid: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-fluid-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 200ms;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-serif: var(--font-playfair-display);
-  --font-mono: var(--font-mono);
-  --font-heading: var(--font-mono);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-geist-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -30,6 +35,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -42,82 +51,91 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * Design tokens. Neutral surfaces with a single emerald accent (primary).
+ * Components use these semantic tokens only; no raw colours in pages.
+ */
 :root {
+  --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: oklch(0.596 0.145 163.225);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.52 0 0);
+  --accent: oklch(0.96 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --success: oklch(0.596 0.145 163.225);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.666 0.179 58.318);
+  --warning-foreground: oklch(0.985 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: #000000;
-  --sidebar-foreground: #a3a3a3;
-  --sidebar-primary: #10b981;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: rgba(255, 255, 255, 0.02);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.05);
-  --sidebar-ring: #10b981;
+  --ring: oklch(0.596 0.145 163.225);
+  --chart-1: oklch(0.596 0.145 163.225);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.596 0.145 163.225);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.95 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.596 0.145 163.225);
 }
 
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.178 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: oklch(0.696 0.17 162.48);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --muted: oklch(0.235 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.696 0.17 162.48);
+  --success-foreground: oklch(0.145 0 0);
+  --warning: oklch(0.769 0.188 70.08);
+  --warning-foreground: oklch(0.145 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: #000000;
-  --sidebar-foreground: #a3a3a3;
-  --sidebar-primary: #10b981;
-  --sidebar-primary-foreground: #000000;
-  --sidebar-accent: rgba(255, 255, 255, 0.02);
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: rgba(255, 255, 255, 0.05);
-  --sidebar-ring: #10b981;
+  --ring: oklch(0.696 0.17 162.48);
+  --chart-1: oklch(0.696 0.17 162.48);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.488 0.243 264.376);
+  --chart-4: oklch(0.769 0.188 70.08);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.165 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.696 0.17 162.48);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.235 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.696 0.17 162.48);
 }
 
 @layer base {
@@ -125,17 +143,38 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
   }
-  html {
-    @apply font-mono;
+
+  /* Tailwind v4 resets buttons to the default cursor; every enabled
+     interactive element gets a pointer, disabled ones show not-allowed. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([data-disabled]),
+  [role="menuitemradio"]:not([data-disabled]),
+  [role="menuitemcheckbox"]:not([data-disabled]),
+  [role="option"]:not([data-disabled]),
+  [role="switch"]:not(:disabled),
+  [role="checkbox"]:not(:disabled),
+  a[href],
+  select:not(:disabled),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  select:disabled {
+    cursor: not-allowed;
   }
 }
 
 @layer utilities {
   .custom-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: var(--border) transparent;
   }
   .custom-scrollbar::-webkit-scrollbar {
     width: 6px;
@@ -144,11 +183,8 @@
     background: transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--border);
     border-radius: 9999px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.18);
   }
 }
 
@@ -166,6 +202,30 @@
   animation: shimmer-text 2.2s linear infinite;
 }
 
+/* "Thinking" text: a soft highlight sweeps through muted text */
+.text-shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 40%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 60%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: text-shimmer 1.8s linear infinite;
+}
+@keyframes text-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .text-shimmer { animation: none; color: var(--muted-foreground); background: none; }
+}
+
 @keyframes caret-blink {
   0%,
   100% {
@@ -178,4 +238,88 @@
 
 .animate-caret {
   animation: caret-blink 0.85s step-end infinite;
+}
+
+/* Codebase graph tooltip (force-graph's float-tooltip) */
+.float-tooltip-kap {
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  font: 12px/1.4 var(--font-mono), ui-monospace, monospace;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.float-tooltip-kap .graph-tip-kind {
+  display: block;
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* Chat composer aura: two soft emerald spots behind the composer's top edge, drifting
+   past each other. Animated through a registered custom property so the move is smooth. */
+@property --aura-x {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 30%;
+}
+.composer-aura {
+  background:
+    radial-gradient(40% 60% at var(--aura-x) 62%, color-mix(in oklab, var(--color-emerald-500) 45%, transparent), transparent 72%),
+    radial-gradient(32% 50% at calc(100% - var(--aura-x)) 70%, color-mix(in oklab, var(--color-emerald-400) 30%, transparent), transparent 72%);
+  filter: blur(24px);
+  animation: aura-drift 7s ease-in-out infinite alternate;
+}
+@keyframes aura-drift {
+  from { --aura-x: 28%; }
+  to { --aura-x: 72%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer-aura { animation: none; }
+}
+
+/* ── Motion ──────────────────────────────────────────────────────────────────
+   tw-animate's enter/exit default to plain `ease`; give them the fluid curve. */
+.animate-in,
+.animate-out {
+  animation-timing-function: var(--ease-fluid);
+}
+
+/* Skeletons breathe softly instead of blinking */
+@keyframes skeleton-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-skeleton {
+  animation: skeleton-breathe 1.8s var(--ease-fluid-in-out) infinite;
+}
+
+/* Lists and grids: children rise in one after another when data arrives */
+@keyframes fluid-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.stagger-in > * {
+  animation: fluid-rise 480ms var(--ease-fluid) both;
+}
+.stagger-in > *:nth-child(2) { animation-delay: 35ms; }
+.stagger-in > *:nth-child(3) { animation-delay: 70ms; }
+.stagger-in > *:nth-child(4) { animation-delay: 105ms; }
+.stagger-in > *:nth-child(5) { animation-delay: 140ms; }
+.stagger-in > *:nth-child(6) { animation-delay: 175ms; }
+.stagger-in > *:nth-child(7) { animation-delay: 210ms; }
+.stagger-in > *:nth-child(8) { animation-delay: 245ms; }
+.stagger-in > *:nth-child(9) { animation-delay: 280ms; }
+.stagger-in > *:nth-child(n + 10) { animation-delay: 300ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-skeleton,
+  .stagger-in > * {
+    animation: none;
+  }
+  .animate-in,
+  .animate-out {
+    animation-duration: 1ms;
+  }
 }
