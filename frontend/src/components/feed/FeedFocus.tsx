@@ -219,8 +219,8 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
           <EndCard loading={loadingMore || hasMore} onBack={() => go(-1)} onExit={onExit} />
         )}
 
-        {/* Controls */}
-        <div className="flex items-center justify-between gap-2">
+        {/* Controls: above the card on phones, where the card runs past the fold */}
+        <div className="flex items-center justify-between gap-2 max-sm:order-first">
           <Button variant="outline" onClick={() => go(-1)} disabled={index === 0}>
             <ArrowLeft /> <span className="hidden sm:inline">Previous</span>
           </Button>
