@@ -1,4 +1,5 @@
-import { Worker, Job } from 'bullmq'
+import { Worker, Job, UnrecoverableError } from 'bullmq'
+import { isPermanentJobError } from '../lib/errors'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { ContributorAnalysisService } from '../services/contributor-analysis.service'
@@ -40,6 +41,13 @@ const processContributorAnalysis = async (
         } catch (error) {
           console.error(`[ContributorWorker] Failed to sync starred repos for user ${userId}:`, error)
         }
+
+        try {
+          const ownedCount = await ContributorAnalysisService.syncOwnedRepositories(githubId, user.oauthAccounts[0].username)
+          console.log(`[ContributorWorker] Synced ${ownedCount} OWNS edges for user ${userId}`)
+        } catch (error) {
+          console.error(`[ContributorWorker] Failed to sync owned repos for user ${userId}:`, error)
+        }
       }
     }
 
@@ -55,6 +63,7 @@ const processContributorAnalysis = async (
     }
   } catch (error) {
     console.error(`[ContributorWorker] Job ${job.id} failed for user ${userId}:`, error)
+    if (isPermanentJobError(error)) throw new UnrecoverableError((error as Error).message)
     throw error
   }
 }

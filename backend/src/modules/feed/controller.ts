@@ -20,8 +20,15 @@ const getFeed = asyncHandler(async (req: RequestWithPaginationAndUser, res: Resp
   const userId = requireUserId(req)
   const page = req.pagination?.page || 1
   const limit = req.pagination?.limit || 20
+  const language = typeof req.query.language === 'string' && req.query.language.trim()
+    ? req.query.language.trim().slice(0, 50)
+    : undefined
+  const beginnerOnly = req.query.beginner === 'true'
+  // Per-visit seed (visit start time in ms): shuffles close matches, freshens repeats
+  const seedParam = Number(req.query.seed)
+  const seed = Number.isSafeInteger(seedParam) && seedParam > 0 ? seedParam : null
 
-  const result = await RecommendationEngineService.generateFeed(userId, page, limit)
+  const result = await RecommendationEngineService.generateFeed(userId, page, limit, { language, beginnerOnly }, seed)
 
   sendResponse(res, 200, true, 'Feed retrieved successfully', result.feed, {
     page: result.page,
@@ -34,6 +41,12 @@ const getFeed = asyncHandler(async (req: RequestWithPaginationAndUser, res: Resp
   }
 })
 
+const getFeedLanguages = asyncHandler(async (_req: RequestWithUser, res: Response) => {
+  const languages = await RecommendationEngineService.listFeedLanguages()
+  sendResponse(res, 200, true, 'Feed languages retrieved successfully', languages)
+})
+
 export const FeedController = {
-  getFeed
+  getFeed,
+  getFeedLanguages
 }

@@ -1,30 +1,24 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { SlidersHorizontal, Globe, BookMarked } from "lucide-react";
+import { toast } from "sonner";
+import { Building2, Check, SearchX, Sprout } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { SearchHeader } from "@/components/repositories/search-header";
-import { RepositoryCard, Repository } from "@/components/repositories/repository-card";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  Checkbox
-} from "@/components/ui";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose
-} from "@/components/ui/dialog";
+  RepositoryCard,
+  RepositoryCardSkeleton,
+  Repository,
+  RepositoryImportStatus,
+} from "@/components/repositories/repository-card";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageContainer } from "@/components/ui/page-container";
+import { Spinner } from "@/components/ui/spinner";
+import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
+import { isGithubTokenError, readApiError } from "@/lib/api";
 
 interface ExtendedRepository extends Repository {
   ownerType?: string;
@@ -57,34 +51,115 @@ interface PaginationMeta {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
+const repoUrl = (repo: Repository) => repo.url || `https://github.com/${repo.name}`;
+
+const MINE_LIMIT_BROWSING = 9;
+const MINE_LIMIT_SEARCHING = 6;
+const GITHUB_LIMIT = 9;
+
+const toRepository = (repo: GitHubRepo): ExtendedRepository => ({
+  id: repo.id,
+  name: repo.full_name,
+  description: repo.description || "",
+  stars: repo.stargazers_count || 0,
+  forks: repo.forks_count || 0,
+  language: repo.language || undefined,
+  issuesCount: repo.open_issues_count || 0,
+  ownerType: repo.owner?.type || "User",
+  url: repo.html_url,
+});
+
+async function getRepos(url: string, token: string): Promise<{ repos: ExtendedRepository[]; pagination?: PaginationMeta }> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw await readApiError(res, "Request failed");
+  const data = await res.json().catch(() => null);
+  if (!data?.success || !Array.isArray(data.data)) throw new Error("Unexpected response");
+  return { repos: data.data.map(toRepository), pagination: data.pagination };
+}
+
+function SectionHeading({ title, meta, children }: { title: string; meta?: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <h2 className="text-base font-semibold">{title}</h2>
+      {meta && <span className="text-sm text-muted-foreground tabular-nums">{meta}</span>}
+      {children && <div className="ml-auto">{children}</div>}
+    </div>
+  );
+}
+
+/** Calls `onLoadMore` when the returned sentinel scrolls near the viewport */
+function useLoadMore(onLoadMore: () => void, enabled: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) onLoadMore();
+      },
+      { rootMargin: "600px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onLoadMore, enabled]);
+  return ref;
+}
+
+function RepoGridSkeleton({ count }: { count: number }) {
+  return (
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-busy="true" aria-label="Loading repositories">
+      {Array.from({ length: count }).map((_, i) => (
+        <RepositoryCardSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 function GitHubReposContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const { token } = useAuth();
-  
-  const queryParam = searchParams.get("q") || "";
-  const pageParam = parseInt(searchParams.get("page") || "1", 10);
+
+  const queryParam = (searchParams.get("q") || "").trim();
   const includeOrgParam = searchParams.get("includeOrg") === "true";
-  
+  // GitHub results limited to repos with open good first issues
+  const goodFirstOnly = searchParams.get("goodFirst") === "true";
+  const searching = queryParam !== "";
+
   const [searchQuery, setSearchQuery] = useState(queryParam);
-  const [repos, setRepos] = useState<ExtendedRepository[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [pagination, setPagination] = useState<PaginationMeta>({ page: 1, limit: 8, total: 0, totalPages: 1 });
   const [includeOrg, setIncludeOrg] = useState(includeOrgParam);
+
+  // Your own repositories: all of them while browsing, top matches while searching
+  const [mine, setMine] = useState<ExtendedRepository[]>([]);
+  const [mineTotal, setMineTotal] = useState(0);
+  const [minePage, setMinePage] = useState(1);
+  const [mineHasMore, setMineHasMore] = useState(false);
+  const [mineLoading, setMineLoading] = useState(true);
+  const [mineLoadingMore, setMineLoadingMore] = useState(false);
+  const [mineError, setMineError] = useState<string | null>(null);
+  const [mineTokenExpired, setMineTokenExpired] = useState(false);
+
+  // Everything else on GitHub, only while searching
+  const [github, setGithub] = useState<ExtendedRepository[]>([]);
+  const [githubTotal, setGithubTotal] = useState(0);
+  const [githubPage, setGithubPage] = useState(1);
+  const [githubHasMore, setGithubHasMore] = useState(false);
+  const [githubLoading, setGithubLoading] = useState(false);
+  const [githubLoadingMore, setGithubLoadingMore] = useState(false);
+  const [githubError, setGithubError] = useState<string | null>(null);
+
+  // Responses for an older query or filter are dropped
+  const mineRequest = useRef(0);
+  const githubRequest = useRef(0);
+
   const [importedUrls, setImportedUrls] = useState<Record<string, string>>({});
-  
-  const [dialogState, setDialogState] = useState<{
-    isOpen: boolean;
-    type: "success" | "error" | "already_imported" | null;
-    message?: string;
-    internalId?: string;
-  }>({ isOpen: false, type: null });
+  // Repos queued for import in this session (lower-cased URLs), until the import list catches up
+  const [queuedUrls, setQueuedUrls] = useState<Set<string>>(new Set());
 
   // Debounced search sync to URL
   useEffect(() => {
-    if (searchQuery.trim() === queryParam.trim()) return;
+    if (searchQuery.trim() === queryParam) return;
 
     const handler = setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
@@ -93,113 +168,156 @@ function GitHubReposContent() {
       } else {
         params.delete("q");
       }
-      params.set("page", "1");
-      router.push(`${pathname}?${params.toString()}`);
-    }, 300);
+      params.delete("page");
+      router.replace(`${pathname}?${params.toString()}`);
+    }, 400);
 
     return () => clearTimeout(handler);
   }, [searchQuery, queryParam, router, pathname]);
 
   useEffect(() => { setIncludeOrg(includeOrgParam); }, [includeOrgParam]);
 
-  useEffect(() => {
-    async function fetchRepos() {
-      if (!token) return;
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(
-          `${API_URL}/repositories/github?page=${pageParam}&limit=8&q=${encodeURIComponent(queryParam)}&includeOrg=${includeOrg}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && Array.isArray(data.data)) {
-            const mappedRepos = data.data.map((repo: GitHubRepo, index: number) => {
-              const lang = repo.language || "TypeScript";
-              let langColor = "bg-neutral-500";
-              if (lang === "TypeScript") langColor = "bg-blue-500";
-              else if (lang === "JavaScript") langColor = "bg-yellow-500";
-              else if (lang === "Python") langColor = "bg-blue-700";
-              else if (lang === "Go") langColor = "bg-cyan-500";
-              else if (lang === "Rust") langColor = "bg-orange-600";
-              else if (lang === "HTML") langColor = "bg-red-500";
-              else if (lang === "CSS") langColor = "bg-purple-500";
-
-              return {
-                id: repo.id,
-                name: repo.full_name,
-                description: repo.description || "",
-                stars: repo.stargazers_count || 0,
-                forks: repo.forks_count || 0,
-                language: lang,
-                languageColor: langColor,
-                matchScore: 95 - (index % 5) * 3,
-                issuesCount: repo.open_issues_count || 0,
-                ownerType: repo.owner?.type || "User",
-                url: repo.html_url
-              };
-            });
-            setRepos(mappedRepos);
-            if (data.pagination) setPagination(data.pagination);
-          } else {
-            setError("Failed to parse repository list.");
-          }
-        } else {
-          setError("Failed to load GitHub repositories.");
-        }
-        
-        // Also fetch imported repositories to check if they are already imported
-        try {
-          const importedRes = await fetch(`${API_URL}/repositories?limit=100`, { headers: { Authorization: `Bearer ${token}` } });
-          if (importedRes.ok) {
-            const importedData = await importedRes.json();
-            if (importedData.success && Array.isArray(importedData.data)) {
-              const urlMap: Record<string, string> = {};
-              importedData.data.forEach((r: ImportedRepo) => {
-                if (r.url) urlMap[r.url.toLowerCase()] = r.id;
-              });
-              setImportedUrls(urlMap);
-            }
-          }
-        } catch {
-          // Silent fail for imported repos fetch
-        }
-      } catch (err) {
-        console.error("Error fetching repositories:", err);
-        setError("An error occurred while loading repositories.");
-      } finally {
-        setLoading(false);
+  const fetchMine = useCallback(async (page: number) => {
+    if (!token) return;
+    const requestId = ++mineRequest.current;
+    const first = page === 1;
+    // While searching only your best matches are shown, above the GitHub results
+    const limit = searching ? MINE_LIMIT_SEARCHING : MINE_LIMIT_BROWSING;
+    if (first) {
+      setMineLoading(true);
+      setMineError(null);
+      setMineTokenExpired(false);
+    } else {
+      setMineLoadingMore(true);
+    }
+    try {
+      const { repos, pagination } = await getRepos(
+        `${API_URL}/repositories/github?page=${page}&limit=${limit}&q=${encodeURIComponent(queryParam)}&includeOrg=${includeOrg}`,
+        token
+      );
+      if (requestId !== mineRequest.current) return;
+      setMine((prev) => (first ? repos : [...prev, ...repos.filter((r) => !prev.some((p) => p.id === r.id))]));
+      setMineTotal(pagination?.total ?? repos.length);
+      setMinePage(page);
+      setMineHasMore(!searching && !!pagination && page < pagination.totalPages);
+    } catch (err) {
+      if (requestId !== mineRequest.current) return;
+      if (first) {
+        setMine([]);
+        setMineTotal(0);
+        setMineTokenExpired(isGithubTokenError(err));
+        setMineError("Couldn't load your GitHub repositories.");
+      } else {
+        setMineHasMore(false);
+        toast.error("Couldn't load more of your repositories");
+      }
+    } finally {
+      if (requestId === mineRequest.current) {
+        setMineLoading(false);
+        setMineLoadingMore(false);
       }
     }
-    fetchRepos();
-  }, [token, pageParam, includeOrg, queryParam]);
+  }, [token, searching, queryParam, includeOrg]);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > pagination.totalPages) return;
+  const fetchGithub = useCallback(async (page: number) => {
+    if (!token || !searching) return;
+    const requestId = ++githubRequest.current;
+    const first = page === 1;
+    if (first) {
+      setGithubLoading(true);
+      setGithubError(null);
+    } else {
+      setGithubLoadingMore(true);
+    }
+    try {
+      const { repos, pagination } = await getRepos(
+        `${API_URL}/repositories/github/search?page=${page}&limit=${GITHUB_LIMIT}&q=${encodeURIComponent(queryParam)}${goodFirstOnly ? "&goodFirst=true" : ""}`,
+        token
+      );
+      if (requestId !== githubRequest.current) return;
+      setGithub((prev) => (first ? repos : [...prev, ...repos.filter((r) => !prev.some((p) => p.id === r.id))]));
+      setGithubTotal(pagination?.total ?? repos.length);
+      setGithubPage(page);
+      setGithubHasMore(!!pagination && page < pagination.totalPages && repos.length > 0);
+    } catch {
+      if (requestId !== githubRequest.current) return;
+      if (first) {
+        setGithub([]);
+        setGithubError("Couldn't search GitHub right now.");
+      } else {
+        setGithubHasMore(false);
+        toast.error("Couldn't load more results");
+      }
+    } finally {
+      if (requestId === githubRequest.current) {
+        setGithubLoading(false);
+        setGithubLoadingMore(false);
+      }
+    }
+  }, [token, searching, queryParam, goodFirstOnly]);
+
+  // New query or filter: start both lists over
+  useEffect(() => { fetchMine(1); }, [fetchMine]);
+  useEffect(() => {
+    if (searching) {
+      fetchGithub(1);
+    } else {
+      githubRequest.current++;
+      setGithub([]);
+      setGithubHasMore(false);
+    }
+  }, [searching, fetchGithub]);
+
+  const loadMoreMine = useCallback(() => {
+    if (!mineLoading && !mineLoadingMore && mineHasMore) fetchMine(minePage + 1);
+  }, [mineLoading, mineLoadingMore, mineHasMore, minePage, fetchMine]);
+  const loadMoreGithub = useCallback(() => {
+    if (!githubLoading && !githubLoadingMore && githubHasMore) fetchGithub(githubPage + 1);
+  }, [githubLoading, githubLoadingMore, githubHasMore, githubPage, fetchGithub]);
+
+  const mineSentinel = useLoadMore(loadMoreMine, !searching && mineHasMore);
+  const githubSentinel = useLoadMore(loadMoreGithub, searching && githubHasMore);
+
+  // Already-imported repos, to show "Open" instead of "Import"
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_URL}/repositories?scope=imported&limit=100`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.success || !Array.isArray(data.data)) return;
+        const urlMap: Record<string, string> = {};
+        data.data.forEach((r: ImportedRepo) => {
+          if (r.url) urlMap[r.url.toLowerCase()] = r.id;
+        });
+        setImportedUrls(urlMap);
+      })
+      .catch(() => {
+        // Best-effort: cards just show Import
+      });
+  }, [token]);
+
+  const toggleGoodFirst = () => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("page", newPage.toString());
-    router.push(`${pathname}?${params.toString()}`);
+    if (goodFirstOnly) params.delete("goodFirst");
+    else params.set("goodFirst", "true");
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const handleIncludeOrgChange = (checked: boolean) => {
     setIncludeOrg(checked);
     const params = new URLSearchParams(searchParams.toString());
     params.set("includeOrg", checked.toString());
-    params.set("page", "1");
-    router.push(`${pathname}?${params.toString()}`);
+    params.delete("page");
+    router.replace(`${pathname}?${params.toString()}`);
   };
 
   const handleImport = async (repo: Repository) => {
-    const targetUrl = repo.url || `https://github.com/${repo.name}`;
+    const targetUrl = repoUrl(repo);
     if (importedUrls[targetUrl.toLowerCase()]) {
       const internalId = importedUrls[targetUrl.toLowerCase()];
-      setDialogState({ 
-        isOpen: true, 
-        type: "already_imported", 
-        internalId,
-        message: "This repository has already been imported into OSCA."
+      toast("Already imported", {
+        description: "This repository has already been imported into OSCA.",
+        action: { label: "Open", onClick: () => router.push(`/dashboard/repository/${internalId}`) },
       });
       return;
     }
@@ -212,167 +330,165 @@ function GitHubReposContent() {
       });
       const data = await res.json();
       if (!data.success) {
-        setDialogState({ isOpen: true, type: "error", message: data.message || "Failed to queue repository for import." });
+        toast.error("Import failed", { description: data.message || "Failed to queue repository for import." });
       } else {
-        setDialogState({ isOpen: true, type: "success", message: "Repository successfully queued for import! It will appear in your Imported Repositories soon." });
+        setQueuedUrls(prev => new Set(prev).add(targetUrl.toLowerCase()));
+        toast.success("Queued for import", {
+          description: `${repo.name} will appear in Imported repositories soon.`,
+        });
       }
     } catch {
-      setDialogState({ isOpen: true, type: "error", message: "Error importing repository." });
+      toast.error("Import failed", { description: "Error importing repository." });
     }
   };
 
-  const getPageNumbers = () => {
-    const pages = [];
-    const { page, totalPages } = pagination;
-    const maxVisible = 5;
-
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1);
-      const start = Math.max(2, page - 1);
-      const end = Math.min(totalPages - 1, page + 1);
-      if (start > 2) pages.push("ellipsis-start");
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (end < totalPages - 1) pages.push("ellipsis-end");
-      pages.push(totalPages);
-    }
-    return pages;
+  const importStatusFor = (repo: Repository): RepositoryImportStatus | undefined => {
+    const key = repoUrl(repo).toLowerCase();
+    if (importedUrls[key]) return { state: "imported", internalId: importedUrls[key] };
+    if (queuedUrls.has(key)) return { state: "queued" };
+    return undefined;
   };
+
+  const renderGrid = (repos: ExtendedRepository[]) => (
+    <div className="stagger-in grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      {repos.map((repo) => (
+        <RepositoryCard key={repo.id} repo={repo} mode="import" importStatus={importStatusFor(repo)} onAction={handleImport} />
+      ))}
+    </div>
+  );
+
+  const orgToggle = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      aria-pressed={includeOrg}
+      onClick={() => handleIncludeOrgChange(!includeOrg)}
+      className="aria-pressed:border-emerald-500/40 aria-pressed:text-emerald-700 dark:aria-pressed:text-emerald-300"
+    >
+      {includeOrg ? <Check /> : <Building2 />}
+      Include organizations
+    </Button>
+  );
+
+  // Your repos already appear above, so leave them out of the GitHub results
+  const mineNames = new Set(mine.map((r) => r.name.toLowerCase()));
+  const githubOnly = github.filter((r) => !mineNames.has(r.name.toLowerCase()));
 
   return (
-    <div className="max-w-7xl w-full mx-auto flex flex-col select-none relative space-y-10 pb-16 px-4 sm:px-6">
-      {/* Decorative background gradients */}
-      <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none blur-3xl -z-10" />
-
-      {/* Search Header */}
+    <PageContainer>
       <SearchHeader searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between border-b border-neutral-800/50 pb-5 sticky top-0 z-20 shadow-[0_4px_30px_rgba(0,0,0,0.1)]">
-          <div className="flex items-center gap-3 mb-2">
-            <label className="flex items-center gap-3 text-sm text-neutral-400 font-medium hover:text-neutral-200 cursor-pointer select-none transition-colors group">
-              <div className="relative flex items-center">
-                <Checkbox checked={includeOrg} onCheckedChange={handleIncludeOrgChange} className="border-neutral-600 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500" />
-              </div>
-              Include Organization Repositories
-            </label>
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-neutral-800 bg-neutral-900/50 hover:bg-neutral-800 hover:text-emerald-400 hover:border-emerald-500/30 text-neutral-300 text-sm font-medium transition-all duration-300 mb-2 shadow-sm">
-            <SlidersHorizontal className="w-4 h-4" />
-            Filters
-          </button>
-        </div>
+      {/* Your repositories */}
+      <section className="flex flex-col gap-4">
+        <SectionHeading
+          title="Your repositories"
+          meta={!mineLoading && !mineError && mineTotal > 0 ? mineTotal.toLocaleString() : undefined}
+        >
+          {orgToggle}
+        </SectionHeading>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-32">
-            <div className="relative">
-              <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-              <div className="absolute inset-0 w-12 h-12 bg-emerald-500/10 rounded-full blur-xl animate-pulse"></div>
-            </div>
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-20 px-4 text-center border border-red-500/20 rounded-3xl bg-gradient-to-b from-red-500/5 to-transparent relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-red-500/50 to-transparent"></div>
-            <p className="text-red-400 text-base font-medium">{error}</p>
-          </div>
-        ) : repos.length > 0 ? (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 pt-6">
-            {repos.map((repo) => (
-              <RepositoryCard key={repo.id} repo={repo} mode="import" onAction={handleImport} />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-32 border border-neutral-800/50 rounded-3xl bg-neutral-900/20 backdrop-blur-sm">
-            <Globe className="w-12 h-12 text-neutral-700 mb-4" />
-            <p className="text-neutral-400 text-base font-medium">No repositories found matching your query.</p>
-            <p className="text-neutral-600 text-sm mt-2">Try adjusting your search terms or filters.</p>
-          </div>
-        )}
-
-        {!loading && !error && pagination.totalPages > 1 && (
-          <Pagination className="mt-8">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious onClick={() => handlePageChange(pagination.page - 1)} disabled={pagination.page === 1} />
-              </PaginationItem>
-              {getPageNumbers().map((pageNumber, idx) => (
-                <PaginationItem key={idx}>
-                  {pageNumber === "ellipsis-start" || pageNumber === "ellipsis-end" ? (
-                    <PaginationEllipsis />
-                  ) : (
-                    <PaginationLink isActive={pagination.page === pageNumber} onClick={() => handlePageChange(pageNumber as number)}>
-                      {pageNumber}
-                    </PaginationLink>
-                  )}
-                </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext onClick={() => handlePageChange(pagination.page + 1)} disabled={pagination.page === pagination.totalPages} />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        )}
-      </div>
-
-      <Dialog open={dialogState.isOpen} onOpenChange={(isOpen) => setDialogState(prev => ({ ...prev, isOpen }))}>
-        <DialogContent className="sm:max-w-[425px] bg-neutral-950 border border-neutral-800 shadow-2xl text-neutral-100 rounded-2xl p-6">
-          <DialogHeader className="space-y-3 pb-4 border-b border-neutral-800/50">
-            <div className="flex items-center gap-3">
-              {dialogState.type === "success" ? (
-                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                </div>
-              ) : dialogState.type === "error" ? (
-                <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
-                  <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                </div>
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center border border-neutral-700">
-                  <BookMarked className="w-4 h-4 text-neutral-300" />
-                </div>
-              )}
-              <DialogTitle className="text-lg font-medium tracking-tight text-neutral-100">
-                {dialogState.type === "success" ? "Success" : 
-                 dialogState.type === "error" ? "Import Failed" : "Already Imported"}
-              </DialogTitle>
-            </div>
-          </DialogHeader>
-
-          <div className="py-4">
-            <DialogDescription className="text-neutral-400 text-sm leading-relaxed">
-              {dialogState.message}
-            </DialogDescription>
-          </div>
-
-          <DialogFooter className="sm:justify-end gap-3 pt-2">
-            <DialogClose asChild>
-              <button className="px-4 py-2 rounded-lg border border-neutral-800 hover:bg-neutral-900 text-neutral-300 text-sm font-medium transition-colors">
-                Cancel
-              </button>
-            </DialogClose>
-            {dialogState.type === "already_imported" && dialogState.internalId && (
-              <button 
-                onClick={() => router.push(`/dashboard/repository/${dialogState.internalId}`)}
-                className="px-4 py-2 rounded-lg bg-emerald-500 text-neutral-950 hover:bg-emerald-400 text-sm font-medium transition-colors"
-              >
-                Open Repository
-              </button>
+        {mineLoading ? (
+          <RepoGridSkeleton count={searching ? 3 : 6} />
+        ) : mineTokenExpired ? (
+          <GithubReconnectNotice action="list your repositories" />
+        ) : mineError ? (
+          searching ? (
+            <p className="text-sm text-muted-foreground">{mineError}</p>
+          ) : (
+            <ErrorState message={mineError} onRetry={() => fetchMine(1)} />
+          )
+        ) : mine.length > 0 ? (
+          <>
+            {renderGrid(mine)}
+            {searching && mineTotal > mine.length && (
+              <p className="text-xs text-muted-foreground">
+                Showing your {mine.length} best matches of {mineTotal}. Refine the search to narrow them down.
+              </p>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </>
+        ) : searching ? (
+          <p className="text-sm text-muted-foreground">None of your repositories match &ldquo;{queryParam}&rdquo;.</p>
+        ) : (
+          <EmptyState
+            icon={<SearchX />}
+            title="No public repositories yet"
+            description="Search above to find any public repository on GitHub."
+          />
+        )}
+
+        {!searching && mineLoadingMore && <RepoGridSkeleton count={3} />}
+        {!searching && mineHasMore && <div ref={mineSentinel} aria-hidden className="h-px" />}
+      </section>
+
+      {/* All of GitHub */}
+      {searching && (
+        <section className="flex flex-col gap-4">
+          <div className="h-px bg-border" />
+          <SectionHeading
+            title="On GitHub"
+            meta={
+              !githubLoading && !githubError && githubTotal > 0
+                ? `${githubTotal.toLocaleString()} ${githubTotal === 1 ? "result" : "results"}`
+                : undefined
+            }
+          >
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              aria-pressed={goodFirstOnly}
+              onClick={toggleGoodFirst}
+              className="aria-pressed:border-emerald-500/40 aria-pressed:text-emerald-700 dark:aria-pressed:text-emerald-300"
+            >
+              {goodFirstOnly ? <Check /> : <Sprout />}
+              Good first issues
+            </Button>
+          </SectionHeading>
+
+          {githubLoading ? (
+            <RepoGridSkeleton count={6} />
+          ) : githubError ? (
+            <ErrorState message={githubError} onRetry={() => fetchGithub(1)} />
+          ) : githubOnly.length > 0 ? (
+            renderGrid(githubOnly)
+          ) : (
+            <EmptyState
+              icon={<SearchX />}
+              title="Nothing found on GitHub"
+              description="Try other keywords, or a qualifier like language:rust or topic:cli."
+              action={
+                <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
+                  Clear search
+                </Button>
+              }
+            />
+          )}
+
+          {githubLoadingMore && <RepoGridSkeleton count={3} />}
+          {githubHasMore && <div ref={githubSentinel} aria-hidden className="h-px" />}
+          {!githubLoading && !githubError && !githubHasMore && githubOnly.length > 0 && (
+            <p className="py-2 text-center text-sm text-muted-foreground">
+              {githubTotal > github.length && github.length >= 1000
+                ? "That's as far as GitHub search goes. Refine the search to see more."
+                : "That's everything for this search."}
+            </p>
+          )}
+        </section>
+      )}
+    </PageContainer>
   );
 }
 
 export default function RepositoriesPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center h-full">
-        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex flex-1 items-center justify-center py-24">
+          <Spinner />
+        </div>
+      }
+    >
       <GitHubReposContent />
     </Suspense>
   );

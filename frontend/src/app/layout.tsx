@@ -1,23 +1,15 @@
 import type { Metadata } from "next";
-import { 
-  Geist, 
-  Geist_Mono, 
-  JetBrains_Mono, 
-  Playfair_Display, 
-  Libre_Baskerville 
-} from "next/font/google";
-import './globals.css'
+import { JetBrains_Mono, Manrope, Playfair_Display } from "next/font/google";
+import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/context/auth-context";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Primary sans for body text and UI
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -26,22 +18,16 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+// Display face for page titles (italic), as in the original design
 const playfairDisplay = Playfair_Display({
   variable: "--font-playfair-display",
   subsets: ["latin"],
   style: ["normal", "italic"],
 });
 
-const libreBaskerville = Libre_Baskerville({
-  variable: "--font-libre-baskerville",
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  style: ["normal", "italic"],
-});
-
 export const metadata: Metadata = {
   title: "OSCA",
-  description: "Open Source Contributor Analytics",
+  description: "Find open-source projects that fit your skills, and make your first contribution.",
 };
 
 export default function RootLayout({
@@ -50,26 +36,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html 
-      lang="en" 
-      className={cn("font-mono bg-black text-white", jetbrainsMono.variable)} 
-      suppressHydrationWarning
-    >
-      <body
-        className={cn(
-          geistSans.variable, 
-          geistMono.variable, 
-          playfairDisplay.variable, 
-          libreBaskerville.variable, 
-          "font-sans antialiased bg-black text-white"
-        )}
-        suppressHydrationWarning
-      >
-        <AuthProvider>
-          <TooltipProvider>
-            {children}
-          </TooltipProvider>
-        </AuthProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={cn(manrope.variable, jetbrainsMono.variable, playfairDisplay.variable, "min-h-svh font-sans antialiased")}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            <TooltipProvider delayDuration={200}>
+              {children}
+              <Toaster />
+            </TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

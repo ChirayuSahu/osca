@@ -1,9 +1,15 @@
 import neo4j, { Session } from 'neo4j-driver'
 import { config } from '../config'
 
+// Short timeouts so callers with a Postgres fallback (the feed) fail over in
+// seconds instead of hanging on the driver's 30–60s defaults.
 export const neo4jDriver = neo4j.driver(
   config.neo4j.uri,
-  neo4j.auth.basic(config.neo4j.user, config.neo4j.password)
+  neo4j.auth.basic(config.neo4j.user, config.neo4j.password),
+  {
+    connectionTimeout: 5_000,
+    connectionAcquisitionTimeout: 5_000
+  }
 )
 
 export const withSession = async <T>(work: (session: Session) => Promise<T>): Promise<T> => {

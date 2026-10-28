@@ -8,7 +8,7 @@ const getUserIdFromRequest = (req: Request): string | undefined => {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1]
     try {
-      const decoded = jwt.verify(token, config.jwtSecret) as { id: string }
+      const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as { id: string }
       return decoded.id
     } catch {
       return undefined
@@ -86,6 +86,24 @@ export const authLimiter = createCustomLimiter({
 export const jobLimiter = createCustomLimiter({
   prefix: 'rl:job:',
   windowSeconds: 5 * 60,
+  maxRequests: 10,
+  keyGenerator: (req) => getUserIdFromRequest(req) || req.ip || 'unknown'
+})
+
+// Each chat call is a paid LLM request, so it gets a much tighter budget than
+// the general per-user limiter.
+// GitHub search may fall back to the server's GITHUB_TOKEN (30 searches/min for
+// the whole server), so each user gets a share of that
+export const searchLimiter = createCustomLimiter({
+  prefix: 'rl:search:',
+  windowSeconds: 60,
+  maxRequests: 20,
+  keyGenerator: (req) => getUserIdFromRequest(req) || req.ip || 'unknown'
+})
+
+export const chatLimiter = createCustomLimiter({
+  prefix: 'rl:chat:',
+  windowSeconds: 60,
   maxRequests: 10,
   keyGenerator: (req) => getUserIdFromRequest(req) || req.ip || 'unknown'
 })

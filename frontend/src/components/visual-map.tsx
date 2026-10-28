@@ -1,11 +1,18 @@
 'use client'
 
-import React, { useRef, useEffect, useState, useMemo } from 'react'
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react'
 import dynamic from 'next/dynamic'
+import { useTheme } from 'next-themes'
+import { Maximize, Minimize } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Dither } from '@/components/ui/dither'
+import { cn } from '@/lib/utils'
+
+// Deeper paths are left out so large repos stay readable
+const MAX_DEPTH = 3
 
 // ForceGraph2D needs to be dynamically imported with ssr: false since it uses HTML5 Canvas and window
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false })
-import { Maximize, Minimize } from 'lucide-react'
 
 // Types based on the backend data structures
 export interface TreeNode {
@@ -29,38 +36,85 @@ interface VisualMapProps {
   dependencies?: ManifestNode[]
 }
 
-const colorMap: Record<string, string> = {
-  tree: '#3b82f6', // blue for folders
-  blob: '#9ca3af', // gray for files
-  dependency: '#10b981', // green for dependencies
-  manifest: '#f59e0b', // orange for manifest files
+type NodeKind = 'tree' | 'blob' | 'dependency' | 'manifest'
+
+interface GraphNode { id: string; name: string; val: number; kind: NodeKind; path?: string }
+interface GraphLink { source: string; target: string; label?: string }
+
+const KIND_LABEL: Record<NodeKind, string> = {
+  tree: 'Folder',
+  blob: 'File',
+  manifest: 'Manifest',
+  dependency: 'Dependency',
+}
+
+const escapeHtml = (text: string) =>
+  text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)
+
+// Minimum hit radius in screen pixels, so small nodes are still easy to hover
+const MIN_HIT_RADIUS = 7
+
+interface GraphPalette {
+  tree: string
+  blob: string
+  dependency: string
+  manifest: string
+  link: string
+}
+
+// Each node kind maps to a theme token; the legend uses the matching Tailwind class
+// and the canvas reads the same CSS variable at runtime, so both follow the theme.
+const NODE_TOKENS: Record<NodeKind, { cssVar: string; swatch: string }> = {
+  tree: { cssVar: '--chart-3', swatch: 'bg-chart-3' },
+  blob: { cssVar: '--muted-foreground', swatch: 'bg-muted-foreground' },
+  dependency: { cssVar: '--primary', swatch: 'bg-primary' },
+  manifest: { cssVar: '--warning', swatch: 'bg-warning' },
+}
+
+function readPalette(): GraphPalette {
+  const styles = getComputedStyle(document.documentElement)
+  const v = (name: string) => styles.getPropertyValue(name).trim()
+  return {
+    tree: v(NODE_TOKENS.tree.cssVar),
+    blob: v(NODE_TOKENS.blob.cssVar),
+    dependency: v(NODE_TOKENS.dependency.cssVar),
+    manifest: v(NODE_TOKENS.manifest.cssVar),
+    link: v('--border'),
+  }
 }
 
 export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const { resolvedTheme } = useTheme()
+  const [palette, setPalette] = useState<GraphPalette | null>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showFolders, setShowFolders] = useState(true)
   const [showFiles, setShowFiles] = useState(false) // Hide files by default to reduce initial noise
   const [showDependencies, setShowDependencies] = useState(true)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [hoverNode, setHoverNode] = useState<any>(null)
+  const [hoverNode, setHoverNode] = useState<GraphNode | null>(null)
+
+  // Re-read the theme tokens whenever the resolved theme changes. Wait a frame so
+  // next-themes has applied the `.dark` class before we read the variables.
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setPalette(readPalette()))
+    return () => cancelAnimationFrame(frame)
+  }, [resolvedTheme])
 
   useEffect(() => {
-    if (containerRef.current) {
-      setDimensions({
-        width: containerRef.current.clientWidth,
-        height: containerRef.current.clientHeight || 500,
-      })
-    }
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => setDimensions({ width: el.clientWidth, height: el.clientHeight || 480 })
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [isFullscreen])
 
   // Process data into nodes and links for the force graph
   const graphData = useMemo(() => {
-    interface GraphNode { id: string; name: string; val: number; color: string; path?: string }
-    interface GraphLink { source: string; target: string; label?: string }
 
-    const nodes: GraphNode[] = [{ id: 'root', name: 'Repository Root', val: 10, color: colorMap.tree }]
+    const nodes: GraphNode[] = [{ id: 'root', name: 'Repository Root', val: 10, kind: 'tree' }]
     const links: GraphLink[] = []
     const addedNodes = new Set<string>(['root'])
 
@@ -68,6 +122,7 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
     if (folderStructure && Array.isArray(folderStructure)) {
       folderStructure.forEach(item => {
         // Check filters
+        if (item.path.split('/').length > MAX_DEPTH) return
         if (item.type === 'tree' && !showFolders) return
         if (item.type === 'blob' && !showFiles) return
 
@@ -77,7 +132,7 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
             id: item.path,
             name: item.path.split('/').pop() || item.path,
             val: item.type === 'tree' ? 5 : 2,
-            color: colorMap[item.type] || colorMap.blob,
+            kind: item.type === 'tree' ? 'tree' : 'blob',
             path: item.path
           })
           addedNodes.add(item.path)
@@ -104,21 +159,21 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
     if (dependencies && Array.isArray(dependencies) && showDependencies) {
       dependencies.forEach(manifest => {
         const manifestPath = manifest.blobPath.replace(/^\//, '') // strip leading slash
-        
+
         // Add manifest node if not exists
         if (!addedNodes.has(manifestPath)) {
           nodes.push({
             id: manifestPath,
             name: manifestPath.split('/').pop() || manifestPath,
             val: 6,
-            color: colorMap.manifest
+            kind: 'manifest'
           })
           addedNodes.add(manifestPath)
           links.push({ source: 'root', target: manifestPath })
         } else {
-          // Color it orange to highlight it's a manifest
+          // Highlight existing file nodes that are manifests
           const node = nodes.find(n => n.id === manifestPath)
-          if (node) node.color = colorMap.manifest
+          if (node) node.kind = 'manifest'
         }
 
         manifest.dependencies?.nodes?.forEach(dep => {
@@ -128,7 +183,7 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
               id: depId,
               name: dep.packageName,
               val: 3,
-              color: colorMap.dependency
+              kind: 'dependency'
             })
             addedNodes.add(depId)
           }
@@ -142,6 +197,12 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fgRef = useRef<any>(null)
+  const fitted = useRef(false)
+
+  // Refit after the filters change the node set
+  useEffect(() => {
+    fitted.current = false
+  }, [graphData])
 
   useEffect(() => {
     // Tweak the d3 physics to spread nodes out and prevent the "clumpy" look
@@ -151,106 +212,124 @@ export function VisualMap({ folderStructure, dependencies }: VisualMapProps) {
     }
   }, [graphData]) // Re-run when data changes just in case
 
+  const fitOnce = useCallback(() => {
+    if (!fitted.current) {
+      fgRef.current?.zoomToFit(400, 48)
+      fitted.current = true
+    }
+  }, [])
+
+  const handleHover = useCallback((node: GraphNode | null) => {
+    setHoverNode(node)
+    if (containerRef.current) containerRef.current.style.cursor = node ? 'pointer' : ''
+  }, [])
+
+  const graph = useMemo(() => {
+    if (typeof window === 'undefined' || !palette) return null
+    return (
+      <ForceGraph2D
+        ref={fgRef}
+        width={dimensions.width}
+        height={dimensions.height}
+        graphData={graphData}
+        // Built-in HTML tooltip (styled in globals.css); no canvas redraw needed on hover
+        nodeLabel={(node: object) => {
+          const n = node as GraphNode
+          return `<span class="graph-tip-kind">${KIND_LABEL[n.kind]}</span>${escapeHtml(n.path ?? n.name)}`
+        }}
+        nodeColor={(node: object) => palette[(node as GraphNode).kind] || palette.blob}
+        nodeRelSize={4}
+        nodePointerAreaPaint={(node: object, color: string, ctx: CanvasRenderingContext2D, globalScale: number) => {
+          const n = node as GraphNode & { x?: number; y?: number }
+          const r = Math.max(Math.sqrt(n.val) * 4, MIN_HIT_RADIUS / globalScale)
+          ctx.fillStyle = color
+          ctx.beginPath()
+          ctx.arc(n.x ?? 0, n.y ?? 0, r, 0, 2 * Math.PI)
+          ctx.fill()
+        }}
+        linkColor={() => palette.link}
+        linkDirectionalArrowLength={3.5}
+        linkDirectionalArrowRelPos={1}
+        backgroundColor="transparent"
+        onNodeHover={handleHover as (node: object | null) => void}
+        cooldownTicks={120}
+        onEngineStop={fitOnce}
+      />
+    )
+  }, [palette, dimensions.width, dimensions.height, graphData, handleHover, fitOnce])
+
   if (!folderStructure && !dependencies) {
-    return <div className="p-8 text-center text-muted-foreground border rounded-lg bg-muted/20">No visualization data available for this repository yet.</div>
+    return (
+      <div className="relative isolate flex items-center justify-center rounded-md border border-border bg-background px-6 py-14 text-center">
+        <Dither
+          cols={70}
+          rows={22}
+          cell={4}
+          direction="radial"
+          peak={0.6}
+          className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
+        />
+        <p className="text-sm text-muted-foreground">No map data for this repository yet.</p>
+      </div>
+    )
   }
 
+  // Manifests and their packages toggle together
+  const filters: { label: string; kinds: NodeKind[]; on: boolean; set: (v: boolean) => void }[] = [
+    { label: 'Folders', kinds: ['tree'], on: showFolders, set: setShowFolders },
+    { label: 'Files', kinds: ['blob'], on: showFiles, set: setShowFiles },
+    { label: 'Dependencies', kinds: ['manifest', 'dependency'], on: showDependencies, set: setShowDependencies },
+  ]
+
   return (
-    <div 
-      className={`relative rounded-xl overflow-hidden border border-neutral-800/60 bg-neutral-950/50 transition-all ${isFullscreen ? 'fixed inset-0 z-50 bg-neutral-950' : 'w-full h-[600px]'}`}
+    <div
+      className={cn('relative overflow-hidden bg-background', isFullscreen ? 'fixed inset-0 z-50' : 'h-[480px] w-full')}
       ref={containerRef}
+      onPointerLeave={() => handleHover(null)}
     >
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
-        <button 
+      <div className="absolute top-3 left-3 right-14 z-10 flex flex-wrap items-center gap-1.5">
+        {filters.map(f => (
+          <button
+            key={f.label}
+            type="button"
+            aria-pressed={f.on}
+            onClick={() => f.set(!f.on)}
+            className={cn(
+              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors',
+              f.on ? 'border-border bg-card text-foreground' : 'border-dashed border-border bg-background text-muted-foreground'
+            )}
+          >
+            {f.kinds.map(k => (
+              <span key={k} className={cn('size-2 rounded-full', NODE_TOKENS[k].swatch, !f.on && 'opacity-30')} aria-hidden />
+            ))}
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="absolute top-3 right-3 z-10">
+        <Button
+          variant="outline"
+          size="icon-sm"
           onClick={() => setIsFullscreen(!isFullscreen)}
-          className="p-2.5 bg-neutral-900/80 backdrop-blur border border-neutral-800 rounded-lg shadow-sm hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+          aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
         >
-          {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-        </button>
+          {isFullscreen ? <Minimize /> : <Maximize />}
+        </Button>
       </div>
 
-      <div className="absolute top-4 left-4 z-10 p-4 bg-neutral-900/80 backdrop-blur border border-neutral-800 rounded-xl shadow-lg text-sm text-neutral-300 min-w-[200px]">
-        <div className="font-semibold mb-3 text-neutral-100 flex items-center justify-between">
-          Legend & Filters
-        </div>
-        
-        <label className="flex items-center justify-between gap-3 mb-2 cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full shadow-[0_0_8px_#3b82f6]" style={{backgroundColor: colorMap.tree}}></div> 
-            <span className="group-hover:text-neutral-100 transition-colors">Folders</span>
-          </div>
-          <input type="checkbox" checked={showFolders} onChange={(e) => setShowFolders(e.target.checked)} className="accent-emerald-500 w-4 h-4 rounded border-neutral-700 bg-neutral-800" />
-        </label>
-        
-        <label className="flex items-center justify-between gap-3 mb-2 cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full shadow-[0_0_8px_#9ca3af]" style={{backgroundColor: colorMap.blob}}></div> 
-            <span className="group-hover:text-neutral-100 transition-colors">Files</span>
-          </div>
-          <input type="checkbox" checked={showFiles} onChange={(e) => setShowFiles(e.target.checked)} className="accent-emerald-500 w-4 h-4 rounded border-neutral-700 bg-neutral-800" />
-        </label>
+      <p className="pointer-events-none absolute bottom-3 left-3 z-10 text-[11px] text-muted-foreground">
+        {hoverNode ? (
+          <>
+            <span className="mr-1.5">{KIND_LABEL[hoverNode.kind]}</span>
+            <span className="font-mono text-foreground">{hoverNode.path ?? hoverNode.name}</span>
+          </>
+        ) : (
+          'Scroll to zoom · drag to pan · hover a node'
+        )}
+      </p>
 
-        <label className="flex items-center justify-between gap-3 mb-2 cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full shadow-[0_0_8px_#f59e0b]" style={{backgroundColor: colorMap.manifest}}></div> 
-            <span className="group-hover:text-neutral-100 transition-colors">Manifests</span>
-          </div>
-          <input type="checkbox" checked={showDependencies} onChange={(e) => setShowDependencies(e.target.checked)} className="accent-emerald-500 w-4 h-4 rounded border-neutral-700 bg-neutral-800" />
-        </label>
-
-        <label className="flex items-center justify-between gap-3 cursor-pointer group">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full shadow-[0_0_8px_#10b981]" style={{backgroundColor: colorMap.dependency}}></div> 
-            <span className="group-hover:text-neutral-100 transition-colors">Dependencies</span>
-          </div>
-          <input type="checkbox" checked={showDependencies} onChange={(e) => setShowDependencies(e.target.checked)} className="accent-emerald-500 w-4 h-4 rounded border-neutral-700 bg-neutral-800" />
-        </label>
-      </div>
-
-      {typeof window !== 'undefined' && (
-        <ForceGraph2D
-          ref={fgRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          graphData={graphData}
-          nodeLabel=""
-          nodeColor="color"
-          nodeRelSize={4}
-          linkColor={() => '#64748b60'}
-          linkDirectionalArrowLength={3.5}
-          linkDirectionalArrowRelPos={1}
-          backgroundColor="rgba(0,0,0,0)" // Ensures canvas background is transparent
-          onNodeHover={setHoverNode}
-          nodeCanvasObjectMode={() => 'after'}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          nodeCanvasObject={(node: any, ctx, globalScale) => {
-            if (hoverNode === node && node.name) {
-              const label = node.name;
-              const fontSize = 12 / globalScale;
-              ctx.font = `${fontSize}px Sans-Serif`;
-              const textWidth = ctx.measureText(label).width;
-              const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.4);
-
-              ctx.fillStyle = 'rgba(23, 23, 23, 0.9)'; // neutral-900 with opacity
-              const x = (node.x ?? 0) - bckgDimensions[0] / 2;
-              const y = (node.y ?? 0) - bckgDimensions[1] / 2 - (15 / globalScale);
-              
-              ctx.beginPath();
-              if (ctx.roundRect) {
-                ctx.roundRect(x, y, bckgDimensions[0], bckgDimensions[1], 4 / globalScale);
-              } else {
-                ctx.rect(x, y, bckgDimensions[0], bckgDimensions[1]);
-              }
-              ctx.fill();
-
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillStyle = '#e5e5e5'; // neutral-200
-              ctx.fillText(label, node.x ?? 0, (node.y ?? 0) - (15 / globalScale));
-            }
-          }}
-        />
-      )}
+      {graph}
     </div>
   )
 }

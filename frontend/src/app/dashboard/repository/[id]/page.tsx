@@ -1,21 +1,50 @@
 "use client";
-
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { RepositoryService } from "@/services/repository.service";
 import { ThreadService } from "@/services/thread.service";
-import { MessageSquarePlus, ExternalLink, ThumbsUp, GitMerge, Star, Activity, Clock, Network, CircleDot, GitPullRequest, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  CircleDot,
+  GitFork,
+  GitPullRequest,
+  HandHelping,
+  MessageSquare,
+  Plus,
+  Sprout,
+  Star,
+  ThumbsUp,
+} from "lucide-react";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageContainer } from "@/components/ui/page-container";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dither } from "@/components/ui/dither";
+import { DitheredImage, githubAvatarUrl } from "@/components/ui/dithered-image";
+import { GithubIcon } from "@/components/icons";
+import { StatStrip, Tag, compactNumber, timeAgo, topLanguages } from "@/components/repo-ui";
 import CreateThreadDialog from "@/components/threads/create-thread-dialog";
-import { GroupChatPanel } from "@/components/threads/group-chat-panel";
-import { VisualMap, TreeNode, ManifestNode } from "@/components/visual-map";
+import { GithubReconnectNotice } from "@/components/github-reconnect-notice";
+import { isGithubTokenError } from "@/lib/api";
+import type { TreeNode, ManifestNode } from "@/components/visual-map";
+import { CodebaseCard } from "@/components/codebase-card";
+import { RepositorySkeleton } from "@/components/skeletons";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { RepositoryInsights } from "@/components/repository-insights";
+import { NewcomerPanel } from "@/components/newcomer-panel";
+import { cn } from "@/lib/utils";
 
 interface Thread {
   id: string;
   title: string;
   content: string;
   createdAt: string | number | Date;
+  isPR?: boolean;
   [key: string]: unknown;
 }
 
@@ -27,6 +56,12 @@ interface RepositoryDetail {
   techStack?: string[];
   folderStructure?: TreeNode[];
   dependencies?: ManifestNode[];
+  stars?: number;
+  forks?: number;
+  likeCount?: number;
+  likedByMe?: boolean;
+  openIssuesCount?: number;
+  pushedAt?: string | null;
   [key: string]: unknown;
 }
 
@@ -34,7 +69,7 @@ export default function RepositoryPage() {
   const params = useParams();
   const repositoryId = params.id as string;
   const { token } = useAuth();
-  
+
   const [repo, setRepo] = useState<RepositoryDetail | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [page, setPage] = useState(1);
@@ -42,7 +77,15 @@ export default function RepositoryPage() {
   const [loading, setLoading] = useState(true);
   const [threadsLoading, setThreadsLoading] = useState(false);
   const [isCreateThreadOpen, setIsCreateThreadOpen] = useState(false);
-  const [isGroupChatOpen, setIsGroupChatOpen] = useState(false);
+  const [threadsError, setThreadsError] = useState<"github-token" | "other" | null>(null);
+  const [threadFilter, setThreadFilter] = useState<"open" | "prs">("open");
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [likePending, setLikePending] = useState(false);
+  useBreadcrumbLabel(
+    `/dashboard/repository/${repositoryId}`,
+    repo?.owner && repo?.name ? `${repo.owner}/${repo.name}` : null
+  );
 
   useEffect(() => {
     if (!token || !repositoryId) return;
@@ -52,6 +95,8 @@ export default function RepositoryPage() {
         setLoading(true);
         const repoRes = await RepositoryService.getRepository(repositoryId, token);
         setRepo(repoRes.data);
+        setLiked(!!repoRes.data?.likedByMe);
+        setLikeCount(repoRes.data?.likeCount ?? 0);
       } catch (err) {
         console.error(err);
       } finally {
@@ -64,10 +109,11 @@ export default function RepositoryPage() {
 
   useEffect(() => {
     if (!token || !repo || !repo.owner || !repo.name) return;
-    
+
     const loadThreads = async () => {
       try {
         setThreadsLoading(true);
+        setThreadsError(null);
         const threadsRes = await ThreadService.listThreads(repo.owner as string, repo.name as string, token, page);
         const mappedThreads = (threadsRes.data || []).map((issue: { number: string | number; title: string; body: string; created_at?: string; pull_request?: object; [key: string]: unknown }) => ({
           ...issue,
@@ -80,8 +126,10 @@ export default function RepositoryPage() {
         setThreads(mappedThreads);
         setTotalPages(threadsRes.meta?.totalPages || 1);
       } catch (e) {
-        console.error("Failed to load threads", e);
+        // An expired GitHub token is expected and shown as a reconnect notice
+        if (!isGithubTokenError(e)) console.error("Failed to load threads", e);
         setThreads([]);
+        setThreadsError(isGithubTokenError(e) ? "github-token" : "other");
       } finally {
         setThreadsLoading(false);
       }
@@ -89,6 +137,27 @@ export default function RepositoryPage() {
 
     loadThreads();
   }, [repo, token, page]);
+
+  const handleToggleLike = async () => {
+    if (!token || likePending) return;
+    const wasLiked = liked;
+    const prevCount = likeCount;
+    const apply = (isLiked: boolean) => {
+      setLiked(isLiked);
+      setLikeCount(prevCount + (isLiked ? 1 : 0) - (wasLiked ? 1 : 0));
+    };
+    setLikePending(true);
+    apply(!wasLiked); // optimistic
+    try {
+      const { liked: nowLiked } = await RepositoryService.toggleLike(repositoryId, token);
+      apply(nowLiked);
+    } catch (err) {
+      console.error("Failed to toggle like", err);
+      apply(wasLiked);
+    } finally {
+      setLikePending(false);
+    }
+  };
 
   const handleThreadCreated = (newThread: Record<string, unknown>) => {
     const mapped = {
@@ -101,227 +170,266 @@ export default function RepositoryPage() {
     setThreads([mapped as unknown as Thread, ...threads]);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-          <div className="absolute inset-0 w-16 h-16 bg-emerald-500/10 rounded-full blur-xl animate-pulse"></div>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <RepositorySkeleton />;
 
   if (!repo) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-        <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 border border-red-500/20 shadow-[0_0_30px_rgba(239,68,68,0.15)]">
-          <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        </div>
-        <h2 className="text-2xl font-semibold text-neutral-200 mb-2">Repository Not Found</h2>
-        <p className="text-neutral-400 max-w-md">We couldn&apos;t load the details for this repository. It may have been deleted or you don&apos;t have access.</p>
-      </div>
+      <PageContainer size="narrow">
+        <ErrorState
+          message="We couldn't load the details for this repository. It may have been deleted or you don't have access."
+          onRetry={() => window.location.reload()}
+        />
+      </PageContainer>
     );
   }
 
+  const owner = typeof repo.owner === "string" ? repo.owner : "";
+  const frameworks = Array.isArray(repo.frameworks) ? (repo.frameworks as string[]) : [];
+  const tags = Array.from(
+    new Map([...topLanguages(repo.languages), ...frameworks.slice(0, 3)].map((t) => [t.toLowerCase(), t])).values()
+  ); // header stays short; the full framework list is in the insights card
+  const goodFirst = typeof repo.goodFirstIssueCount === "number" ? repo.goodFirstIssueCount : null;
+  const helpWanted = typeof repo.helpWantedCount === "number" ? repo.helpWantedCount : 0;
+  const hasGuide = repo.hasContributingGuide === true;
+
+  const stats = [
+    ...(typeof repo.stars === "number" ? [{ label: "Stars", value: compactNumber(repo.stars), icon: Star }] : []),
+    ...(typeof repo.forks === "number" ? [{ label: "Forks", value: compactNumber(repo.forks), icon: GitFork }] : []),
+    ...(typeof repo.openIssuesCount === "number"
+      ? [{ label: "Open issues", value: repo.openIssuesCount.toLocaleString(), icon: CircleDot }]
+      : []),
+    ...(goodFirst !== null
+      ? [{ label: "Good first issues", value: goodFirst.toLocaleString(), icon: Sprout, accent: true }]
+      : []),
+  ];
+
+  const visibleThreads = threadFilter === "prs" ? threads.filter((t) => t.isPR) : threads;
+  const showThreadsEmpty = !threadsError && !threadsLoading && threads.length === 0;
+
+  const headerDither = (
+    <Dither cols={110} rows={40} cell={5} direction="radial" falloff={1.4} className="text-emerald-500/20" />
+  );
+
   return (
-    <div className="max-w-[1400px] w-full mx-auto px-4 sm:px-6 md:px-8 space-y-12 pb-16 pt-8 relative">
-      {/* Immersive background glow */}
-      <div className="absolute top-0 inset-x-0 h-[500px] bg-gradient-to-b from-emerald-500/10 via-emerald-500/[0.02] to-transparent pointer-events-none blur-3xl -z-10" />
-
-      {/* Header Section */}
-      <div className="relative bg-neutral-900/40 backdrop-blur-2xl border border-neutral-800/60 rounded-3xl p-8 sm:p-10 shadow-2xl overflow-hidden group">
-        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent" />
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
-          <div className="space-y-4 max-w-4xl">
-            <h1 className="text-4xl md:text-5xl font-medium tracking-tight text-neutral-100 flex items-center gap-4 break-words">
-              {repo.name}
-              <a href={repo.url} target="_blank" rel="noreferrer" className="p-2 rounded-full bg-neutral-800/50 text-neutral-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all">
-                <ExternalLink className="w-5 h-5" />
-              </a>
-            </h1>
-            <p className="text-neutral-400 text-lg font-light leading-relaxed">
-              {repo.description || "No description provided."}
-            </p>
-            
-            <div className="flex flex-wrap items-center gap-3 mt-6">
-              {repo.techStack && repo.techStack.length > 0 ? (
-                repo.techStack.map((tech: string) => (
-                  <span key={tech} className="px-3.5 py-1.5 text-xs font-medium bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.05)]">
-                    {tech}
-                  </span>
-                ))
-              ) : (
-                <span className="px-3.5 py-1.5 text-xs font-medium bg-neutral-800/50 border border-neutral-700/50 rounded-full text-neutral-400">
-                  Codebase
-                </span>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex flex-col gap-4 min-w-[200px]">
-            <button className="w-full flex items-center justify-center gap-2.5 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 rounded-xl text-sm font-semibold transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] transform hover:-translate-y-0.5">
-              <ThumbsUp className="w-4 h-4" />
-              Like Repository
-            </button>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-neutral-900/80 border border-neutral-800/60 rounded-xl p-3 flex flex-col items-center justify-center">
-                <GitMerge className="w-4 h-4 text-emerald-400 mb-1" />
-                <span className="text-xs text-neutral-400 font-medium">Active</span>
-              </div>
-              <div className="bg-neutral-900/80 border border-neutral-800/60 rounded-xl p-3 flex flex-col items-center justify-center">
-                <Star className="w-4 h-4 text-emerald-400 mb-1" />
-                <span className="text-xs text-neutral-400 font-medium">Favorite</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two Column Layout: Map & Insights */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left Column: Visual Map (takes up 2/3 on xl screens) */}
-        <div className="xl:col-span-2 flex flex-col space-y-4">
-          {(repo.folderStructure || (repo.dependencies && repo.dependencies.length > 0)) && (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-neutral-200 flex items-center gap-2">
-                  <Network className="w-5 h-5 text-emerald-500" />
-                  Codebase Architecture Map
-                </h2>
-              </div>
-              <VisualMap folderStructure={repo.folderStructure} dependencies={repo.dependencies} />
-            </>
+    <PageContainer>
+      {/* Repository header (D1) */}
+      <div className="relative isolate overflow-hidden rounded-md border border-border bg-card">
+        <div className="pointer-events-none absolute -right-10 top-1/2 -z-10 -translate-y-[58%] [mask-image:radial-gradient(closest-side,black_45%,transparent)]">
+          {owner ? (
+            <DitheredImage
+              src={githubAvatarUrl(owner, 200)}
+              cols={72}
+              cell={5}
+              className="text-emerald-500/25"
+              fallback={headerDither}
+            />
+          ) : (
+            headerDither
           )}
         </div>
 
-        {/* Right Column: Insights (takes up 1/3 on xl screens) */}
-        <div className="xl:col-span-1 flex flex-col space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-neutral-200 flex items-center gap-2">
-              <Activity className="w-5 h-5 text-emerald-500" />
-              Repository Insights
-            </h2>
+        <div className="flex flex-col gap-6 p-5 sm:p-8 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="min-w-0">
+              {owner && (
+                <p className="text-sm text-muted-foreground">
+                  {owner} <span className="text-muted-foreground/50">/</span>
+                </p>
+              )}
+              <h1 className="break-words font-serif text-4xl font-medium italic tracking-wide md:text-5xl">{repo.name}</h1>
+            </div>
+            {repo.description && (
+              <p className="max-w-2xl text-base leading-relaxed text-muted-foreground">{repo.description}</p>
+            )}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {tags.map((t) => <Tag key={t}>{t}</Tag>)}
+              </div>
+            )}
+            {(repo.pushedAt || hasGuide || helpWanted > 0) && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-xs text-muted-foreground">
+                {repo.pushedAt && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                    Pushed {timeAgo(repo.pushedAt)}
+                  </span>
+                )}
+                {hasGuide && (
+                  <span className="inline-flex items-center gap-1.5"><BookOpen className="size-3.5" /> Contributing guide</span>
+                )}
+                {helpWanted > 0 && (
+                  <span className="inline-flex items-center gap-1.5"><HandHelping className="size-3.5" /> {helpWanted} help wanted</span>
+                )}
+              </div>
+            )}
           </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            {repo.url && (
+              <Button variant="outline" size="icon" asChild>
+                <a href={repo.url} target="_blank" rel="noreferrer" aria-label="Open on GitHub" title="Open on GitHub">
+                  <GithubIcon />
+                </a>
+              </Button>
+            )}
+            <Button
+              variant={liked ? "outline" : "default"}
+              onClick={handleToggleLike}
+              disabled={likePending}
+              aria-pressed={liked}
+              className={cn("min-w-32", liked && "border-emerald-500/40 text-emerald-700 dark:text-emerald-300")}
+            >
+              <ThumbsUp className={cn(liked && "fill-current")} />
+              {liked ? "Liked" : "Like"}
+              <span className="tabular-nums opacity-70">{likeCount}</span>
+            </Button>
+          </div>
+        </div>
+
+        <StatStrip stats={stats} />
+      </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+          {/* Issues (D3 / D4) */}
+          <div className="overflow-hidden rounded-md border border-border bg-card">
+            <div className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3.5">
+              <h2 className="text-base font-semibold">Issues</h2>
+              {typeof repo.openIssuesCount === "number" && (
+                <span className="text-sm text-muted-foreground tabular-nums">{repo.openIssuesCount.toLocaleString()}</span>
+              )}
+              {threads.length > 0 && (
+                <SegmentedControl
+                  size="sm"
+                  aria-label="Filter issues"
+                  className="ml-2"
+                  value={threadFilter}
+                  onValueChange={setThreadFilter}
+                  options={[
+                    { value: "open", label: "All open" },
+                    { value: "prs", label: "Pull requests" },
+                  ]}
+                />
+              )}
+              <Button variant="outline" size="sm" className="ml-auto" onClick={() => setIsCreateThreadOpen(true)}>
+                <Plus /> New issue
+              </Button>
+            </div>
+
+            {threadsError === "github-token" && (
+              <div className="p-4">
+                <GithubReconnectNotice action="load this repository's issues" />
+              </div>
+            )}
+            {threadsError === "other" && (
+              <p className="px-5 py-6 text-sm text-muted-foreground">Couldn&apos;t load issues right now.</p>
+            )}
+
+            {!threadsError && threadsLoading && threads.length === 0 && (
+              <div className="divide-y divide-border" aria-busy="true">
+                {["w-4/5", "w-3/5", "w-2/3", "w-1/2"].map((w) => (
+                  <div key={w} className="flex items-start gap-3 px-5 py-3.5">
+                    <Skeleton className="mt-0.5 size-4 shrink-0 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className={`h-3.5 ${w}`} />
+                      <Skeleton className="h-3 w-32" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showThreadsEmpty && (
+              <div className="relative isolate flex flex-col items-center justify-center px-6 py-14 text-center">
+                <Dither
+                  cols={70}
+                  rows={22}
+                  cell={4}
+                  direction="radial"
+                  peak={0.6}
+                  className="absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 text-emerald-500/[0.12]"
+                />
+                <p className="font-medium">No open issues</p>
+                <p className="mt-1 text-sm text-muted-foreground">Nothing is open on GitHub right now.</p>
+              </div>
+            )}
+
+            {threads.length > 0 && (
+              <>
+                {visibleThreads.length === 0 ? (
+                  <p className="px-5 py-6 text-sm text-muted-foreground">No pull requests on this page.</p>
+                ) : (
+                  <ul className={cn("divide-y divide-border transition-opacity", threadsLoading && "opacity-50")}>
+                    {visibleThreads.map((thread) => (
+                      <li key={thread.id}>
+                        <Link
+                          href={`/dashboard/repository/${repositoryId}/threads/${thread.id}`}
+                          className="flex items-start gap-3 px-5 py-3.5 transition-colors hover:bg-muted/40"
+                        >
+                          {thread.isPR ? (
+                            <GitPullRequest className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Pull request" />
+                          ) : (
+                            <CircleDot className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-label="Issue" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{thread.title}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                              #{thread.id} · opened {timeAgo(thread.createdAt)}
+                            </p>
+                          </div>
+                          {typeof thread.comments === "number" && (
+                            <span className="inline-flex shrink-0 items-center gap-1 pt-0.5 text-xs text-muted-foreground tabular-nums">
+                              <MessageSquare className="size-3.5" /> {thread.comments}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-border px-5 py-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1 || threadsLoading}
+                    >
+                      <ChevronLeft /> Prev
+                    </Button>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages || threadsLoading}
+                    >
+                      Next <ChevronRight />
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <CodebaseCard folderStructure={repo.folderStructure} dependencies={repo.dependencies} repoUrl={repo.url} />
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6">
+          {token && <NewcomerPanel repositoryId={repositoryId} token={token} repo={repo} />}
           <RepositoryInsights repo={repo} />
         </div>
       </div>
 
-      {/* Discussions Section */}
-      <div className="space-y-6">
-        <div className="flex items-center justify-between pb-2 border-b border-neutral-800/50">
-          <h2 className="text-2xl font-medium tracking-tight text-neutral-100 flex items-center gap-3">
-            <MessageSquarePlus className="w-6 h-6 text-emerald-500" />
-            Discussions
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-sm font-medium border border-emerald-500/20">
-              {threads.length}
-            </span>
-          </h2>
-          <button 
-            onClick={() => setIsCreateThreadOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-neutral-900 border border-neutral-800 hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-400 text-neutral-300 font-medium rounded-xl text-sm transition-all shadow-lg"
-          >
-            <MessageSquarePlus className="w-4 h-4" />
-            New Thread
-          </button>
-        </div>
-
-        <div className="bg-neutral-900/40 backdrop-blur-xl border border-neutral-800/60 rounded-2xl overflow-hidden shadow-xl">
-          {threads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-16 h-16 bg-neutral-800/50 rounded-2xl flex items-center justify-center mb-6 border border-neutral-700/50">
-                <MessageSquarePlus className="w-8 h-8 text-neutral-500" />
-              </div>
-              <p className="text-neutral-300 text-lg font-medium mb-2">No discussions yet</p>
-              <p className="text-neutral-500 text-sm max-w-sm">Be the first to start a conversation, report an issue, or suggest a feature for this repository.</p>
-              <button 
-                onClick={() => setIsCreateThreadOpen(true)}
-                className="mt-6 px-6 py-2.5 bg-emerald-500/10 text-emerald-400 font-medium text-sm rounded-xl border border-emerald-500/20 hover:bg-emerald-500 hover:text-neutral-950 transition-all duration-300"
-              >
-                Start Discussion
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className={`divide-y divide-neutral-800/50 transition-opacity duration-200 ${threadsLoading ? 'opacity-50' : 'opacity-100'}`}>
-              {threads.map(thread => (
-                <a 
-                  key={thread.id} 
-                  href={`/dashboard/repository/${repositoryId}/threads/${thread.id}`}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-6 hover:bg-neutral-800/40 transition-colors group relative overflow-hidden"
-                >
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 transform scale-y-0 group-hover:scale-y-100 transition-transform origin-center duration-300" />
-                  
-                  <div className="flex-1 min-w-0 pr-6 pl-2">
-                    <h3 className="text-lg font-medium text-neutral-200 group-hover:text-emerald-400 transition-colors truncate mb-1.5 flex items-center gap-2">
-                      {thread.title}
-                      {thread.isPR ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex-shrink-0">
-                          <GitPullRequest className="w-3 h-3" />
-                          PR
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-neutral-500/10 text-neutral-400 border border-neutral-500/20 flex-shrink-0">
-                          <CircleDot className="w-3 h-3" />
-                          Issue
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-neutral-500 text-sm font-light truncate">
-                      {thread.content}
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 mt-4 sm:mt-0 whitespace-nowrap text-xs text-neutral-500 font-medium">
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-950/50 border border-neutral-800/80">
-                      <Clock className="w-3.5 h-3.5 text-neutral-400" />
-                      {new Date(thread.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-neutral-800/50 bg-neutral-900/20">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-400 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" /> Previous
-                </button>
-                <span className="text-xs text-neutral-500 font-medium">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-400 hover:text-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            </>
-          )}
-        </div>
-      </div>
-
-      <CreateThreadDialog 
-        isOpen={isCreateThreadOpen} 
-        onClose={() => setIsCreateThreadOpen(false)} 
+      <CreateThreadDialog
+        isOpen={isCreateThreadOpen}
+        onClose={() => setIsCreateThreadOpen(false)}
         owner={repo.owner as string}
         repo={repo.name as string}
         onThreadCreated={handleThreadCreated}
       />
-
-      <GroupChatPanel 
-        isOpen={isGroupChatOpen}
-        onClose={() => setIsGroupChatOpen(false)}
-        repositoryId={repositoryId}
-      />
-    </div>
+    </PageContainer>
   );
 }
