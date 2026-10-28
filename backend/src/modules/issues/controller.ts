@@ -5,6 +5,7 @@ import { AppError } from '../../lib/errors'
 import { RequestWithUser } from '../../middlewares/auth.middleware'
 import { RequestWithPaginationAndUser } from '../../middlewares/pagination.middleware'
 import { IssuesService, isValidReaction } from './service'
+import { IssueActivityService } from './activity'
 
 const listIssues = asyncHandler(async (req: RequestWithPaginationAndUser, res: Response, next: NextFunction) => {
   try {
@@ -34,6 +35,21 @@ const getIssue = asyncHandler(async (req: RequestWithUser, res: Response, next: 
 
     const result = await IssuesService.getIssue(userId, owner, repo, issueNumber)
     sendResponse(res, 200, true, 'Issue retrieved successfully', result)
+  } catch (error) {
+    next(error)
+  }
+})
+
+// Timeline events, linked PRs or issues, and PR review threads, for the thread page
+const getIssueActivity = asyncHandler(async (req: RequestWithUser, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.id
+    const owner = String(req.params.owner)
+    const repo = String(req.params.repo)
+    const issueNumber = parseInt(String(req.params.issueNumber), 10)
+
+    const result = await IssueActivityService.getActivity(userId, owner, repo, issueNumber)
+    sendResponse(res, 200, true, 'Activity retrieved successfully', result)
   } catch (error) {
     next(error)
   }
@@ -171,6 +187,7 @@ const toggleIssueCommentReaction = asyncHandler(async (req: RequestWithUser, res
 })
 
 export const IssuesController = {
+  getIssueActivity,
   listIssues,
   getIssue,
   listIssueComments,

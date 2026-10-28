@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Timeline events (mentions, referencing commits, label changes, transfers, reviews…), linked pull requests or issues, and for pull requests the code review threads with their replies. One GitHub GraphQL call.'
+url: '{{BASE_URL}}/api/v1/issues/{{owner}}/{{repo}}/{{issue_number}}/activity'
+method: GET
+order: 2500
