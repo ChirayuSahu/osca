@@ -1,0 +1,137 @@
+# Full OSCA stack: Postgres, Redis, Neo4j, backend API (+ BullMQ workers) and frontend.
+#
+#   docker compose up --build
+#
+# Secrets (GitHub OAuth, JWT_SECRET, OPENROUTER_API_KEY, ...) come from backend/.env;
+# the datastore settings below override whatever that file points at, so the stack
+# always talks to its own containers. Only the frontend (3000) and backend (8000)
+# publish ports; Postgres, Redis and Neo4j are reachable only on the compose network.
+#
+# First start on empty volumes: `migrate` applies the schema, then `seed` queues the
+# beginner-friendly repo catalogue (needs GITHUB_TOKEN in backend/.env) and the
+# backend's workers analyze it into Postgres + Neo4j. Later starts skip the seed.
+
+x-local-datastores: &local-datastores
+  DATABASE_URL: postgresql://osca:${POSTGRES_PASSWORD:-osca-local-password}@postgres:5432/osca
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ""
+  REDIS_TLS: "false"
+  NEO4J_URI: bolt://neo4j:7687
+  NEO4J_USER: neo4j
+  NEO4J_PASSWORD: ${NEO4J_PASSWORD:-osca-local-password}
+  NEO4J_DATABASE: neo4j
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: osca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-osca-local-password}
+      POSTGRES_DB: osca
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osca -d osca"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  neo4j:
+    image: neo4j:5.26-community
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-osca-local-password}
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  # One-shot: applies Prisma migrations, then exits. The backend waits for it.
+  migrate:
+    build:
+      context: ./backend
+      target: builder
+    command: ["npx", "prisma", "migrate", "deploy"]
+    environment:
+      <<: *local-datastores
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-shot: on a fresh database, enqueues the beginner-friendly repository
+  # catalogue for the backend's workers to analyze. Skips when repositories
+  # already exist or GITHUB_TOKEN is unset, so it never blocks startup.
+  seed:
+    build:
+      context: ./backend
+    command: ["node", "dist/scripts/seed-beginner-repositories.js", "--if-empty"]
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *local-datastores
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *local-datastores
+      PORT: "8000"
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client bundle at build time; the browser calls the API on the host.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  neo4j_data:
