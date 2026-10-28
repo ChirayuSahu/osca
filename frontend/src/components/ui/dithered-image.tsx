@@ -187,7 +187,5 @@ function DitheredImage({
   )
 }
 
-// Avatar URL that serves CORS headers (github.com/<login>.png redirects without them)
-const githubAvatarUrl = (login: string, size = 96) => `https://avatars.githubusercontent.com/${login}?size=${size}`
-
-export { DitheredImage, githubAvatarUrl }
+export { DitheredImage }
+export { githubAvatarUrl } from "@/lib/github-avatar"

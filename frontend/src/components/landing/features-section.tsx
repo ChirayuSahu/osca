@@ -1,121 +1,170 @@
-import React from "react";
+import * as React from "react";
+import { CircleDot } from "lucide-react";
+import { Dither } from "@/components/ui/dither";
+import { GithubIcon } from "@/components/icons";
+import { SegmentedMeter } from "@/components/repo-ui";
+import { cn } from "@/lib/utils";
+
+// "How it works" as a bento: two wide steps, then three. Each step shows a small
+// piece of the real product rather than an illustration.
+
+function Step({
+  step,
+  title,
+  className,
+  children,
+}: {
+  step: string;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("group relative isolate flex flex-col overflow-hidden rounded-md border border-border bg-card", className)}>
+      <Dither
+        cols={46}
+        rows={18}
+        cell={4}
+        direction="top-right"
+        className="absolute right-0 top-0 -z-10 text-emerald-500/[0.12]"
+      />
+      <div className="space-y-2 p-6 pb-0 sm:p-7 sm:pb-0">
+        <p className="font-mono text-xs text-emerald-600 dark:text-emerald-400">{step}</p>
+        <p className="max-w-md text-lg font-medium leading-snug tracking-tight sm:text-xl">{title}</p>
+      </div>
+      <div className="mt-auto p-6 pt-6 sm:p-7">{children}</div>
+    </div>
+  );
+}
+
+function ConnectVisual() {
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-border bg-background px-4 py-3">
+      <GithubIcon className="size-5" />
+      <span className="h-px flex-1 border-t border-dashed border-border" />
+      <span className="text-xs text-muted-foreground">read-only</span>
+      <span className="h-px flex-1 border-t border-dashed border-border" />
+      <span className="inline-flex items-baseline gap-1">
+        <span className="font-serif text-lg font-semibold italic leading-none">osca</span>
+        <span className="size-1.5 -translate-y-[2px] rounded-full bg-emerald-500" aria-hidden />
+      </span>
+    </div>
+  );
+}
+
+function SkillsVisual() {
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-background p-4">
+      {[
+        { name: "TypeScript", value: 92 },
+        { name: "Python", value: 54 },
+        { name: "Go", value: 31 },
+      ].map((s) => (
+        <div key={s.name} className="grid grid-cols-[6.5rem_1fr_2rem] items-center gap-3 text-sm">
+          <span className="text-muted-foreground">{s.name}</span>
+          <SegmentedMeter value={s.value} segments={24} />
+          <span className="text-right text-xs tabular-nums text-muted-foreground">{s.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnalyzeVisual() {
+  const slices = [
+    { ext: ".ts", share: 58, swatch: "bg-emerald-500" },
+    { ext: ".tsx", share: 22, swatch: "bg-emerald-500/60" },
+    { ext: ".json", share: 9, swatch: "bg-emerald-500/30" },
+    { ext: "other", share: 11, swatch: "bg-muted-foreground/25" },
+  ];
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-background p-4">
+      <div className="flex h-2 w-full gap-[3px]">
+        {slices.map((s) => (
+          <span key={s.ext} className={cn("h-full rounded-[1px]", s.swatch)} style={{ width: `${s.share}%` }} />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {slices.map((s) => (
+          <span key={s.ext} className="inline-flex items-center gap-1.5">
+            <span className={cn("size-2 rounded-[1px]", s.swatch)} aria-hidden />
+            <span className="font-mono">{s.ext}</span>
+            <span className="text-muted-foreground tabular-nums">{s.share}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MatchVisual() {
+  return (
+    <ul className="divide-y divide-border rounded-md border border-border bg-background text-sm">
+      {[
+        { repo: "excalidraw/excalidraw", match: 92 },
+        { repo: "medusajs/medusa", match: 88 },
+        { repo: "ueberdosis/tiptap", match: 85 },
+      ].map((r) => (
+        <li key={r.repo} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+          <span className="truncate">{r.repo}</span>
+          <span className="text-xs font-medium tabular-nums text-emerald-700 dark:text-emerald-400">{r.match}%</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function ContributeVisual() {
+  return (
+    <ul className="divide-y divide-border rounded-md border border-border bg-background text-sm">
+      {[
+        { title: "Export dialog ignores iOS safe area", n: 4833 },
+        { title: "Add keyboard shortcut for zoom to fit", n: 8012 },
+        { title: "Docs: clarify collaboration setup", n: 7790 },
+      ].map((i) => (
+        <li key={i.n} className="flex items-center gap-2.5 px-3.5 py-2.5">
+          <CircleDot className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span className="min-w-0 flex-1 truncate">{i.title}</span>
+          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">#{i.n}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function FeaturesSection() {
-  const cardBg = (src: string) => ({
-    backgroundImage: `url('${src}')`,
-  });
-
-  const cardBase =
-    "min-w-0 rounded-[24px] bg-cover bg-center text-[#031303] p-6 md:p-10 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1 relative overflow-hidden";
-
   return (
-    <section id="how-it-works" className="w-full h-full bg-[#020503] text-white flex items-center select-none relative overflow-hidden py-16 md:py-24">
-      {/* Background Pattern */}
-      <div 
-        className="absolute inset-0 opacity-[0.04] pointer-events-none z-0"
-        aria-hidden="true"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at center, #ffffff 1px, transparent 1px)",
-          backgroundSize: "24px 24px",
-        }}
-      />
-
-      <div className="relative w-full max-w-7xl mx-auto px-6 md:px-12 z-10 flex flex-col gap-12 md:gap-16">
-        {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 md:gap-8">
-          <h2 className="font-serif italic font-medium text-3xl md:text-5xl lg:text-[56px] text-[#F0FFF2] leading-[1.1] max-w-[500px]">
-            How does our product work?
-          </h2>
-
-          <p className="w-full max-w-[460px] text-[#F0FFF2] font-normal text-lg md:text-xl leading-relaxed">
-            From profile to perfect match in minutes, with a personalized
-            contribution roadmap
+    <section id="how-it-works" className="scroll-mt-16 border-t border-border">
+      <div className="mx-auto w-full max-w-7xl px-4 py-20 md:px-6 md:py-28">
+        <div className="mb-12 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <p className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.2em] text-emerald-600 dark:text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
+              How it works
+            </p>
+            <h2 className="font-serif text-4xl font-medium italic tracking-tight md:text-5xl">From profile to first PR</h2>
+          </div>
+          <p className="max-w-md text-lg leading-relaxed text-muted-foreground">
+            Five steps, most of them automatic. You sign in; OSCA does the reading and ranking.
           </p>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {/* Steps 1 & 2 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Step 1 */}
-            <div className="bg-gradient-to-br from-[#e8f7ee] via-[#f0fdf4] to-[#cbe9d7] text-neutral-900 rounded-[24px] p-8 flex flex-col justify-between min-h-[180px] group transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3 block">Step 1</span>
-                <p className="font-medium text-xl lg:text-[24px] leading-snug max-w-[520px]">
-                  Connect your GitHub via Github or Gitlab to securely import your repositories
-                </p>
-              </div>
-              <div className="flex items-center gap-3 mt-6 bg-white/40 backdrop-blur-sm px-4 py-2.5 rounded-xl border border-white/50 w-fit">
-                <div className="flex items-center gap-2" aria-hidden="true">
-                  <svg className="w-5 h-5 fill-[#e24329]" viewBox="0 0 24 24">
-                    <path d="M23.955 13.582l-1.32-4.067-1.428-4.401c-.08-.246-.423-.246-.503 0L19.276 9.515H4.724L3.316 5.114c-.08-.246-.423-.246-.503 0L1.385 9.515.045 13.582c-.144.444.013.931.393 1.205l11.085 8.061c.219.16.511.16.73 0l11.085-8.061c.38-.274.537-.761.393-1.205z"/>
-                  </svg>
-                  <svg className="w-5 h-5 fill-neutral-900" viewBox="0 0 24 24">
-                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                  </svg>
-                </div>
-                <div className="w-12 border-t border-dashed border-neutral-400 mx-1" />
-                <span className="font-serif italic font-bold text-neutral-900 text-base">osca</span>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="bg-gradient-to-br from-[#e8f7ee] via-[#f0fdf4] to-[#cbe9d7] text-neutral-900 rounded-[24px] p-8 flex flex-col justify-between min-h-[180px] group transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
-              <div className="relative z-10">
-                <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3 block">Step 2</span>
-                <p className="font-medium text-xl lg:text-[24px] leading-snug max-w-[520px]">
-                  The engine scans your contribution history and coding pattern to build your skill profile
-                </p>
-              </div>
-              
-              <div className="absolute top-2 right-4 w-24 h-24 opacity-40 pointer-events-none" aria-hidden="true">
-                <svg viewBox="0 0 200 200" className="w-full h-full text-emerald-600/30 fill-current">
-                  <path d="M 100, 100 m -60, 0 a 60,60 0 1,0 120,0 a 60,60 0 1,0 -120,0" stroke="currentColor" strokeWidth="18" fill="none" opacity="0.6" />
-                  <path d="M 100, 100 m -45, 0 a 45,45 0 1,0 90,0 a 45,45 0 1,0 -90,0" stroke="currentColor" strokeWidth="6" fill="none" opacity="0.3" />
-                </svg>
-              </div>
-
-              <div className="absolute right-0 bottom-0 w-[200px] bg-[#09150e] border-l border-t border-neutral-800 rounded-tl-xl p-3 font-sans text-[9px] text-neutral-400 select-none shadow-2xl" aria-hidden="true">
-                <p className="text-white font-medium mb-1.5 truncate">
-                  3,591 contributions in the last year
-                </p>
-                <div className="grid grid-flow-col grid-rows-4 gap-0.5 w-full h-10">
-                  {Array.from({ length: 24 }).map((_, i) => {
-                    const opacities = ["bg-emerald-950", "bg-emerald-800", "bg-emerald-600", "bg-emerald-400"];
-                    const bgClass = opacities[Math.floor(Math.random() * opacities.length)];
-                    return <div key={i} className={`rounded-[1px] ${bgClass}`} />;
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Steps 3, 4, 5 generated via Array.map */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 auto-rows-fr max-w-6xl mx-auto w-full">
-            {[
-              { title: "Step 3", desc: "Your repositories are analyzed across multiple metrics to understand what they need" },
-              { title: "Step 4", desc: "Our matching engine pairs you with projects that align with your skills and interests" },
-              { title: "Step 5", desc: "Receive your personalized roadmap and start contributing immediately" }
-            ].map((step, i) => (
-              <div key={i} className={`${cardBase} min-h-[360px]`} style={cardBg(`group-${19-i}.png`)}>
-                <div className="max-w-[90%] flex flex-col gap-4">
-                  <span className="text-sm font-semibold uppercase tracking-wider text-[#031303] block">
-                    {step.title}
-                  </span>
-                  <p className="font-medium text-xl md:text-2xl leading-tight">
-                    {step.desc}
-                  </p>
-                </div>
-                
-                {/* Fixed: Moved the SVG decorative div inside the parent wrapper */}
-                <div className="absolute -bottom-6 -right-2 w-20 h-20 text-emerald-600/20 pointer-events-none rotate-12" aria-hidden="true">
-                  <svg fill="currentColor" viewBox="0 0 24 24" className="w-full h-full">
-                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
-                  </svg>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="grid gap-4 lg:grid-cols-6">
+          <Step step="01" title="Connect GitHub. OSCA only asks to read your public profile." className="lg:col-span-3">
+            <ConnectVisual />
+          </Step>
+          <Step step="02" title="Your repos and contributions become a skill profile." className="lg:col-span-3">
+            <SkillsVisual />
+          </Step>
+          <Step step="03" title="Repositories are mapped: languages, structure, issues." className="lg:col-span-2">
+            <AnalyzeVisual />
+          </Step>
+          <Step step="04" title="Matches are ranked by skill fit and newcomer friendliness." className="lg:col-span-2">
+            <MatchVisual />
+          </Step>
+          <Step step="05" title="Pick a good first issue and open your PR." className="lg:col-span-2">
+            <ContributeVisual />
+          </Step>
         </div>
       </div>
     </section>
