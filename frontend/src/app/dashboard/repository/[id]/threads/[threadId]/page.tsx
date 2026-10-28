@@ -276,7 +276,9 @@ export default function ThreadPage() {
           <CommentSection owner={repoDetails.owner} repo={repoDetails.name} threadId={threadId} />
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-6">
+        {/* Pinned beside the issue and comments while they scroll (desktop only) */}
+        <aside className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100svh-3rem)] lg:overflow-y-auto">
+
           <div className="overflow-hidden rounded-md border border-border bg-card">
             <div className="border-b border-border px-5 py-3.5">
               <Eyebrow>Details</Eyebrow>
