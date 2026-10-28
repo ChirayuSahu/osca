@@ -81,8 +81,13 @@ export default function PrivacyPage() {
           </li>
           <li>
             What you do with recommendations: which ones were shown to you, and which you opened, liked, hid, skipped or
-            followed to GitHub. This tunes how your recommendations are ranked and tells us, in aggregate, whether they
-            lead to contributions (by checking your public pull requests to recommended repositories)
+            followed to GitHub. This tunes how your recommendations are ranked and tells us whether they lead to
+            contributions
+          </li>
+          <li>
+            Your public pull requests: once a day (and when you open your profile) OSCA reads the public pull requests
+            you opened recently, and records which ones went to projects it had shown you. You see them on your profile.
+            Pull requests to private repositories are never read
           </li>
           <li>Repositories you asked OSCA to analyze, and whether each analysis is queued, running, finished or failed</li>
         </ul>

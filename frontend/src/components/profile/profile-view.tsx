@@ -27,6 +27,7 @@ import { ProfileSkeleton } from "@/components/skeletons";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
+import { ContributionsPanel } from "@/components/profile/contributions-panel";
 
 // The contributions calendar is heavy and below the fold; load it on demand
 const GitHubCalendar = dynamic(() => import("react-github-calendar").then((m) => m.GitHubCalendar), {
@@ -504,6 +505,8 @@ export function ProfileView({ userId }: { userId?: string }) {
           <Skeleton className="h-28 w-full" />
         )}
       </div>
+
+      {isSelf && authUser?.id && token && <ContributionsPanel userId={authUser.id} token={token} />}
     </PageContainer>
   );
 }

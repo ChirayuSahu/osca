@@ -32,6 +32,10 @@ model User {
   // Per-user multipliers on the ranking weights, learned from what they open,
   // like and hide: { content, collab, topic, keyword, stars, approachability }
   rankingTuning      Json?
+  // Set when GitHub rejects the stored token (expired or revoked); the app asks
+  // the user to reconnect until a new sign-in clears it
+  githubTokenInvalidAt   DateTime?
+  contributionsSyncedAt  DateTime?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   oauthAccounts      OAuthAccount[]
@@ -42,6 +46,7 @@ model User {
   imports            RepositoryImport[]
   analysisRequests   AnalysisRequest[]
   recommendationEvents RecommendationEvent[]
+  contributions        Contribution[]
 }
 
 model OAuthAccount {
@@ -219,10 +224,45 @@ model RecommendationEvent {
   issueUrl     String?
   position     Int?
   explore      Boolean  @default(false)
+  // Score components when it was shown; lets a later merged PR teach the ranking
+  breakdown    Json?
   createdAt    DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([type, createdAt])
+  @@index([userId, repositoryId])
+}
+
+// A public pull request a user opened, found by the daily check of their GitHub
+// activity. `attributed` means OSCA showed them that repository or issue before
+// they opened it, and they hadn't contributed there before: the product's goal.
+model Contribution {
+  id             String    @id @default(uuid())
+  userId         String
+  prUrl          String
+  prNumber       Int
+  title          String
+  repoFullName   String
+  repositoryId   String?
+  state          String // open | merged | closed
+  closesIssues   Int[]     @default([])
+  attributed     Boolean   @default(false)
+  // Where OSCA first showed it (feed, focus, issues, repository) and when
+  surface        String?
+  firstShownAt   DateTime?
+  openedAt       DateTime
+  mergedAt       DateTime?
+  closedAt       DateTime?
+  // Set once a merge has been fed to the ranking, so it's learned from once
+  learnedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, prUrl])
+  @@index([userId, openedAt])
+  @@index([attributed, openedAt])
 }

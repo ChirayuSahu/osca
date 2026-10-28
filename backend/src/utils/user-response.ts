@@ -26,6 +26,7 @@ export const selfUserSelect = {
   feedView: true,
   interestAreas: true,
   onboardedAt: true,
+  githubTokenInvalidAt: true,
   oauthAccounts: {
     select: {
       id: true,

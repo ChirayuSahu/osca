@@ -5,6 +5,7 @@ import { getRedisConnectionOptions } from '../config/redis'
 import { prisma } from '../utils/prisma'
 import { JobEnqueueService } from '../services/job-enqueue.service'
 import { DEFAULT_LANGUAGES, DEFAULT_TOPICS, discoverRepositories } from '../services/catalogue-discovery.service'
+import { syncContributions } from '../services/contribution-tracking.service'
 
 // Keeps the catalogue fresh, on the server GITHUB_TOKEN:
 // - nightly, re-checks the repos with the oldest signals (newcomer signals,
@@ -16,8 +17,26 @@ import { DEFAULT_LANGUAGES, DEFAULT_TOPICS, discoverRepositories } from '../serv
 const REFRESH_BATCH = 150
 const SCHEDULES = [
   { id: 'refresh-stale', pattern: '0 3 * * *' }, // 03:00 daily
-  { id: 'discover', pattern: '0 4 * * 1' } // 04:00 Mondays
+  { id: 'discover', pattern: '0 4 * * 1' }, // 04:00 Mondays
+  { id: 'sync-contributions', pattern: '30 5 * * *' } // 05:30 daily
 ]
+
+const ACTIVE_WITHIN_MS = 30 * 24 * 60 * 60 * 1000
+
+// Public PRs of everyone active in the last month (their own tokens, one
+// GraphQL call each); people whose token GitHub rejected are skipped until
+// they reconnect
+const syncAllContributions = async (): Promise<number> => {
+  const active = await prisma.recommendationEvent.findMany({
+    where: { createdAt: { gte: new Date(Date.now() - ACTIVE_WITHIN_MS) }, user: { githubTokenInvalidAt: null } },
+    distinct: ['userId'],
+    select: { userId: true }
+  })
+  for (const { userId } of active) {
+    await syncContributions(userId).catch((error) => console.error(`[CatalogueWorker] Contribution sync failed for ${userId}:`, error))
+  }
+  return active.length
+}
 
 const refreshStale = async (): Promise<number> => {
   const repos = await prisma.repository.findMany({
@@ -42,10 +61,15 @@ const discover = async (): Promise<number> => {
   return fresh.length
 }
 
-const processMaintenanceJob = async (job: Job): Promise<{ queued: number }> => {
-  const queued = job.name === 'discover' ? await discover() : await refreshStale()
-  console.log(`[CatalogueWorker] ${job.name}: queued ${queued} repository analyses`)
-  return { queued }
+const processMaintenanceJob = async (job: Job): Promise<{ count: number }> => {
+  if (job.name === 'sync-contributions') {
+    const count = await syncAllContributions()
+    console.log(`[CatalogueWorker] sync-contributions: checked ${count} users`)
+    return { count }
+  }
+  const count = job.name === 'discover' ? await discover() : await refreshStale()
+  console.log(`[CatalogueWorker] ${job.name}: queued ${count} repository analyses`)
+  return { count }
 }
 
 export const createCatalogueWorker = (): Worker => {

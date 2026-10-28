@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { sendResponse } from '../utils/send-response'
 import { AppError } from '../lib/errors'
+import { noteGithubTokenError } from '../services/github-token-health.service'
 
 export interface CustomError extends Error {
   statusCode?: number
@@ -13,6 +14,9 @@ export const errorMiddleware = (
   next: NextFunction
 ): void => {
   const statusCode = err instanceof AppError ? err.statusCode : (err.statusCode ?? 500)
+
+  // GitHub rejected this user's token: remember it so every page can prompt a reconnect
+  void noteGithubTokenError((req as Request & { user?: { id: string } }).user?.id, err)
 
   // Only AppErrors and 4xx framework errors (e.g. body-parser) carry messages
   // meant for clients; anything else may leak Prisma/network internals.

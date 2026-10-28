@@ -20,6 +20,8 @@ router.post('/:id/analyze', authMiddleware, jobLimiter, UserController.analyzePr
 
 router.get('/:id/not-interested', authMiddleware, UserController.listNotInterested)
 
+router.get('/:id/contributions', authMiddleware, UserController.getContributions)
+
 router.delete('/:id', authMiddleware, UserController.deleteUser)
 
 

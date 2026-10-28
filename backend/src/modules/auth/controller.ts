@@ -113,6 +113,10 @@ const handleGithubCallback = asyncHandler(async (req: Request, res: Response) =>
       where: { id: existingOauth.id },
       data: { accessToken: encryptToken(accessToken) }
     })
+    // A fresh token: stop asking them to reconnect
+    if (existingOauth.user.githubTokenInvalidAt) {
+      await prisma.user.update({ where: { id: existingOauth.userId }, data: { githubTokenInvalidAt: null } })
+    }
     userRecord = existingOauth.user
   } else {
     // Never link to an existing user by email: emails aren't verified on our

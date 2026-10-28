@@ -1,6 +1,6 @@
 import { prisma } from '../utils/prisma'
 import { AppError } from '../lib/errors'
-import { learnFromSignals, type Breakdown } from './ranking-tuning.service'
+import { clampBreakdown, learnFromSignals, type Breakdown } from './ranking-tuning.service'
 
 // Records what people do with recommendations (see RecommendationEvent) and
 // feeds the learnable ones into the user's ranking multipliers.
@@ -41,7 +41,9 @@ export const recordEvents = async (userId: string, body: unknown): Promise<numbe
       repositoryId: shortString(e.repositoryId, 64),
       issueUrl: issueUrl && issueUrl.startsWith('https://github.com/') ? issueUrl : null,
       position: Number.isInteger(e.position) && (e.position as number) >= 0 && (e.position as number) < 10_000 ? (e.position as number) : null,
-      explore: e.explore === true
+      explore: e.explore === true,
+      // Kept so a later merged PR to this repo can teach the ranking
+      breakdown: e.breakdown && typeof e.breakdown === 'object' ? clampBreakdown(e.breakdown as Breakdown) : undefined
     }
   })
   await prisma.recommendationEvent.createMany({ data: rows })

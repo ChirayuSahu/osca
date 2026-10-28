@@ -2,6 +2,7 @@ import { Worker, Job, UnrecoverableError } from 'bullmq'
 import { GithubRateLimitError, isPermanentJobError } from '../lib/errors'
 import { AnalysisRequestService } from '../services/analysis-request.service'
 import { rebuildProfileIfOwnRepository } from '../services/profile-refresh.service'
+import { noteGithubTokenError } from '../services/github-token-health.service'
 import { waitOnGithubRateLimit } from './github-rate-limit'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
@@ -87,6 +88,7 @@ const processRepositoryAnalysis = async (
   } catch (error: any) {
     const reason = error?.message || error
     console.error(`[RepositoryWorker:${job.id}] Job failed for ${url}. Reason:`, reason)
+    await noteGithubTokenError(userId, error)
     // Failed for good, or going back in the queue (retry, or waiting out a rate limit)
     const final = !(error instanceof GithubRateLimitError) &&
       (isPermanentJobError(error) || job.attemptsMade + 1 >= (job.opts.attempts ?? 1))

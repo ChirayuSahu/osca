@@ -21,6 +21,8 @@ export interface User {
   feedView?: "grid" | "focus";
   interestAreas?: string[];
   onboardedAt?: string | null;
+  /** Set when GitHub rejected the stored token; cleared by signing in again */
+  githubTokenInvalidAt?: string | null;
 }
 
 interface AuthContextType {

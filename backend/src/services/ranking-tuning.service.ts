@@ -38,7 +38,8 @@ export const parseTuning = (value: unknown): RankingTuning => {
   return tuning
 }
 
-const clampBreakdown = (b: Breakdown): Partial<Record<TunedComponent, number>> => {
+/** Known components only, each clamped to [0, 1] */
+export const clampBreakdown = (b: Breakdown): Partial<Record<TunedComponent, number>> => {
   const out: Partial<Record<TunedComponent, number>> = {}
   for (const c of TUNED_COMPONENTS) {
     const v = b[c]

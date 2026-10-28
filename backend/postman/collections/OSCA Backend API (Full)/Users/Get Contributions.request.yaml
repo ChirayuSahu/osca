@@ -1,0 +1,5 @@
+$kind: http-request
+description: 'Your recent public pull requests, with the ones OSCA led you to marked attributed (shown the repo or issue before you opened the PR, no earlier PRs there). Refreshed from GitHub first when the last check is over 6 hours old. Own account only.'
+url: '{{BASE_URL}}/api/v1/users/{{user_id}}/contributions'
+method: GET
+order: 4500

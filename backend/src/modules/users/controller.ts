@@ -10,6 +10,7 @@ import { AccountService } from '../../services/account.service'
 import { clearIssueRecommendations } from '../../services/issue-recommendation.service'
 import { syncUserInterestAreas } from '../../services/user-keywords.service'
 import { INTEREST_AREAS } from '../../lib/text/keywords'
+import { listContributions, syncContributions } from '../../services/contribution-tracking.service'
 import { NOT_INTERESTED_ACTION } from '../../services/recommendation-engine.service'
 
 const MAX_NAME_LENGTH = 100
@@ -158,6 +159,23 @@ const listNotInterested = asyncHandler(async (req: RequestWithUser, res: Respons
   sendResponse(res, 200, true, 'Hidden repositories retrieved successfully', rows.map(r => ({ ...r.repository, hiddenAt: r.createdAt })))
 })
 
+const CONTRIBUTIONS_STALE_MS = 6 * 60 * 60 * 1000
+
+// Your public PRs and which ones OSCA led to; refreshed first if the last check is old
+const getContributions = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  const id = String(req.params.id)
+  requireSelf(req, id)
+  const user = assertFound(
+    await prisma.user.findUnique({ where: { id }, select: { contributionsSyncedAt: true, githubTokenInvalidAt: true } }),
+    'User not found'
+  )
+  const stale = !user.contributionsSyncedAt || Date.now() - user.contributionsSyncedAt.getTime() > CONTRIBUTIONS_STALE_MS
+  if (stale && !user.githubTokenInvalidAt) {
+    await syncContributions(id).catch(err => console.error(`[Users] Contribution sync failed for ${id}:`, err))
+  }
+  sendResponse(res, 200, true, 'Contributions retrieved successfully', await listContributions(id))
+})
+
 // Deletes your account and everything OSCA stores about you
 const deleteUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
@@ -173,5 +191,6 @@ export const UserController = {
   updateUser,
   analyzeProfile,
   listNotInterested,
+  getContributions,
   deleteUser
 }

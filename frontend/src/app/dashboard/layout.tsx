@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppBreadcrumbs, BreadcrumbProvider } from "@/components/breadcrumbs";
 import dynamic from "next/dynamic";
+import { GithubReconnectBanner } from "@/components/github-reconnect-banner";
 
 // Only people who haven't onboarded yet download the dialog
 const OnboardingDialog = dynamic(() => import("@/components/onboarding-dialog").then((m) => m.OnboardingDialog), { ssr: false });
@@ -43,6 +44,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center border-b bg-background px-4 md:hidden">
           <SidebarTrigger className="-ml-1" />
         </header>
+        <GithubReconnectBanner />
         <BreadcrumbProvider>
           <div className="mx-auto w-full max-w-7xl px-4 md:px-6">
             <AppBreadcrumbs />

@@ -31,6 +31,26 @@ export interface HiddenRepository {
 
 const authHeaders = (token: string) => ({ Authorization: `Bearer ${token}` })
 
+/** A public PR you opened; `attributed` when OSCA showed you the repo or issue first */
+export interface Contribution {
+  id: string
+  prUrl: string
+  prNumber: number
+  title: string
+  repoFullName: string
+  repositoryId: string | null
+  state: 'open' | 'merged' | 'closed'
+  attributed: boolean
+  surface: string | null
+  openedAt: string
+  mergedAt: string | null
+}
+
+export interface ContributionSummary {
+  contributions: Contribution[]
+  totals: { viaOsca: number; mergedViaOsca: number }
+}
+
 export const UserService = {
   async getSettings(userId: string, token: string): Promise<UserSettings> {
     const res = await fetch(`${API_URL}/users/${userId}`, { headers: authHeaders(token) })
@@ -45,6 +65,12 @@ export const UserService = {
       body: JSON.stringify(patch)
     })
     if (!res.ok) throw await readApiError(res, 'Failed to save your settings')
+    return (await res.json()).data
+  },
+
+  async getContributions(userId: string, token: string): Promise<ContributionSummary> {
+    const res = await fetch(`${API_URL}/users/${userId}/contributions`, { headers: authHeaders(token) })
+    if (!res.ok) throw await readApiError(res, 'Failed to load contributions')
     return (await res.json()).data
   },
 

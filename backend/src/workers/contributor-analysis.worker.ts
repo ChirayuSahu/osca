@@ -2,6 +2,7 @@ import { Worker, Job, UnrecoverableError } from 'bullmq'
 import { isPermanentJobError } from '../lib/errors'
 import { waitOnGithubRateLimit } from './github-rate-limit'
 import { syncUserInterestAreas, syncUserRepoKeywords } from '../services/user-keywords.service'
+import { noteGithubTokenError } from '../services/github-token-health.service'
 import { QUEUE_NAMES } from '../config/queue'
 import { getRedisConnectionOptions } from '../config/redis'
 import { ContributorAnalysisService } from '../services/contributor-analysis.service'
@@ -73,6 +74,7 @@ const processContributorAnalysis = async (
     }
   } catch (error) {
     console.error(`[ContributorWorker] Job ${job.id} failed for user ${userId}:`, error)
+    await noteGithubTokenError(userId, error)
     if (isPermanentJobError(error)) throw new UnrecoverableError((error as Error).message)
     throw error
   }
