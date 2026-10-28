@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { CommentService } from "@/services/comment.service";
 import { isGithubTokenError } from "@/lib/api";
-import { ChevronDown, MessageSquare, Reply, Send, Trash2 } from "lucide-react";
+import { ChevronDown, FileCode2, MessageSquare, Reply, Send, Trash2 } from "lucide-react";
 import { GithubBody } from "@/components/markdown-lazy";
 import { Reactions, type ReactionRollup } from "@/components/reactions";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,6 +25,15 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { timeAgo } from "@/components/repo-ui";
 import { cn } from "@/lib/utils";
+import {
+  ActivityIcon,
+  ActivityRow,
+  ReviewThreadCard,
+  groupEvents,
+  type ActivityEvent,
+  type ReviewThread,
+  type ThreadActivity,
+} from "@/components/threads/thread-activity";
 
 interface Comment {
   id: string | number;
@@ -64,7 +73,27 @@ export function UserAvatar({
   );
 }
 
-export default function CommentSection({ owner, repo, threadId }: { owner: string; repo: string; threadId: string }) {
+// One row of the timeline: a comment, a run of events, or a code review thread
+type Entry =
+  | { type: "comment"; at: number; comment: Comment }
+  | { type: "events"; at: number; group: ActivityEvent[] }
+  | { type: "review"; at: number; thread: ReviewThread };
+
+export default function CommentSection({
+  owner,
+  repo,
+  threadId,
+  repositoryId,
+  activity,
+}: {
+  owner: string;
+  repo: string;
+  threadId: string;
+  /** Lets mentions of other issues in this repo open in the app */
+  repositoryId?: string;
+  /** Timeline events and review threads, interleaved with the comments by date */
+  activity?: ThreadActivity | null;
+}) {
   const { token, user: currentUser } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -125,6 +154,17 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
     }
   };
 
+  const entries: Entry[] = [
+    ...comments.map((comment): Entry => ({ type: "comment", at: Date.parse(String(comment.created_at)), comment })),
+    ...groupEvents([...(activity?.events ?? [])].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))).map(
+      (group): Entry => ({ type: "events", at: Date.parse(group[0].createdAt), group })
+    ),
+    ...(activity?.reviewThreads ?? [])
+      .filter((thread) => thread.comments.length > 0)
+      .map((thread): Entry => ({ type: "review", at: Date.parse(thread.comments[0].createdAt), thread })),
+  ].sort((a, b) => a.at - b.at);
+  const repoFullName = `${owner}/${repo}`;
+
   return (
     <section className="overflow-hidden rounded-md border border-border bg-card">
       {/* Header row: title, count, collapse */}
@@ -157,14 +197,39 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
               </div>
             ))}
           </div>
-        ) : comments.length === 0 ? (
+        ) : entries.length === 0 ? (
           <div className="flex items-center justify-center px-6 py-10 text-center">
             <p className="text-sm text-muted-foreground">No comments yet.</p>
           </div>
         ) : (
-          // Timeline: a thin line runs from each avatar down to the next one
+          // Timeline: a thin line runs from each avatar or icon down to the next one
           <ul className="flex flex-col p-5 sm:p-6">
-            {comments.map((comment) => {
+            {entries.map((entry) => {
+              if (entry.type === "events") {
+                return (
+                  <li key={entry.group[0].id} className="group/comment flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <ActivityIcon group={entry.group} />
+                      <span className="mt-2 w-px flex-1 bg-border group-last/comment:hidden" aria-hidden />
+                    </div>
+                    <ActivityRow group={entry.group} repoFullName={repoFullName} repositoryId={repositoryId} />
+                  </li>
+                );
+              }
+              if (entry.type === "review") {
+                return (
+                  <li key={entry.thread.id} className="group/comment flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-background">
+                        <FileCode2 className="size-3.5 text-muted-foreground" aria-hidden />
+                      </span>
+                      <span className="mt-2 w-px flex-1 bg-border group-last/comment:hidden" aria-hidden />
+                    </div>
+                    <ReviewThreadCard thread={entry.thread} />
+                  </li>
+                );
+              }
+              const comment = entry.comment;
               const login = comment.user?.login;
               return (
                 <li key={comment.id} className="group/comment flex gap-3">

@@ -42,6 +42,15 @@ export const ThreadService = {
     return body.data?.toggled === 'added'
   },
 
+  // Timeline events, linked PRs or issues, and PR review threads (one GitHub call)
+  async getActivity(owner: string, repo: string, issueNumber: string | number, token: string) {
+    const res = await fetch(`${API_URL}/issues/${owner}/${repo}/${issueNumber}/activity`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (!res.ok) throw await readApiError(res, 'Failed to fetch activity')
+    return res.json()
+  },
+
   async getPull(owner: string, repo: string, pullNumber: string | number, token: string) {
     const res = await fetch(`${API_URL}/pulls/${owner}/${repo}/${pullNumber}`, {
       headers: { Authorization: `Bearer ${token}` }

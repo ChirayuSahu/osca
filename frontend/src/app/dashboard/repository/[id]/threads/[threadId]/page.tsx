@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useBreadcrumbLabel } from "@/components/breadcrumbs";
 import { ThreadSkeleton } from "@/components/skeletons";
 import { useStickyEnd } from "@/hooks/use-sticky-end";
+import { LabelChip, RefLink, type ThreadActivity } from "@/components/threads/thread-activity";
 
 interface ThreadDetail {
   id?: string | number;
@@ -49,8 +50,6 @@ function CardHeading({ icon: Icon, children }: { icon: React.ComponentType<{ cla
   );
 }
 
-// GitHub label colours are 6-digit hex; anything else falls back to the theme border
-const labelHex = (color: string) => (/^[0-9a-f]{6}$/i.test(color) ? `#${color}` : null);
 
 export default function ThreadPage() {
   const params = useParams();
@@ -62,6 +61,7 @@ export default function ThreadPage() {
   const [thread, setThread] = useState<ThreadDetail | null>(null);
   const [repoDetails, setRepoDetails] = useState<{owner: string, name: string} | null>(null);
   const [relatedThreads, setRelatedThreads] = useState<ThreadDetail[]>([]);
+  const [activity, setActivity] = useState<ThreadActivity | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [prData, setPrData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +84,11 @@ export default function ThreadPage() {
 
         const threadRes = await ThreadService.getThread(owner, repo, threadId, token);
         setThread(threadRes.data);
+
+        // Timeline events and review threads load beside the rest; the page works without them
+        ThreadService.getActivity(owner, repo, threadId, token)
+          .then((res) => setActivity(res.data ?? null))
+          .catch(() => setActivity(null));
 
         if (threadRes.data?.pull_request) {
           try {
@@ -277,7 +282,13 @@ export default function ThreadPage() {
             </div>
           </article>
 
-          <CommentSection owner={repoDetails.owner} repo={repoDetails.name} threadId={threadId} />
+          <CommentSection
+            owner={repoDetails.owner}
+            repo={repoDetails.name}
+            threadId={threadId}
+            repositoryId={repositoryId}
+            activity={activity}
+          />
         </div>
 
         {/* Pinned beside the issue and comments; when taller than the screen it scrolls to its end first (desktop only) */}
@@ -297,20 +308,21 @@ export default function ThreadPage() {
               <div className="flex flex-col gap-2 border-t border-border pt-4">
                 <span className="text-sm text-muted-foreground">Labels</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {thread.labels.map((label) => {
-                    const hex = labelHex(label.color);
-                    return (
-                      <span
-                        key={label.name}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-[11px] font-medium"
-                        style={hex ? { backgroundColor: `${hex}1f`, borderColor: `${hex}59` } : undefined}
-                      >
-                        <span className="size-1.5 shrink-0 rounded-full bg-muted-foreground" style={hex ? { backgroundColor: hex } : undefined} aria-hidden />
-                        <span className="truncate">{label.name}</span>
-                      </span>
-                    );
-                  })}
+                  {thread.labels.map((label) => <LabelChip key={label.name} name={label.name} color={label.color} />)}
                 </div>
+              </div>
+            )}
+            {/* Issue: pull requests that will close it. Pull request: issues it closes. */}
+            {activity && activity.linked.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-border pt-4">
+                <span className="text-sm text-muted-foreground">Development</span>
+                <ul className="flex flex-col gap-2 text-sm">
+                  {activity.linked.map((ref) => (
+                    <li key={`${ref.repo}#${ref.number}`}>
+                      <RefLink refItem={ref} repoFullName={`${repoDetails.owner}/${repoDetails.name}`} repositoryId={repositoryId} />
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </div>
