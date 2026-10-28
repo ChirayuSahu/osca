@@ -389,3 +389,27 @@
   .reveal, .reveal-stagger > *, .hero-rise > * { opacity: 1; transform: none; animation: none !important; }
   .in-view .segment-on, .in-view .grow-x, .in-view .slide-row, .dash-flow { animation: none !important; }
 }
+
+/* ── Toasts ──────────────────────────────────────────────────────────────────
+   Sonner places and stacks them; components/ui/sonner.tsx sets the look. The
+   corner dither is tinted by type, and toasts move on the app's fluid curve. */
+.osca-toast[data-sonner-toast] {
+  --toast-tint: var(--color-emerald-500, oklch(69.6% 0.17 162.48));
+  transition-timing-function: var(--ease-fluid);
+}
+.osca-toast[data-sonner-toast][data-type="error"] { --toast-tint: var(--color-red-500, oklch(63.7% 0.237 25.331)); }
+.osca-toast[data-sonner-toast][data-type="warning"] { --toast-tint: var(--color-amber-500, oklch(76.9% 0.188 70.08)); }
+.osca-toast[data-sonner-toast][data-type="loading"] { --toast-tint: var(--muted-foreground); }
+.osca-toast[data-sonner-toast]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: -1;
+  width: 160px;
+  height: 72px;
+  background-color: var(--toast-tint);
+  opacity: 0.16;
+  mask: var(--toast-dither) top right / 160px 72px no-repeat;
+  pointer-events: none;
+}
