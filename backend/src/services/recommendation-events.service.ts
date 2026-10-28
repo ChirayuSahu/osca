@@ -26,25 +26,28 @@ export const recordEvents = async (userId: string, body: unknown): Promise<numbe
   if (!Array.isArray(events) || events.length === 0) throw new AppError('events must be a non-empty list', 400)
   if (events.length > MAX_BATCH) throw new AppError(`At most ${MAX_BATCH} events per request`, 400)
 
-  const rows = (events as IncomingEvent[]).flatMap(e => {
-    if (typeof e?.type !== 'string' || !TYPES.has(e.type)) return []
-    if (typeof e.surface !== 'string' || !SURFACES.has(e.surface)) return []
+  // Only events that pass validation are stored, and only those can teach the ranking
+  const valid = (events as IncomingEvent[]).filter(
+    e => typeof e?.type === 'string' && TYPES.has(e.type) && typeof e.surface === 'string' && SURFACES.has(e.surface)
+  )
+  if (valid.length === 0) return 0
+
+  const rows = valid.map(e => {
     const issueUrl = shortString(e.issueUrl, 300)
-    return [{
+    return {
       userId,
-      type: e.type,
-      surface: e.surface,
+      type: e.type as string,
+      surface: e.surface as string,
       repositoryId: shortString(e.repositoryId, 64),
       issueUrl: issueUrl && issueUrl.startsWith('https://github.com/') ? issueUrl : null,
       position: Number.isInteger(e.position) && (e.position as number) >= 0 && (e.position as number) < 10_000 ? (e.position as number) : null,
       explore: e.explore === true
-    }]
+    }
   })
-  if (rows.length === 0) return 0
-
   await prisma.recommendationEvent.createMany({ data: rows })
-  const signals = (events as IncomingEvent[])
-    .filter(e => typeof e?.type === 'string' && e.breakdown && typeof e.breakdown === 'object')
+
+  const signals = valid
+    .filter(e => e.breakdown && typeof e.breakdown === 'object')
     .map(e => ({ type: e.type as string, breakdown: e.breakdown as Breakdown }))
   await learnFromSignals(userId, signals)
   return rows.length

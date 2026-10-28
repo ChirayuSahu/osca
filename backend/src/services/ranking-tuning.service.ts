@@ -52,20 +52,23 @@ export const learnFromSignals = async (userId: string, signals: Array<{ type: st
   const useful = signals.filter(s => SIGNAL[s.type] !== undefined && s.breakdown)
   if (useful.length === 0) return
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { rankingTuning: true } })
-  if (!user) return
-  const tuning = parseTuning(user.rankingTuning)
+  // Row lock: two batches arriving together must not overwrite each other's update
+  await prisma.$transaction(async tx => {
+    const locked = await tx.$queryRaw<Array<{ rankingTuning: unknown }>>`SELECT "rankingTuning" FROM "User" WHERE id = ${userId} FOR UPDATE`
+    if (locked.length === 0) return
+    const tuning = parseTuning(locked[0].rankingTuning)
 
-  for (const signal of useful) {
-    const b = clampBreakdown(signal.breakdown as Breakdown)
-    const present = TUNED_COMPONENTS.filter(c => b[c] !== undefined)
-    if (present.length < 2) continue
-    const mean = present.reduce((sum, c) => sum + (b[c] as number), 0) / present.length
-    for (const c of present) {
-      const delta = LEARNING_RATE * SIGNAL[signal.type] * ((b[c] as number) - mean)
-      tuning[c] = Math.min(MAX, Math.max(MIN, tuning[c] * Math.exp(delta)))
+    for (const signal of useful) {
+      const b = clampBreakdown(signal.breakdown as Breakdown)
+      const present = TUNED_COMPONENTS.filter(c => b[c] !== undefined)
+      if (present.length < 2) continue
+      const mean = present.reduce((sum, c) => sum + (b[c] as number), 0) / present.length
+      for (const c of present) {
+        const delta = LEARNING_RATE * SIGNAL[signal.type] * ((b[c] as number) - mean)
+        tuning[c] = Math.min(MAX, Math.max(MIN, tuning[c] * Math.exp(delta)))
+      }
     }
-  }
 
-  await prisma.user.update({ where: { id: userId }, data: { rankingTuning: tuning } })
+    await tx.user.update({ where: { id: userId }, data: { rankingTuning: tuning } })
+  })
 }

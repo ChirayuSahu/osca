@@ -74,9 +74,10 @@ type Approachability = {
 const TEAM = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
 const DAY_MS = 24 * 60 * 60 * 1000
 
+type Author = { __typename?: string } | null
 type SignalNodes = {
-  closedPrs?: { nodes?: Array<{ authorAssociation: string; merged: boolean; closedAt: string | null }> }
-  recentIssues?: { nodes?: Array<{ authorAssociation: string; createdAt: string; comments?: { nodes?: Array<{ authorAssociation: string; createdAt: string }> } }> }
+  closedPrs?: { nodes?: Array<{ authorAssociation: string; author?: Author; merged: boolean; closedAt: string | null }> }
+  recentIssues?: { nodes?: Array<{ authorAssociation: string; author?: Author; createdAt: string; comments?: { nodes?: Array<{ authorAssociation: string; createdAt: string }> } }> }
   starters?: { nodes?: Array<{ assignees?: { totalCount: number }; closedByPullRequestsReferences?: { totalCount: number } }> }
 }
 
@@ -89,25 +90,32 @@ const median = (values: number[]): number | null => {
 
 // Whether newcomers actually succeed: merged outside PRs, maintainer replies to
 // outsiders' issues, and starter issues still free to pick up
+// Dependabot, Renovate and other bots aren't newcomers
+const isBot = (author?: Author) => author?.__typename === 'Bot'
+const UNANSWERED_CAP_HOURS = 14 * 24
+// An unanswered issue younger than this says nothing yet about responsiveness
+const UNANSWERED_MIN_AGE_HOURS = 3 * 24
+
 const newcomerSignals = (repository: SignalNodes) => {
-  const outsidePrs = (repository.closedPrs?.nodes ?? []).filter(pr => !TEAM.has(pr.authorAssociation))
+  const outsidePrs = (repository.closedPrs?.nodes ?? []).filter(pr => !TEAM.has(pr.authorAssociation) && !isBot(pr.author))
   const merged = outsidePrs.filter(pr => pr.merged)
   const since90d = Date.now() - 90 * DAY_MS
 
-  const outsideIssues = (repository.recentIssues?.nodes ?? []).filter(issue => !TEAM.has(issue.authorAssociation))
+  const outsideIssues = (repository.recentIssues?.nodes ?? []).filter(issue => !TEAM.has(issue.authorAssociation) && !isBot(issue.author))
+  // Hours until a maintainer replied; unanswered ones count as their age (capped
+  // at two weeks), and very recent unanswered ones are left out
   const responseHours = outsideIssues.flatMap(issue => {
     const reply = (issue.comments?.nodes ?? []).find(c => TEAM.has(c.authorAssociation))
-    return reply ? [(Date.parse(reply.createdAt) - Date.parse(issue.createdAt)) / 3_600_000] : []
+    if (reply) return [(Date.parse(reply.createdAt) - Date.parse(issue.createdAt)) / 3_600_000]
+    const ageHours = (Date.now() - Date.parse(issue.createdAt)) / 3_600_000
+    return ageHours < UNANSWERED_MIN_AGE_HOURS ? [] : [Math.min(ageHours, UNANSWERED_CAP_HOURS)]
   })
   // Fewer than 3 data points says little either way
   const starters = repository.starters?.nodes
   return {
     outsidePrMergeRate: outsidePrs.length >= 3 ? merged.length / outsidePrs.length : null,
     outsidePrsMerged90d: repository.closedPrs ? merged.filter(pr => pr.closedAt && Date.parse(pr.closedAt) >= since90d).length : null,
-    // Issues nobody on the team answered count as a very slow reply (two weeks)
-    maintainerResponseHours: outsideIssues.length >= 3
-      ? median([...responseHours, ...Array(outsideIssues.length - responseHours.length).fill(14 * 24)])
-      : null,
+    maintainerResponseHours: responseHours.length >= 3 ? median(responseHours) : null,
     unclaimedStarterIssues: starters
       ? starters.filter(i => (i.assignees?.totalCount ?? 0) === 0 && (i.closedByPullRequestsReferences?.totalCount ?? 0) === 0).length
       : null
@@ -131,10 +139,10 @@ const fetchApproachability = async (owner: string, repo: string, token: string):
         helpWanted: issues(states: OPEN, labels: $hw) { totalCount }
         ${contributingFields}
         closedPrs: pullRequests(last: 50, states: [MERGED, CLOSED], orderBy: { field: UPDATED_AT, direction: ASC }) {
-          nodes { authorAssociation merged closedAt }
+          nodes { authorAssociation author { __typename } merged closedAt }
         }
         recentIssues: issues(last: 20, orderBy: { field: CREATED_AT, direction: ASC }) {
-          nodes { authorAssociation createdAt comments(first: 10) { nodes { authorAssociation createdAt } } }
+          nodes { authorAssociation author { __typename } createdAt comments(first: 10) { nodes { authorAssociation createdAt } } }
         }
         starters: issues(first: 50, states: OPEN, labels: $gfi) {
           nodes { assignees { totalCount } closedByPullRequestsReferences(first: 1, includeClosedPrs: false) { totalCount } }

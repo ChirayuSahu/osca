@@ -50,16 +50,18 @@ const assertRepositoryVisible = async (repository: Repository, userId: string): 
 const queueRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const userId = requireUserId(req)
   const url = resolveRepositoryUrl(req.body)
+  await AnalysisRequestService.recordQueued(userId, url)
   const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId, false)
-  await AnalysisRequestService.recordQueued(userId, url, queued.jobId)
+  await AnalysisRequestService.setJobId(userId, url, queued.jobId)
   sendResponse(res, 202, true, 'Repository analysis queued', queued)
 })
 
 const queueForceRepositoryAnalysis = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const userId = requireUserId(req)
   const url = resolveRepositoryUrl(req.body)
+  await AnalysisRequestService.recordQueued(userId, url)
   const queued = await JobEnqueueService.enqueueRepositoryAnalysis(url, userId, true)
-  await AnalysisRequestService.recordQueued(userId, url, queued.jobId)
+  await AnalysisRequestService.setJobId(userId, url, queued.jobId)
   sendResponse(res, 202, true, 'Forced repository analysis queued', queued)
 })
 

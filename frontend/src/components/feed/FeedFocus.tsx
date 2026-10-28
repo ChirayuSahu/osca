@@ -109,9 +109,13 @@ export function FeedFocus({ items, token, hasMore, loadingMore, onNeedMore, onNo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item?.repository.id])
 
-  // Moving on without liking is a (weak) "not this"
+  // Moving on without liking is a (weak) "not this", counted once per card per visit
+  const skipped = useRef(new Set<string>())
   const next = useCallback(() => {
-    if (item && !liked[item.repository.id]) trackFeedItem(item, 'skip', 'focus', index)
+    if (item && !liked[item.repository.id] && !skipped.current.has(item.repository.id)) {
+      skipped.current.add(item.repository.id)
+      trackFeedItem(item, 'skip', 'focus', index)
+    }
     go(1)
   }, [item, liked, index, go])
 

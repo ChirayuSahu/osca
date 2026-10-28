@@ -120,7 +120,8 @@ export const INTEREST_AREAS: Record<string, string[]> = {
 export const keywordsForInterestAreas = (areas: string[]): Array<{ name: string; weight: number }> => {
   const seen = new Map<string, number>()
   for (const area of areas) {
-    for (const word of INTEREST_AREAS[area] ?? []) {
+    if (!Object.hasOwn(INTEREST_AREAS, area)) continue
+    for (const word of INTEREST_AREAS[area]) {
       // Same normalization as project keywords, so the two sides match
       const w = normalize(word)
       if (w) seen.set(w, 2)

@@ -114,6 +114,8 @@ type GraphFeedParams = {
   weights: typeof config.recommendation
   filters: FeedFilters
   seed: number | null
+  /** Settings that shape the ranking (not learned weights), for the visit's cache key */
+  settingsKey: string
 }
 
 const toNum = (value: unknown): number => {
@@ -251,23 +253,33 @@ const EXPLORE_FROM_RANK = 60
 const interleaveExploration = (items: RankedRepo[], seed: number): RankedRepo[] => {
   if (items.length <= EXPLORE_FROM_RANK) return items
   const head = items.slice(0, EXPLORE_FROM_RANK)
-  const pool = items.slice(EXPLORE_FROM_RANK).sort((a, b) => seededNoise(seed + 1, b.repositoryId) - seededNoise(seed + 1, a.repositoryId))
+  const rest = items.slice(EXPLORE_FROM_RANK)
+  // Picks come from a shuffled copy; everything not picked keeps its ranked order
+  const shuffled = [...rest].sort((a, b) => seededNoise(seed + 1, b.repositoryId) - seededNoise(seed + 1, a.repositoryId))
+  const picked = new Set<string>()
   const out: RankedRepo[] = []
   for (const item of head) {
-    if ((out.length + 1) % EXPLORE_EVERY === 0 && pool.length > 0) {
+    if ((out.length + 1) % EXPLORE_EVERY === 0) {
       const prev = out[out.length - 1]?.primaryLanguage ?? null
-      const idx = Math.max(0, pool.findIndex(p => p.primaryLanguage !== prev))
-      out.push({ ...pool.splice(idx, 1)[0], explore: true })
+      const pick = shuffled.find(p => !picked.has(p.repositoryId) && p.primaryLanguage !== prev)
+        ?? shuffled.find(p => !picked.has(p.repositoryId))
+      if (pick) {
+        picked.add(pick.repositoryId)
+        out.push({ ...pick, explore: true })
+      }
     }
     out.push(item)
   }
-  return [...out, ...pool]
+  return [...out, ...rest.filter(r => !picked.has(r.repositoryId))]
 }
 
 const RANKING_CACHE_SECONDS = 10 * 60
-const rankingCacheKey = (userId: string, seed: number, filters: FeedFilters, weights: Record<string, number>): string => {
-  // Anything that changes the ranking is part of the key, so new settings take effect at once
-  const parts = JSON.stringify([filters.language ?? '', !!filters.beginnerOnly, filters.preferredLanguages ?? [], filters.excludedLanguages ?? [], weights])
+// Keyed on the visit and the user's settings, so changing a setting re-ranks at
+// once. Learned weights are left out on purpose: they shift with every event,
+// and re-ranking mid-visit would reorder pages the user is scrolling through
+// (they apply from the next visit).
+const rankingCacheKey = (userId: string, seed: number, filters: FeedFilters, settingsKey: string): string => {
+  const parts = JSON.stringify([filters.language ?? '', !!filters.beginnerOnly, filters.preferredLanguages ?? [], filters.excludedLanguages ?? [], settingsKey])
   let h = 2166136261
   for (let i = 0; i < parts.length; i++) h = Math.imul(h ^ parts.charCodeAt(i), 16777619) >>> 0
   return `feed:ranked:${userId}:${seed}:${h.toString(36)}`
@@ -355,7 +367,7 @@ const recordShown = async (userId: string, repoIds: string[]) => {
 // Each component is squashed into [0, 1] before weighting so the configured
 // weights actually control the blend (raw skill scores are 0–100+ while the
 // collaborative/topic signals are small counts).
-const runGraphFeed = async (session: Session, { userId, githubId, page, limit, skip, weights, filters, seed }: GraphFeedParams) => {
+const runGraphFeed = async (session: Session, { userId, githubId, page, limit, skip, weights, filters, seed, settingsKey }: GraphFeedParams) => {
   const filterParams = {
     language: filters.language ? filters.language.toLowerCase() : null,
     beginnerOnly: !!filters.beginnerOnly,
@@ -421,7 +433,9 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
     CALL {
       WITH u, r
       OPTIONAL MATCH (u)-[i:INTERESTED_IN]->(k:Keyword)<-[:HAS_KEYWORD]-(r)
-      RETURN sum(coalesce(i.weight, 1.0)) AS keywordSum, collect(k.name)[..3] AS sharedKeywords
+      // No match still yields one row with k = null: that row must add nothing
+      RETURN sum(CASE WHEN k IS NULL THEN 0.0 ELSE coalesce(i.weight, 1.0) END) AS keywordSum,
+             collect(DISTINCT k.name)[..3] AS sharedKeywords
     }
 
     WITH r, primaryLanguage, bestLang, sharedTopics, sharedKeywords, collabCount, contentScore,
@@ -488,7 +502,7 @@ const runGraphFeed = async (session: Session, { userId, githubId, page, limit, s
 
   // A visit's full ranking is computed once and cached: later pages of infinite
   // scroll read it instead of re-scoring up to MAX_RANKED candidates each time
-  const rankingKey = seed !== null ? rankingCacheKey(userId, seed, filters, weights) : null
+  const rankingKey = seed !== null ? rankingCacheKey(userId, seed, filters, settingsKey) : null
   const cachedRanking = rankingKey ? await redisClient.get(rankingKey).catch(() => null) : null
   const ranked: RankedRepo[] = cachedRanking ? JSON.parse(cachedRanking) : await (async () => {
     const result = await session.run(cypher, {
@@ -611,6 +625,7 @@ export const generateFeed = async (
       experienceLevel: true,
       preferredLanguages: true,
       excludedLanguages: true,
+      interestAreas: true,
       rankingTuning: true
     }
   })
@@ -642,7 +657,8 @@ export const generateFeed = async (
   }
 
   try {
-    return await withSession(session => runGraphFeed(session, { userId, githubId, page, limit, skip, weights, filters, seed }))
+    const settingsKey = JSON.stringify([user.experienceLevel, user.interestAreas])
+    return await withSession(session => runGraphFeed(session, { userId, githubId, page, limit, skip, weights, filters, seed, settingsKey }))
   } catch (error) {
     console.error(`[RecommendationEngine] Failed to generate feed from Neo4j for user ${userId}:`, error)
     return fallbackFeed(userId, page, limit, filters)

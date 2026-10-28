@@ -117,6 +117,13 @@ export const createRepositoryWorker = (): Worker => {
 
   worker.on('failed', (job, err) => {
     console.error(`[RepositoryWorker] Job ${job?.id} failed: ${err.message}`)
+    // Covers failures the processor never saw (e.g. stalled past BullMQ's limit),
+    // so a request can't sit at "analyzing" for good
+    if (job && job.attemptsMade >= (job.opts.attempts ?? 1)) {
+      AnalysisRequestService.setStatus(job.data.userId, job.data.url, 'failed', {
+        error: friendlyAnalysisError(err)
+      }).catch(() => {})
+    }
   })
 
   worker.on('error', (err) => {

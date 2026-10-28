@@ -93,7 +93,7 @@ const updateUser = asyncHandler(async (req: RequestWithUser, res: Response) => {
   }
   if (req.body.interestAreas !== undefined) {
     const areas = req.body.interestAreas
-    if (!Array.isArray(areas) || areas.some(a => typeof a !== 'string' || !(a in INTEREST_AREAS))) {
+    if (!Array.isArray(areas) || areas.some(a => typeof a !== 'string' || !Object.hasOwn(INTEREST_AREAS, a))) {
       throw new AppError(`interestAreas must be a list of: ${Object.keys(INTEREST_AREAS).join(', ')}`, 400)
     }
     data.interestAreas = [...new Set(areas as string[])]

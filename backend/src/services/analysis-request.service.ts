@@ -9,14 +9,25 @@ const fullNameOf = (url: string): string => {
   return `${owner}/${repo}`
 }
 
-// Called when a user queues an analysis (again): back to "queued", error cleared
-const recordQueued = async (userId: string, url: string, jobId: string): Promise<void> => {
+// Called before the job is queued, so the worker's status updates always find
+// the row (a fast job can finish before the enqueue call returns). A request
+// that's already being analyzed keeps that status instead of going back to queued.
+const recordQueued = async (userId: string, url: string): Promise<void> => {
   const fullName = fullNameOf(url)
   await prisma.analysisRequest.upsert({
     where: { userId_fullName: { userId, fullName } },
-    create: { userId, url, fullName, jobId },
-    update: { url, jobId, status: 'queued', error: null }
+    create: { userId, url, fullName },
+    update: { url }
   })
+  await prisma.analysisRequest.updateMany({
+    where: { userId, fullName, status: { not: 'analyzing' } },
+    data: { status: 'queued', error: null }
+  })
+}
+
+// The job id, for live progress; status is left to the worker
+const setJobId = async (userId: string, url: string, jobId: string): Promise<void> => {
+  await prisma.analysisRequest.updateMany({ where: { userId, fullName: fullNameOf(url) }, data: { jobId } })
 }
 
 // Worker updates; no-ops for system (seed) jobs and requests the user dismissed
@@ -56,6 +67,7 @@ const dismiss = async (userId: string, id: string): Promise<boolean> => {
 
 export const AnalysisRequestService = {
   recordQueued,
+  setJobId,
   setStatus,
   listOpen,
   dismiss
