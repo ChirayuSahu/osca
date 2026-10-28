@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/auth-context";
 import { CommentService } from "@/services/comment.service";
+import { isGithubTokenError } from "@/lib/api";
 import { ArrowUp, ChevronDown, MessageSquare, Trash2 } from "lucide-react";
 import { Markdown } from "@/components/markdown-lazy";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,7 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
       setNewComment("");
     } catch (err) {
       console.error(err);
-      toast.error("Couldn't post your comment");
+      toast.error(isGithubTokenError(err) ? "Reconnect GitHub to comment." : "Couldn't post your comment");
     } finally {
       setSubmitting(false);
     }
@@ -87,7 +88,7 @@ export default function CommentSection({ owner, repo, threadId }: { owner: strin
       toast.success("Comment deleted");
     } catch (err) {
       console.error(err);
-      toast.error("Couldn't delete the comment");
+      toast.error(isGithubTokenError(err) ? "Reconnect GitHub to delete comments." : "Couldn't delete the comment");
     } finally {
       setDeleting(false);
       setPendingDelete(null);

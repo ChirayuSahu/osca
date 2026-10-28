@@ -42,7 +42,7 @@ export default function HeroSection() {
             </a>
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Free and open source. Read-only access to your public profile.</p>
+        <p className="text-xs text-muted-foreground">Free and open source. No access to your private repositories.</p>
       </div>
     </section>
   );
