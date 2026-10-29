@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { EyeOff, Star } from "lucide-react";
@@ -48,6 +48,9 @@ const VIEW_OPTIONS = [
   { value: "focus", label: "One by one" },
 ] as const satisfies readonly { value: FeedView; label: string }[];
 
+// Quick clicks within this long of each other go out as one save
+const RECOMMENDATION_SAVE_DELAY_MS = 600;
+
 const HEADER = <PageHeader title={<em>Settings</em>} description="Your profile's visibility, what you're recommended, and your account." />;
 
 /* ─── Layout pieces ────────────────────────────────────────────────────────── */
@@ -57,12 +60,15 @@ function Section({
   title,
   description,
   danger,
+  status,
   children,
 }: {
   id: string;
   title: string;
   description?: string;
   danger?: boolean;
+  /** Small note beside the title, e.g. "Saving…" */
+  status?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -72,7 +78,10 @@ function Section({
       className={cn("scroll-mt-6 rounded-md border bg-card", danger ? "border-destructive/40" : "border-border")}
     >
       <div className="border-b border-border px-5 py-4 sm:px-6">
-        <h2 className={cn("text-base font-semibold tracking-tight", danger && "text-destructive")}>{title}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={cn("text-base font-semibold tracking-tight", danger && "text-destructive")}>{title}</h2>
+          {status}
+        </div>
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       <div className="divide-y divide-border">{children}</div>
@@ -199,10 +208,47 @@ export default function SettingsPage() {
     }
   };
 
+  // Recommendation settings change the ranking, so quick clicks are collected and
+  // sent as one save shortly after the last one; the section is locked while it sends
+  type RecommendationPatch = Partial<Pick<UserSettings, "interestAreas" | "experienceLevel" | "preferredLanguages" | "excludedLanguages">>;
+  const pending = useRef<RecommendationPatch>({});
+  const timer = useRef<number | undefined>(undefined);
+  const [savingRecommendations, setSavingRecommendations] = useState(false);
+
+  const flushRecommendations = useCallback(async () => {
+    window.clearTimeout(timer.current);
+    const patch = pending.current;
+    pending.current = {};
+    if (!user?.id || !token || Object.keys(patch).length === 0) return;
+    setSavingRecommendations(true);
+    try {
+      await UserService.updateSettings(user.id, patch, token);
+      updateUser(patch);
+    } catch (err) {
+      // Show what the server actually has rather than guessing what to undo
+      toast.error(err instanceof Error ? err.message : "Couldn't save those settings.");
+      load();
+    } finally {
+      setSavingRecommendations(false);
+    }
+  }, [user?.id, token, updateUser, load]);
+
+  const queueRecommendation = (patch: RecommendationPatch) => {
+    setSettings((current) => (current ? { ...current, ...patch } : current));
+    pending.current = { ...pending.current, ...patch };
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => void flushRecommendations(), RECOMMENDATION_SAVE_DELAY_MS);
+  };
+
+  // Leaving the page within the delay still saves what was picked
+  const flushRef = useRef(flushRecommendations);
+  flushRef.current = flushRecommendations;
+  useEffect(() => () => void flushRef.current(), []);
+
   const toggleLanguage = (list: "preferredLanguages" | "excludedLanguages", language: string) => {
     if (!settings) return;
     const current = settings[list];
-    save({ [list]: current.includes(language) ? current.filter((l) => l !== language) : [...current, language] });
+    queueRecommendation({ [list]: current.includes(language) ? current.filter((l) => l !== language) : [...current, language] });
   };
 
   const restore = async (repo: HiddenRepository) => {
@@ -289,12 +335,25 @@ export default function SettingsPage() {
             />
           </Section>
 
-          <Section id="recommendations" title="Recommendations" description="Shapes what For you and OscaBot suggest.">
+          <Section
+            id="recommendations"
+            title="Recommendations"
+            description="Shapes what For you and OscaBot suggest."
+            status={
+              savingRecommendations && (
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+                  <Spinner className="size-3.5" /> Saving…
+                </span>
+              )
+            }
+          >
+            {/* No clicks while a save is on its way; they'd race it */}
+            <div inert={savingRecommendations} aria-busy={savingRecommendations} className="divide-y divide-border">
             <Row title="What you want to work on" description="Projects in these areas rank higher.">
               <InterestPicker
                 selected={settings.interestAreas}
                 onToggle={(area) =>
-                  save({
+                  queueRecommendation({
                     interestAreas: settings.interestAreas.includes(area)
                       ? settings.interestAreas.filter((a) => a !== area)
                       : [...settings.interestAreas, area],
@@ -306,7 +365,7 @@ export default function SettingsPage() {
               <SegmentedControl
                 aria-label="Experience level"
                 value={settings.experienceLevel}
-                onValueChange={(experienceLevel) => save({ experienceLevel })}
+                onValueChange={(experienceLevel) => queueRecommendation({ experienceLevel })}
                 options={EXPERIENCE_OPTIONS}
                 className="self-start"
               />
@@ -329,6 +388,7 @@ export default function SettingsPage() {
                 onToggle={(l) => toggleLanguage("excludedLanguages", l)}
               />
             </Row>
+            </div>
           </Section>
 
           <Section id="feed" title="For you" description="How your recommendations are laid out.">
