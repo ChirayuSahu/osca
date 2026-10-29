@@ -74,50 +74,44 @@ const listIssues = async (userId: string, owner: string, repo: string, page: num
   const token = await getGithubAccessToken(userId)
   
   const response = await fetchGithub(`/repos/${owner}/${repo}/issues?page=${page}&per_page=${limit}&state=all`, { token })
+  // One GitHub call per page: sub-issues aren't shown anywhere, and fetching them
+  // cost an extra call per issue on every page view
   const issues = await response.json()
-  
-  let issuesWithSubIssues = issues
-  if (Array.isArray(issues)) {
-    issuesWithSubIssues = await Promise.all(issues.map(async (issue: any) => {
-      try {
-        const subRes = await fetchGithub(`/repos/${owner}/${repo}/issues/${issue.number}/sub_issues`, { token })
-        if (subRes.ok) {
-          issue.sub_issues = await subRes.json()
-        } else {
-          issue.sub_issues = []
-        }
-      } catch {
-        issue.sub_issues = []
-      }
-      return issue
-    }))
-  }
 
   const totalPages = totalPagesFromLink(response.headers.get('Link') ?? response.headers.get('link'), page)
   
-  return { issues: issuesWithSubIssues, page, limit, totalPages }
+  return { issues, page, limit, totalPages }
+}
+
+type ViewerReactionsResponse = {
+  data?: { repository?: { issueOrPullRequest?: { reactionGroups?: { content: string; viewerHasReacted: boolean }[] } | null } | null }
+}
+
+// The caller's own reactions on one issue, looked up by number so it can run
+// alongside the issue request instead of after it
+const viewerReactionsByNumber = async (owner: string, repo: string, issueNumber: number, token: string): Promise<ReactionContent[]> => {
+  try {
+    const res = await githubGraphQL<ViewerReactionsResponse>(
+      'query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issueOrPullRequest(number: $number) { ... on Reactable { reactionGroups { content viewerHasReacted } } } } }',
+      token,
+      { owner, name: repo, number: issueNumber }
+    )
+    const groups = res.data?.repository?.issueOrPullRequest?.reactionGroups ?? []
+    return groups.filter((g) => g.viewerHasReacted).map((g) => GRAPHQL_REACTIONS[g.content]).filter(Boolean)
+  } catch {
+    // Counts still show; the caller's own reactions just aren't highlighted
+    return []
+  }
 }
 
 const getIssue = async (userId: string, owner: string, repo: string, issueNumber: number) => {
   const token = await getGithubAccessToken(userId)
-  const response = await fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}`, { token, accept: FULL_ACCEPT })
+  const [response, viewerReactions] = await Promise.all([
+    fetchGithubWithAccept(`/repos/${owner}/${repo}/issues/${issueNumber}`, { token, accept: FULL_ACCEPT }),
+    viewerReactionsByNumber(owner, repo, issueNumber, token)
+  ])
   const issue = await response.json()
-  
-  if (response.ok && issue) {
-    try {
-      const subRes = await fetchGithub(`/repos/${owner}/${repo}/issues/${issue.number}/sub_issues`, { token })
-      if (subRes.ok) {
-        issue.sub_issues = await subRes.json()
-      } else {
-        issue.sub_issues = []
-      }
-    } catch {
-      issue.sub_issues = []
-    }
-  }
-  
-  const [withReactions] = await withViewerReactions([issue], token)
-  return withReactions
+  return { ...issue, viewer_reactions: viewerReactions }
 }
 
 const listIssueComments = async (userId: string, owner: string, repo: string, issueNumber: number, page: number, limit: number) => {

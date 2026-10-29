@@ -161,7 +161,8 @@ const listNotInterested = asyncHandler(async (req: RequestWithUser, res: Respons
 
 const CONTRIBUTIONS_STALE_MS = 6 * 60 * 60 * 1000
 
-// Your public PRs and which ones OSCA led to; refreshed first if the last check is old
+// Your public PRs and which ones OSCA led to. The first visit waits for a sync;
+// after that the stored list answers at once and an old one refreshes in the background.
 const getContributions = asyncHandler(async (req: RequestWithUser, res: Response) => {
   const id = String(req.params.id)
   requireSelf(req, id)
@@ -171,7 +172,8 @@ const getContributions = asyncHandler(async (req: RequestWithUser, res: Response
   )
   const stale = !user.contributionsSyncedAt || Date.now() - user.contributionsSyncedAt.getTime() > CONTRIBUTIONS_STALE_MS
   if (stale && !user.githubTokenInvalidAt) {
-    await syncContributions(id).catch(err => console.error(`[Users] Contribution sync failed for ${id}:`, err))
+    const sync = syncContributions(id).catch(err => console.error(`[Users] Contribution sync failed for ${id}:`, err))
+    if (!user.contributionsSyncedAt) await sync
   }
   sendResponse(res, 200, true, 'Contributions retrieved successfully', await listContributions(id))
 })

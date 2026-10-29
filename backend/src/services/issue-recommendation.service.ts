@@ -7,12 +7,17 @@ import { generateFeed } from './recommendation-engine.service'
 import type { Reason } from './recommendation-reasons'
 
 // "Your next issue": open starter issues nobody has claimed, from the repos the
-// feed ranks highest for this user. One GraphQL call covers every repo.
+// feed ranks highest for this user, read from GitHub in small parallel batches.
 
 const REPOS_CONSIDERED = 15
 const ISSUES_PER_REPO = 8
 const MAX_PER_REPO = 3
-const CACHE_SECONDS = 15 * 60
+// A list is fresh for 15 minutes; after that it's still served at once while a
+// new one is built in the background, and dropped entirely after a day
+const FRESH_MS = 15 * 60 * 1000
+const KEEP_SECONDS = 24 * 60 * 60
+// One big query for every repo is slow on GitHub's side; small batches in parallel answer much sooner
+const REPOS_PER_QUERY = 5
 const DAY_MS = 24 * 60 * 60 * 1000
 
 type IssueNode = {
@@ -68,8 +73,8 @@ const compute = async (userId: string): Promise<IssueRecommendation[]> => {
   const token = await getGithubAccessToken(userId).catch(() => config.githubServerToken)
   if (!token) return []
 
-  const fields = feed.map(({ repository }, i) => `
-    r${i}: repository(owner: ${JSON.stringify(repository.owner)}, name: ${JSON.stringify(repository.name)}) {
+  const field = (owner: string, name: string, i: number) => `
+    r${i}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(name)}) {
       issues(first: ${ISSUES_PER_REPO}, states: OPEN, labels: $labels, orderBy: { field: CREATED_AT, direction: DESC }) {
         nodes {
           number title url createdAt
@@ -79,21 +84,32 @@ const compute = async (userId: string): Promise<IssueRecommendation[]> => {
           labels(first: 6) { nodes { name color } }
         }
       }
-    }`).join('\n')
+    }`
   type IssuesResponse = { data?: Record<string, { issues?: { nodes?: IssueNode[] } } | null> }
-  const query = `query($labels: [String!]) { ${fields} }`
   const variables = { labels: GOOD_FIRST_ISSUE_LABELS }
-  let res: IssuesResponse
-  try {
-    res = await githubGraphQL<IssuesResponse>(query, token, variables)
-  } catch (error) {
-    // The user's token was revoked or ran out: note it (reconnect banner) and
-    // answer with the server's token rather than failing every visit
-    await noteGithubTokenError(userId, error).catch(() => false)
-    const fallback = config.githubServerToken
-    if (!fallback || fallback === token) throw error
-    res = await githubGraphQL<IssuesResponse>(query, fallback, variables)
+  const run = async (query: string): Promise<IssuesResponse> => {
+    try {
+      return await githubGraphQL<IssuesResponse>(query, token, variables)
+    } catch (error) {
+      // The user's token was revoked or ran out: note it (reconnect banner) and
+      // answer with the server's token rather than failing every visit
+      await noteGithubTokenError(userId, error).catch(() => false)
+      const fallback = config.githubServerToken
+      if (!fallback || fallback === token) throw error
+      return githubGraphQL<IssuesResponse>(query, fallback, variables)
+    }
   }
+  // Aliases keep each repo's index (r0, r1, …), so the batches merge back into one result
+  const batches: string[] = []
+  for (let start = 0; start < feed.length; start += REPOS_PER_QUERY) {
+    const fields = feed
+      .slice(start, start + REPOS_PER_QUERY)
+      .map(({ repository }, j) => field(repository.owner, repository.name, start + j))
+      .join('\n')
+    batches.push(`query($labels: [String!]) { ${fields} }`)
+  }
+  const results = await Promise.all(batches.map(run))
+  const res: IssuesResponse = { data: Object.assign({}, ...results.map(r => r.data ?? {})) }
 
   const perRepo: IssueRecommendation[][] = []
   feed.forEach(({ repository, scoreInfo }, i) => {
@@ -131,12 +147,38 @@ const compute = async (userId: string): Promise<IssueRecommendation[]> => {
   return picks
 }
 
-/** Starter issues for this user, best first; cached for 15 minutes */
+type CachedIssues = { builtAt: number; issues: IssueRecommendation[] }
+
+// One rebuild per user at a time, so parallel visits don't all hit GitHub
+const rebuilding = new Map<string, Promise<IssueRecommendation[]>>()
+const rebuild = (userId: string): Promise<IssueRecommendation[]> => {
+  const running = rebuilding.get(userId)
+  if (running) return running
+  const job = compute(userId)
+    .then(async issues => {
+      const entry: CachedIssues = { builtAt: Date.now(), issues }
+      await redisClient.set(cacheKey(userId), JSON.stringify(entry), 'EX', KEEP_SECONDS).catch(() => {})
+      return issues
+    })
+    .finally(() => rebuilding.delete(userId))
+  rebuilding.set(userId, job)
+  return job
+}
+
+/**
+ * Starter issues for this user, best first. Only the first visit waits for
+ * GitHub: a list older than 15 minutes is served as is and rebuilt behind it.
+ */
 export const getIssueRecommendations = async (userId: string, limit = 30): Promise<IssueRecommendation[]> => {
-  const cached = await redisClient.get(cacheKey(userId)).catch(() => null)
-  const issues: IssueRecommendation[] = cached ? JSON.parse(cached) : await compute(userId)
-  if (!cached) await redisClient.set(cacheKey(userId), JSON.stringify(issues), 'EX', CACHE_SECONDS).catch(() => {})
-  return issues.slice(0, limit)
+  const raw = await redisClient.get(cacheKey(userId)).catch(() => null)
+  const cached = raw ? (JSON.parse(raw) as Partial<CachedIssues>) : null
+  if (cached && Array.isArray(cached.issues)) {
+    if (Date.now() - (cached.builtAt ?? 0) > FRESH_MS) {
+      void rebuild(userId).catch(err => console.error(`[NextIssues] Background rebuild failed for ${userId}:`, err))
+    }
+    return cached.issues.slice(0, limit)
+  }
+  return (await rebuild(userId)).slice(0, limit)
 }
 
 // Settings that change the ranking make the cached list stale
